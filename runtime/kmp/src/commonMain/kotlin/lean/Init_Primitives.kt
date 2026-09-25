@@ -12,16 +12,95 @@
 
 package lean
 
+import lean.runtime.LeanArray
+import lean.runtime.LeanClosure
 import lean.runtime.LeanCtor
 import lean.runtime.LeanNat
 import lean.runtime.LeanObject
 import lean.runtime.LeanString
+import lean.runtime.LeanThunk
 import kotlin.jvm.JvmStatic
 
 /**
  * Kotlin Multiplatform runtime primitives for Lean's standard `Init` library modules.
  */
 public object mod_l_Init_Prelude {
+    @JvmStatic
+    public fun f_Array_mkEmpty(type: LeanObject?, capacity: LeanObject?): LeanObject = LeanArray.empty()
+
+    @JvmStatic
+    public fun f_Array_emptyWithCapacity(type: LeanObject?, capacity: LeanObject?): LeanObject = LeanArray.empty()
+
+    @JvmStatic
+    public fun f_Array_push(type: LeanObject?, arr: LeanObject?, v: LeanObject?): LeanObject {
+        return (arr as? LeanArray)?.push(v) ?: LeanArray.of(v)
+    }
+
+    @JvmStatic
+    public fun f_Array_size(type: LeanObject?, arr: LeanObject?): LeanObject {
+        val sz = (arr as? LeanArray)?.size()?.toLong() ?: 0L
+        return LeanNat.ofLong(sz)
+    }
+
+    @JvmStatic
+    public fun f_Array_getInternal(type: LeanObject?, arr: LeanObject?, i: LeanObject?, h: LeanObject?): LeanObject? {
+        val idx = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_getInternalBorrowed(type: LeanObject?, arr: LeanObject?, i: LeanObject?, h: LeanObject?): LeanObject? {
+        val idx = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_get_x21Internal(type: LeanObject?, inst: LeanObject?, arr: LeanObject?, i: LeanObject?): LeanObject? {
+        val idx = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_get_x21InternalBorrowed(type: LeanObject?, inst: LeanObject?, arr: LeanObject?, i: LeanObject?): LeanObject? {
+        val idx = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_mk(type: LeanObject?, list: LeanObject?): LeanObject {
+        val elems = mutableListOf<LeanObject?>()
+        var curr = list
+        while (curr != null && curr.tag != 0) {
+            val ctor = curr as? LeanCtor ?: break
+            elems.add(ctor.getObj(0))
+            curr = ctor.getObj(1)
+        }
+        val arr = arrayOfNulls<LeanObject>(elems.size)
+        for (i in elems.indices) arr[i] = elems[i]
+        return LeanArray(arr)
+    }
+
+    @JvmStatic
+    public fun f_Array_toList(type: LeanObject?, arr: LeanObject?): LeanObject {
+        val a = arr as? LeanArray ?: return LeanCtor(0)
+        var list: LeanObject = LeanCtor(0)
+        for (i in a.data.indices.reversed()) {
+            list = LeanCtor(1, arrayOf(a.data[i], list))
+        }
+        return list
+    }
+
+    @JvmStatic
+    public fun f_List_lengthTR___redArg(asObj: LeanObject?): LeanObject {
+        var count = 0L
+        var curr = asObj
+        while (curr != null && curr.tag != 0) {
+            val ctor = curr as? LeanCtor ?: break
+            count++
+            curr = ctor.getObj(1)
+        }
+        return LeanNat.ofLong(count)
+    }
     @JvmStatic
     public fun f_Nat_add(a: LeanObject?, b: LeanObject?): LeanObject {
         val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
@@ -316,3 +395,112 @@ public object mod_l_Init_Data_Repr {
     public fun f_Option_repr___redArg(inst: LeanObject?, opt: LeanObject?, prec: LeanObject?): LeanObject =
         LeanString.of(opt?.toString() ?: "none")
 }
+
+public object mod_l_Init_Data_Array_Basic {
+    @JvmStatic
+    public fun f_Array_swap(type: LeanObject?, arr: LeanObject?, i: LeanObject?, j: LeanObject?, h1: LeanObject?, h2: LeanObject?): LeanObject {
+        val a = arr as? LeanArray ?: return LeanArray.empty()
+        val idxI = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        val idxJ = if (j is LeanNat) j.smallVal.toInt() else j?.tag ?: 0
+        val copy = a.data.copyOf()
+        val tmp = copy[idxI]
+        copy[idxI] = copy[idxJ]
+        copy[idxJ] = tmp
+        return LeanArray(copy)
+    }
+
+    @JvmStatic
+    public fun f_Array_fswap(type: LeanObject?, arr: LeanObject?, i: LeanObject?, j: LeanObject?, h1: LeanObject?, h2: LeanObject?): LeanObject =
+        f_Array_swap(type, arr, i, j, h1, h2)
+
+    @JvmStatic
+    public fun f_Array_uget(type: LeanObject?, arr: LeanObject?, usize: LeanObject?, h: LeanObject?): LeanObject? {
+        val idx = (usize as? LeanNat)?.smallVal?.toInt() ?: usize?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_uget_borrowed(type: LeanObject?, arr: LeanObject?, usize: LeanObject?): LeanObject? {
+        val idx = (usize as? LeanNat)?.smallVal?.toInt() ?: usize?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_uset(type: LeanObject?, arr: LeanObject?, usize: LeanObject?, v: LeanObject?, h: LeanObject?): LeanObject {
+        val a = arr as? LeanArray ?: return LeanArray.empty()
+        val idx = (usize as? LeanNat)?.smallVal?.toInt() ?: usize?.tag ?: 0
+        val copy = a.data.copyOf()
+        copy[idx] = v
+        return LeanArray(copy)
+    }
+
+    @JvmStatic
+    public fun f_Array_pop(type: LeanObject?, arr: LeanObject?): LeanObject {
+        val a = arr as? LeanArray ?: return LeanArray.empty()
+        if (a.data.isEmpty()) return a
+        return LeanArray(a.data.copyOf(a.data.size - 1))
+    }
+}
+
+public object mod_l_Init_Data_Array_Set {
+    @JvmStatic
+    public fun f_Array_set(type: LeanObject?, arr: LeanObject?, i: LeanObject?, v: LeanObject?, h: LeanObject?): LeanObject {
+        val a = arr as? LeanArray ?: return LeanArray.empty()
+        val idx = if (i is LeanNat) i.smallVal.toInt() else i?.tag ?: 0
+        val copy = a.data.copyOf()
+        copy[idx] = v
+        return LeanArray(copy)
+    }
+
+    @JvmStatic
+    public fun f_Array_fset(type: LeanObject?, arr: LeanObject?, i: LeanObject?, v: LeanObject?, h: LeanObject?): LeanObject =
+        f_Array_set(type, arr, i, v, h)
+}
+
+public object mod_l_Init_Data_List_Basic {
+    @JvmStatic
+    public fun f_List_replicateTR___redArg(n: LeanObject?, elem: LeanObject?): LeanObject {
+        val count = (n as? LeanNat)?.smallVal?.toInt() ?: 0
+        var res: LeanObject = LeanCtor(0)
+        for (i in 0 until count) {
+            res = LeanCtor(1, arrayOf(elem, res))
+        }
+        return res
+    }
+
+    @JvmStatic
+    public fun f_List_appendTR___redArg(asObj: LeanObject?, bsObj: LeanObject?): LeanObject {
+        val elems = mutableListOf<LeanObject?>()
+        var curr = asObj
+        while (curr != null && curr.tag != 0) {
+            val ctor = curr as? LeanCtor ?: break
+            elems.add(ctor.getObj(0))
+            curr = ctor.getObj(1)
+        }
+        var res: LeanObject = bsObj ?: LeanCtor(0)
+        for (i in elems.indices.reversed()) {
+            res = LeanCtor(1, arrayOf(elems[i], res))
+        }
+        return res
+    }
+}
+
+public object mod_l_Init_Core {
+    @JvmStatic
+    public fun f_Thunk_mk(type: LeanObject?, closure: LeanObject?): LeanObject {
+        return LeanThunk.alloc(closure as? LeanClosure)
+    }
+
+    @JvmStatic
+    public fun f_Thunk_get(type: LeanObject?, thunk: LeanObject?): LeanObject? {
+        return (thunk as? LeanThunk)?.get()
+    }
+
+    @JvmStatic
+    public fun f_Thunk_pure(type: LeanObject?, value: LeanObject?): LeanObject {
+        return LeanThunk.pure(value)
+    }
+}
+
+
+
