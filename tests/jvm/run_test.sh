@@ -215,7 +215,7 @@ case "$TEST_BASE" in
   closure_curry_chain)
     if [[ -f "lean/test/ClosureCurryRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureCurryRunner)
-      rm -f lean/test/ClosureCurryRunner.class lean/mod_l_lean_test_ClosureCurryModule.class lean/test/ClosureCurryModule.lean
+      rm -f lean/test/ClosureCurryRunner.class lean/mod_l_lean_test_ClosureCurryModule*.class lean/test/ClosureCurryModule.lean
       if [[ "$OUTPUT" != "70" ]]; then
         fail "ClosureCurryRunner failed: expected '70', got '$OUTPUT'"
       fi
@@ -224,7 +224,7 @@ case "$TEST_BASE" in
   closure_capture_ctor)
     if [[ -f "lean/test/ClosureCaptureCtorRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureCaptureCtorRunner)
-      rm -f lean/test/ClosureCaptureCtorRunner.class lean/mod_l_lean_test_ClosureCaptureCtorModule.class lean/test/ClosureCaptureCtorModule.lean
+      rm -f lean/test/ClosureCaptureCtorRunner.class lean/mod_l_lean_test_ClosureCaptureCtorModule*.class lean/test/ClosureCaptureCtorModule.lean
       if [[ "$OUTPUT" != "37" ]]; then
         fail "ClosureCaptureCtorRunner failed: expected '37', got '$OUTPUT'"
       fi
@@ -233,7 +233,7 @@ case "$TEST_BASE" in
   closure_in_loop)
     if [[ -f "lean/test/ClosureInLoopRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureInLoopRunner)
-      rm -f lean/test/ClosureInLoopRunner.class lean/mod_l_lean_test_ClosureInLoopModule.class lean/test/ClosureInLoopModule.lean
+      rm -f lean/test/ClosureInLoopRunner.class lean/mod_l_lean_test_ClosureInLoopModule*.class lean/test/ClosureInLoopModule.lean
       if [[ "$OUTPUT" != "15" ]]; then
         fail "ClosureInLoopRunner failed: expected '15', got '$OUTPUT'"
       fi
@@ -242,7 +242,7 @@ case "$TEST_BASE" in
   expr_diff)
     if [[ -f "lean/test/ExprDiffRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ExprDiffRunner)
-      rm -f lean/test/ExprDiffRunner.class lean/mod_l_lean_test_ExprDiffModule.class lean/test/ExprDiffModule.lean
+      rm -f lean/test/ExprDiffRunner.class lean/mod_l_lean_test_ExprDiffModule*.class lean/test/ExprDiffModule.lean
       if [[ "$OUTPUT" != "5" ]]; then
         fail "ExprDiffRunner failed: expected '5', got '$OUTPUT'"
       fi
@@ -251,7 +251,7 @@ case "$TEST_BASE" in
   tree_map)
     if [[ -f "lean/test/TreeMapRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.TreeMapRunner)
-      rm -f lean/test/TreeMapRunner.class lean/mod_l_lean_test_TreeMapModule.class lean/test/TreeMapModule.lean
+      rm -f lean/test/TreeMapRunner.class lean/mod_l_lean_test_TreeMapModule*.class lean/test/TreeMapModule.lean
       if [[ "$OUTPUT" != "430" ]]; then
         fail "TreeMapRunner failed: expected '430', got '$OUTPUT'"
       fi
@@ -260,7 +260,7 @@ case "$TEST_BASE" in
   lazylist_fib)
     if [[ -f "lean/test/LazyListRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.LazyListRunner)
-      rm -f lean/test/LazyListRunner.class lean/mod_l_lean_test_LazyListModule.class lean/test/LazyListModule.lean
+      rm -f lean/test/LazyListRunner.class lean/mod_l_lean_test_LazyListModule*.class lean/test/LazyListModule.lean
       if [[ "$OUTPUT" != "13" ]]; then
         fail "LazyListRunner failed: expected '13', got '$OUTPUT'"
       fi
@@ -269,7 +269,7 @@ case "$TEST_BASE" in
   qsort_test)
     if [[ -f "lean/test/QSortRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.QSortRunner)
-      rm -f lean/test/QSortRunner.class lean/mod_l_lean_test_QSortModule.class lean/test/QSortModule.lean
+      rm -f lean/test/QSortRunner.class lean/mod_l_lean_test_QSortModule*.class lean/test/QSortModule.lean
       if [[ "$OUTPUT" != "#[1, 2, 3, 4, 5]" ]]; then
         fail "QSortRunner failed: expected '#[1, 2, 3, 4, 5]', got '$OUTPUT'"
       fi
@@ -278,12 +278,14 @@ case "$TEST_BASE" in
   list_append)
     if [[ -f "lean/test/ListAppendRunner.class" ]] && command -v java &>/dev/null; then
       OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ListAppendRunner)
-      rm -f lean/test/ListAppendRunner.class lean/mod_l_lean_test_ListAppendModule.class lean/test/ListAppendModule.lean
+      rm -f lean/test/ListAppendRunner.class lean/mod_l_lean_test_ListAppendModule*.class lean/test/ListAppendModule.lean
       if [[ "$OUTPUT" != "2000" ]]; then
         fail "ListAppendRunner failed: expected '2000', got '$OUTPUT'"
       fi
     fi
     ;;
 esac
+
+rmdir lean/test lean 2>/dev/null || true
 
 run_after "$1"
