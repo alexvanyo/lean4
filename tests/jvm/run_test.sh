@@ -213,11 +213,30 @@ case "$TEST_BASE" in
     fi
     ;;
   closure_curry_chain)
-    if [[ -f "lean/test/ClosureCurryModule.class" ]] && command -v javap &>/dev/null; then
-      javap -p lean/test/ClosureCurryModule.class | grep -q "f_makeAdder" || fail "f_makeAdder missing from ClosureCurryModule.class"
-      javap -p lean/test/ClosureCurryModule.class | grep -q "f_makeCurried" || fail "f_makeCurried missing from ClosureCurryModule.class"
-      javap -p lean/test/ClosureCurryModule.class | grep -q "f_runTest" || fail "f_runTest missing from ClosureCurryModule.class"
-      rm -f lean/test/ClosureCurryModule.class lean/test/ClosureCurryModule.lean
+    if [[ -f "lean/test/ClosureCurryRunner.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureCurryRunner)
+      rm -f lean/test/ClosureCurryRunner.class lean/mod_l_lean_test_ClosureCurryModule.class lean/test/ClosureCurryModule.lean
+      if [[ "$OUTPUT" != "70" ]]; then
+        fail "ClosureCurryRunner failed: expected '70', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  closure_capture_ctor)
+    if [[ -f "lean/test/ClosureCaptureCtorRunner.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureCaptureCtorRunner)
+      rm -f lean/test/ClosureCaptureCtorRunner.class lean/mod_l_lean_test_ClosureCaptureCtorModule.class lean/test/ClosureCaptureCtorModule.lean
+      if [[ "$OUTPUT" != "37" ]]; then
+        fail "ClosureCaptureCtorRunner failed: expected '37', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  closure_in_loop)
+    if [[ -f "lean/test/ClosureInLoopRunner.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ClosureInLoopRunner)
+      rm -f lean/test/ClosureInLoopRunner.class lean/mod_l_lean_test_ClosureInLoopModule.class lean/test/ClosureInLoopModule.lean
+      if [[ "$OUTPUT" != "15" ]]; then
+        fail "ClosureInLoopRunner failed: expected '15', got '$OUTPUT'"
+      fi
     fi
     ;;
 esac
