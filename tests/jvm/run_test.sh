@@ -205,6 +205,24 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  nat_shiftr)
+    if [[ -f "lean/test/NatShiftTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'16\n1\n2\n1\n0'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.NatShiftTest)
+      rm -f lean/test/NatShiftTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "NatShiftTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  closure_curry_chain)
+    if [[ -f "lean/test/ClosureCurryModule.class" ]] && command -v javap &>/dev/null; then
+      javap -p lean/test/ClosureCurryModule.class | grep -q "f_makeAdder" || fail "f_makeAdder missing from ClosureCurryModule.class"
+      javap -p lean/test/ClosureCurryModule.class | grep -q "f_makeCurried" || fail "f_makeCurried missing from ClosureCurryModule.class"
+      javap -p lean/test/ClosureCurryModule.class | grep -q "f_runTest" || fail "f_runTest missing from ClosureCurryModule.class"
+      rm -f lean/test/ClosureCurryModule.class lean/test/ClosureCurryModule.lean
+    fi
+    ;;
 esac
 
 run_after "$1"

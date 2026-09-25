@@ -4,42 +4,71 @@
  */
 package lean.runtime;
 
+import java.math.BigInteger;
+
 public final class LeanNat extends LeanObject {
     public final long smallVal;
+    public final BigInteger bigVal;
 
     public static final LeanNat ZERO = new LeanNat(0L);
     public static final LeanNat ONE = new LeanNat(1L);
 
     public LeanNat(long smallVal) {
         this.smallVal = smallVal;
+        this.bigVal = null;
+    }
+
+    public LeanNat(BigInteger bigVal) {
+        if (bigVal != null && bigVal.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0 && bigVal.compareTo(BigInteger.ZERO) >= 0) {
+            this.smallVal = bigVal.longValue();
+            this.bigVal = null;
+        } else {
+            this.smallVal = -1L;
+            this.bigVal = bigVal != null ? bigVal : BigInteger.ZERO;
+        }
+    }
+
+    public BigInteger toBigInteger() {
+        if (bigVal != null) return bigVal;
+        return BigInteger.valueOf(smallVal);
     }
 
     @Override
     public int getTag() {
-        return (int) smallVal;
+        return (int) (bigVal != null ? bigVal.intValue() : smallVal);
     }
 
     @Override
     public String toString() {
-        return Long.toString(smallVal);
+        return bigVal != null ? bigVal.toString() : Long.toString(smallVal);
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof LeanNat)) return false;
-        return smallVal == ((LeanNat) o).smallVal;
+        LeanNat other = (LeanNat) o;
+        if (bigVal != null || other.bigVal != null) {
+            return toBigInteger().equals(other.toBigInteger());
+        }
+        return smallVal == other.smallVal;
     }
 
     @Override
     public int hashCode() {
-        return Long.hashCode(smallVal);
+        return bigVal != null ? bigVal.hashCode() : Long.hashCode(smallVal);
     }
 
     public static LeanNat ofLong(long v) {
         if (v == 0L) return ZERO;
         if (v == 1L) return ONE;
         return new LeanNat(v);
+    }
+
+    public static LeanNat ofBigInteger(BigInteger b) {
+        if (b == null || b.equals(BigInteger.ZERO)) return ZERO;
+        if (b.equals(BigInteger.ONE)) return ONE;
+        return new LeanNat(b);
     }
 
     public static LeanNat add(LeanNat a, LeanNat b) {

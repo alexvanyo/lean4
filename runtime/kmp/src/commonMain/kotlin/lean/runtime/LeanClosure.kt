@@ -66,5 +66,41 @@ public abstract class LeanClosure(
     companion object {
         @JvmField
         public val EMPTY_CAPTURED: Array<LeanObject?> = emptyArray()
+
+        @kotlin.jvm.JvmStatic
+        public fun alloc(arity: Int): LeanClosure = alloc("", "", arity, EMPTY_CAPTURED)
+
+        @kotlin.jvm.JvmStatic
+        public fun alloc(
+            className: String,
+            methodName: String,
+            arity: Int,
+            captured: Array<LeanObject?>
+        ): LeanClosure {
+            return LeanDynamicClosure(className, methodName, arity, captured)
+        }
     }
 }
+
+public open class LeanDynamicClosure(
+    public val targetClass: String,
+    public val targetMethod: String,
+    arity: Int,
+    captured: Array<LeanObject?>
+) : LeanClosure(arity, captured) {
+    override fun copyCurried(newCaptured: Array<LeanObject?>): LeanClosure {
+        return LeanDynamicClosure(targetClass, targetMethod, arity, newCaptured)
+    }
+
+    override fun invokeBody(args: Array<LeanObject?>): LeanObject? {
+        return invokeDynamicClosure(targetClass, targetMethod, arity, args)
+    }
+}
+
+internal expect fun invokeDynamicClosure(
+    targetClass: String,
+    targetMethod: String,
+    arity: Int,
+    args: Array<LeanObject?>
+): LeanObject?
+
