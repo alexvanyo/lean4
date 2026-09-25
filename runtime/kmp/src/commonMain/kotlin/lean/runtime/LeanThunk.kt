@@ -30,7 +30,7 @@ public final class LeanThunk : LeanObject {
         if (v != null) return v
         val c = closure
         if (c != null) {
-            val res = c.apply()
+            val res = if (c.captured.size < c.arity) c.apply(null) else c.apply()
             value = res
             closure = null
             return res
