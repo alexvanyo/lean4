@@ -249,7 +249,18 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
         let applyIdx ← addMethodRef "lean/runtime/LeanClosure" "apply3" "(Llean/runtime/LeanObject;Llean/runtime/LeanObject;Llean/runtime/LeanObject;)Llean/runtime/LeanObject;"
         emitOp (.invokevirtual applyIdx)
       else
-        emitOp .aconst_null
+        emitPushInt args.size
+        let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
+        emitOp (.anewarray leanObjClassIdx)
+        for h : i in 0...args.size do
+          emitOp .dup
+          emitPushInt i
+          match args[i] with
+          | .fvar argId => emitLoad argId
+          | .erased => emitOp .aconst_null
+          emitOp .aastore
+        let applyIdx ← addMethodRef "lean/runtime/LeanClosure" "apply" "([Llean/runtime/LeanObject;)Llean/runtime/LeanObject;"
+        emitOp (.invokevirtual applyIdx)
   | .fap fn args =>
     let targetClass ← getDeclClassName fn
     let methodName := toJVMMethodName fn
@@ -273,11 +284,34 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     let methodRef ← addMethodRef targetClass methodName descriptor
     emitOp (.invokestatic methodRef)
   | .pap fn args =>
+    let targetClass ← getDeclClassName fn
+    let methodName := toJVMMethodName fn
     let arity := match ← getImpureSignature? fn with
       | some sig => sig.params.size
       | none => args.size
-    emitOp (.bipush arity.toUInt8)
-    let allocClosureIdx ← addMethodRef "lean/runtime/LeanClosure" "alloc" "(I)Llean/runtime/LeanClosure;"
+    let classStrRef ← addString targetClass
+    if classStrRef <= 255 then
+      emitOp (.ldc classStrRef.toUInt8)
+    else
+      emitOp (.ldc_w classStrRef)
+    let methodStrRef ← addString methodName
+    if methodStrRef <= 255 then
+      emitOp (.ldc methodStrRef.toUInt8)
+    else
+      emitOp (.ldc_w methodStrRef)
+    emitPushInt arity
+    emitPushInt args.size
+    let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
+    emitOp (.anewarray leanObjClassIdx)
+    for h : i in 0...args.size do
+      emitOp .dup
+      emitPushInt i
+      let arg := args[i]
+      match arg with
+      | .fvar argId => emitLoad argId
+      | .erased => emitOp .aconst_null
+      emitOp .aastore
+    let allocClosureIdx ← addMethodRef "lean/runtime/LeanClosure" "alloc" "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
     emitOp (.invokestatic allocClosureIdx)
   | .ctor info args =>
     emitCtor info args
