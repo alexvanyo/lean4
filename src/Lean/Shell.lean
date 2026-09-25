@@ -576,11 +576,25 @@ def shellMain (args : List String) (opts : ShellOptions) : IO UInt32 := do
     if let some jvm := opts.jvmFileName? then
       if let some parent := jvm.parent then
         IO.FS.createDirAll parent
-      writeFileAtomically jvm fun out => do
-        profileitIO "JVM bytecode generation" opts.leanOpts do
-          let data ← Compiler.LCNF.JVM.emitJVM mainModuleName
-            |>.toIO' { fileName, fileMap := default } { env }
-          out.write data
+      profileitIO "JVM bytecode generation" opts.leanOpts do
+        let classFiles ← Compiler.LCNF.JVM.emitJVM mainModuleName
+          |>.toIO' { fileName, fileMap := default } { env }
+        -- Write the main module class to jvmFileName; write synthetic closure
+        -- classes (Foo$Clo_N.class) alongside it in the same directory.
+        let parent := jvm.parent.getD "."
+        let mut isFirst := true
+        for (className, bytes) in classFiles do
+          if isFirst then
+            -- The first entry is always the main module class; write it to the
+            -- requested jvmFileName path so callers find it there.
+            writeFileAtomically jvm fun out => out.write bytes
+            isFirst := false
+          else
+            -- Synthetic closure classes: place them in the same directory using
+            -- the last segment of the JVM binary class name as the file stem.
+            let baseName := (className : System.FilePath).fileName.getD className
+            let outPath := parent / (baseName ++ ".class")
+            writeFileAtomically outPath fun out => out.write bytes
   displayCumulativeProfilingTimes
   if Internal.hasAddressSanitizer () then
     return if env?.isSome then 0 else 1
