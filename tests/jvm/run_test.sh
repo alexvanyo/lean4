@@ -10,7 +10,19 @@ check_out_file
 check_exit_is_success
 
 RUNTIME_JAR="../../runtime/jvm/build/lean-runtime.jar"
-if [[ ! -f "$RUNTIME_JAR" ]] && command -v javac &>/dev/null; then
+NEED_BUILD=0
+if [[ ! -f "$RUNTIME_JAR" ]]; then
+  NEED_BUILD=1
+else
+  for f in ../../runtime/jvm/src/lean/runtime/*.java; do
+    if [[ "$f" -nt "$RUNTIME_JAR" ]]; then
+      NEED_BUILD=1
+      break
+    fi
+  done
+fi
+
+if [[ "$NEED_BUILD" -eq 1 ]] && command -v javac &>/dev/null; then
   mkdir -p "$(dirname "$RUNTIME_JAR")/classes"
   javac -d "$(dirname "$RUNTIME_JAR")/classes" ../../runtime/jvm/src/lean/runtime/*.java
   jar cf "${RUNTIME_JAR}.tmp.$$" -C "$(dirname "$RUNTIME_JAR")/classes" .
@@ -79,6 +91,69 @@ case "$TEST_BASE" in
       if [[ "$OUTPUT" != "$EXPECTED" ]]; then
         fail "ArrayTest failed: expected '$EXPECTED', got '$OUTPUT'"
       fi
+    fi
+    ;;
+  tuple_test)
+    if [[ -f "lean/test/TupleTest.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.TupleTest)
+      rm -f lean/test/TupleTest.class
+      if [[ "$OUTPUT" != "6" ]]; then
+        fail "TupleTest failed: expected '6', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  strict_and_or)
+    if [[ -f "lean/test/StrictAndOrTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'false\ntrue\ntrue\ntrue\nfalse\nfalse\nfalse\ntrue'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.StrictAndOrTest)
+      rm -f lean/test/StrictAndOrTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "StrictAndOrTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  uset_test)
+    if [[ -f "lean/test/USetTest.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.USetTest)
+      rm -f lean/test/USetTest.class
+      if [[ "$OUTPUT" != "42" ]]; then
+        fail "USetTest failed: expected '42', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  thunk_test)
+    if [[ -f "lean/test/ThunkTest.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ThunkTest)
+      rm -f lean/test/ThunkTest.class
+      if [[ "$OUTPUT" != "42" ]]; then
+        fail "ThunkTest failed: expected '42', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  string_ops)
+    if [[ -f "lean/test/StringOpsTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'hello world\n11\nhello'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.StringOpsTest)
+      rm -f lean/test/StringOpsTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "StringOpsTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  large_closure)
+    if [[ -f "lean/test/LargeClosureTest.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.LargeClosureTest)
+      rm -f lean/test/LargeClosureTest.class
+      if [[ "$OUTPUT" != "155" ]]; then
+        fail "LargeClosureTest failed: expected '155', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  direct_compile)
+    if [[ -f "lean/test/SampleModule.class" ]] && command -v javap &>/dev/null; then
+      javap -p lean/test/SampleModule.class | grep -q "f_addOne" || fail "f_addOne method missing from SampleModule.class"
+      javap -p lean/test/SampleModule.class | grep -q "f_pairSwap" || fail "f_pairSwap method missing from SampleModule.class"
+      rm -f lean/test/SampleModule.class lean/test/SampleModule.lean
     fi
     ;;
 esac
