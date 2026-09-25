@@ -241,6 +241,11 @@ public object mod_l_Init_Data_Int_Basic {
 public object mod_l_Init_Data_Nat_Bitwise_Basic {
     @JvmStatic
     public fun f_Nat_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        if (a is LeanNat && b is LeanNat) {
+            val bVal = b.bigVal?.let { lean.runtime.bigIntToLong(it) } ?: b.smallVal
+            if (bVal < 0 || bVal > Int.MAX_VALUE) return LeanNat.ZERO
+            return LeanNat.ofBigInteger(lean.runtime.bigIntShiftRight(a.toBigInteger(), bVal.toInt()))
+        }
         val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
         val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
         if (bVal >= 64L) return LeanNat.ZERO
@@ -249,6 +254,11 @@ public object mod_l_Init_Data_Nat_Bitwise_Basic {
 
     @JvmStatic
     public fun f_Nat_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        if (a is LeanNat && b is LeanNat) {
+            val bVal = b.bigVal?.let { lean.runtime.bigIntToLong(it) } ?: b.smallVal
+            if (bVal < 0 || bVal > 1_000_000) return LeanNat.ZERO
+            return LeanNat.ofBigInteger(lean.runtime.bigIntShiftLeft(a.toBigInteger(), bVal.toInt()))
+        }
         val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
         val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
         if (bVal >= 64L) return LeanNat.ZERO
@@ -257,6 +267,9 @@ public object mod_l_Init_Data_Nat_Bitwise_Basic {
 
     @JvmStatic
     public fun f_Nat_land(a: LeanObject?, b: LeanObject?): LeanObject {
+        if (a is LeanNat && b is LeanNat) {
+            return LeanNat.ofBigInteger(lean.runtime.bigIntAnd(a.toBigInteger(), b.toBigInteger()))
+        }
         val aVal = if (a is LeanNat) a.smallVal else 0L
         val bVal = if (b is LeanNat) b.smallVal else 0L
         return LeanNat.ofLong(aVal and bVal)
@@ -264,6 +277,9 @@ public object mod_l_Init_Data_Nat_Bitwise_Basic {
 
     @JvmStatic
     public fun f_Nat_lor(a: LeanObject?, b: LeanObject?): LeanObject {
+        if (a is LeanNat && b is LeanNat) {
+            return LeanNat.ofBigInteger(lean.runtime.bigIntOr(a.toBigInteger(), b.toBigInteger()))
+        }
         val aVal = if (a is LeanNat) a.smallVal else 0L
         val bVal = if (b is LeanNat) b.smallVal else 0L
         return LeanNat.ofLong(aVal or bVal)
@@ -271,6 +287,9 @@ public object mod_l_Init_Data_Nat_Bitwise_Basic {
 
     @JvmStatic
     public fun f_Nat_xor(a: LeanObject?, b: LeanObject?): LeanObject {
+        if (a is LeanNat && b is LeanNat) {
+            return LeanNat.ofBigInteger(lean.runtime.bigIntXor(a.toBigInteger(), b.toBigInteger()))
+        }
         val aVal = if (a is LeanNat) a.smallVal else 0L
         val bVal = if (b is LeanNat) b.smallVal else 0L
         return LeanNat.ofLong(aVal xor bVal)

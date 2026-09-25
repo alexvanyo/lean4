@@ -16,6 +16,7 @@ kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
             freeCompilerArgs.add("-Xjsr305=strict")
+            freeCompilerArgs.add("-Xexpect-actual-classes")
         }
     }
 
@@ -36,3 +37,17 @@ kotlin {
         }
     }
 }
+
+val standaloneRuntimeJar by tasks.registering(Jar::class) {
+    archiveBaseName.set("lean-runtime")
+    archiveClassifier.set("")
+    archiveVersion.set("")
+    from(kotlin.jvm().compilations.getByName("main").output)
+    from({
+        configurations.getByName("jvmRuntimeClasspath").map { file ->
+            if (file.isDirectory) file else zipTree(file)
+        }
+    })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+

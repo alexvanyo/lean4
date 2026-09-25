@@ -9,12 +9,12 @@ normalize_measurements
 check_out_file
 check_exit_is_success
 
-RUNTIME_JAR="../../runtime/jvm/build/lean-runtime.jar"
+RUNTIME_JAR="../../runtime/kmp/build/libs/lean-runtime.jar"
 NEED_BUILD=0
 if [[ ! -f "$RUNTIME_JAR" ]]; then
   NEED_BUILD=1
 else
-  for f in $(find ../../runtime/jvm/src -name "*.java"); do
+  for f in $(find ../../runtime/kmp/src -name "*.kt"); do
     if [[ "$f" -nt "$RUNTIME_JAR" ]]; then
       NEED_BUILD=1
       break
@@ -22,11 +22,8 @@ else
   done
 fi
 
-if [[ "$NEED_BUILD" -eq 1 ]] && command -v javac &>/dev/null; then
-  mkdir -p "$(dirname "$RUNTIME_JAR")/classes"
-  javac -d "$(dirname "$RUNTIME_JAR")/classes" $(find ../../runtime/jvm/src -name "*.java")
-  jar cf "${RUNTIME_JAR}.tmp.$$" -C "$(dirname "$RUNTIME_JAR")/classes" .
-  mv -f "${RUNTIME_JAR}.tmp.$$" "$RUNTIME_JAR" 2>/dev/null || true
+if [[ "$NEED_BUILD" -eq 1 ]]; then
+  (cd ../../runtime/kmp && ./gradlew standaloneRuntimeJar --quiet)
 fi
 
 TEST_BASE=$(basename "$1" .lean)

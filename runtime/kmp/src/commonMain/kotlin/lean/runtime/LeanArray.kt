@@ -14,7 +14,10 @@ public final class LeanArray(
     @JvmField public var data: Array<LeanObject?>
 ) : LeanObject() {
 
+    @get:kotlin.jvm.JvmSynthetic
     public val size: Int get() = data.size
+
+    public fun size(): Int = data.size
 
     public fun get(index: Int): LeanObject? = data[index]
     public fun set(index: Int, value: LeanObject?) { data[index] = value }
@@ -24,6 +27,16 @@ public final class LeanArray(
         for (i in data.indices) newArr[i] = data[i]
         newArr[data.size] = value
         return LeanArray(newArr)
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder("#[")
+        for (i in data.indices) {
+            if (i > 0) sb.append(", ")
+            sb.append(data[i])
+        }
+        sb.append("]")
+        return sb.toString()
     }
 
     companion object {

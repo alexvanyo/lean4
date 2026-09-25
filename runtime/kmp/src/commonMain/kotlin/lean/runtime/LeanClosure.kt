@@ -12,8 +12,10 @@ import kotlin.jvm.JvmField
  */
 public abstract class LeanClosure(
     @JvmField public val arity: Int,
-    @JvmField public val captured: Array<LeanObject?> = EMPTY_CAPTURED
+    captured: Array<LeanObject?>? = EMPTY_CAPTURED
 ) : LeanObject() {
+    @JvmField public val captured: Array<LeanObject?> = captured ?: EMPTY_CAPTURED
+
 
     /**
      * Body invocation once all [arity] arguments are available.
@@ -86,7 +88,7 @@ public open class LeanDynamicClosure(
     public val targetClass: String,
     public val targetMethod: String,
     arity: Int,
-    captured: Array<LeanObject?>
+    captured: Array<LeanObject?>?
 ) : LeanClosure(arity, captured) {
     override fun copyCurried(newCaptured: Array<LeanObject?>): LeanClosure {
         return LeanDynamicClosure(targetClass, targetMethod, arity, newCaptured)
