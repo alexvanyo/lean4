@@ -14,7 +14,7 @@ NEED_BUILD=0
 if [[ ! -f "$RUNTIME_JAR" ]]; then
   NEED_BUILD=1
 else
-  for f in ../../runtime/jvm/src/lean/runtime/*.java; do
+  for f in $(find ../../runtime/jvm/src -name "*.java"); do
     if [[ "$f" -nt "$RUNTIME_JAR" ]]; then
       NEED_BUILD=1
       break
@@ -24,7 +24,7 @@ fi
 
 if [[ "$NEED_BUILD" -eq 1 ]] && command -v javac &>/dev/null; then
   mkdir -p "$(dirname "$RUNTIME_JAR")/classes"
-  javac -d "$(dirname "$RUNTIME_JAR")/classes" ../../runtime/jvm/src/lean/runtime/*.java
+  javac -d "$(dirname "$RUNTIME_JAR")/classes" $(find ../../runtime/jvm/src -name "*.java")
   jar cf "${RUNTIME_JAR}.tmp.$$" -C "$(dirname "$RUNTIME_JAR")/classes" .
   mv -f "${RUNTIME_JAR}.tmp.$$" "$RUNTIME_JAR" 2>/dev/null || true
 fi
@@ -192,6 +192,16 @@ case "$TEST_BASE" in
       rm -f lean/test/ReuseBugTest.class
       if [[ "$OUTPUT" != "$EXPECTED" ]]; then
         fail "ReuseBugTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  prelude_resolution)
+    if [[ -f "lean/test/PreludeResolutionTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'1\n1\n0\n5\n16\n123\n1'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.PreludeResolutionTest)
+      rm -f lean/test/PreludeResolutionTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "PreludeResolutionTest failed: expected '$EXPECTED', got '$OUTPUT'"
       fi
     fi
     ;;
