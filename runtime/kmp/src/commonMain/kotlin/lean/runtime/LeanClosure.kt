@@ -13,9 +13,17 @@ import kotlin.jvm.JvmField
 public abstract class LeanClosure(
     @JvmField public val arity: Int,
     captured: Array<LeanObject?>? = EMPTY_CAPTURED
-) : LeanObject() {
+) : LeanObject(),
+    () -> LeanObject?,
+    (LeanObject?) -> LeanObject?,
+    (LeanObject?, LeanObject?) -> LeanObject?,
+    (LeanObject?, LeanObject?, LeanObject?) -> LeanObject? {
     @JvmField public val captured: Array<LeanObject?> = captured ?: EMPTY_CAPTURED
 
+    override fun invoke(): LeanObject? = apply()
+    override fun invoke(p1: LeanObject?): LeanObject? = apply1(p1)
+    override fun invoke(p1: LeanObject?, p2: LeanObject?): LeanObject? = apply2(p1, p2)
+    override fun invoke(p1: LeanObject?, p2: LeanObject?, p3: LeanObject?): LeanObject? = apply3(p1, p2, p3)
 
     /**
      * Body invocation once all [arity] arguments are available.
