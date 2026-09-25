@@ -574,6 +574,8 @@ def shellMain (args : List String) (opts : ShellOptions) : IO UInt32 := do
       profileitIO "LLVM code generation" opts.leanOpts do
         emitLLVM env mainModuleName bc
     if let some jvm := opts.jvmFileName? then
+      if let some parent := jvm.parent then
+        IO.FS.createDirAll parent
       writeFileAtomically jvm fun out => do
         profileitIO "JVM bytecode generation" opts.leanOpts do
           let data ← Compiler.LCNF.JVM.emitJVM mainModuleName

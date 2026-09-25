@@ -187,7 +187,7 @@ def encodeConstantPool (ba : ByteArray) (cp : ConstantPool) : ByteArray :=
 
 /--
 Serializes a ClassFile into standard JVM .class binary bytes.
-Targeting Java 17+ (major version 61).
+Targeting Java 6+ (major version 50).
 -/
 def toByteArray (cf : ClassFile) : ByteArray :=
   Id.run do
@@ -219,11 +219,11 @@ def toByteArray (cf : ClassFile) : ByteArray :=
       cp := cp'
       methodData := methodData.push (m.accessFlags, nameIdx, descIdx, m.maxStack, m.maxLocals, m.bytecodes, m.stackMap?)
 
-    -- Header: Magic (0xCAFEBABE), Minor version (0), Major version (61 = Java 17)
+    -- Header: Magic (0xCAFEBABE), Minor version (0), Major version (50 = Java 6)
     let mut ba := ByteArray.empty
     ba := writeU32 ba 0xCAFEBABE
     ba := writeU16 ba 0 -- minor version
-    ba := writeU16 ba 61 -- major version (Java 17)
+    ba := writeU16 ba 50 -- major version (Java 6: universally supported, verifier uses type inference without requiring StackMapTable)
 
     -- Constant Pool Count (cp.size + 1)
     ba := writeU16 ba (cp.size + 1).toUInt16
