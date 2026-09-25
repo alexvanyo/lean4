@@ -62,6 +62,9 @@ structure JVMState where
   code : ByteArray := ByteArray.empty
   labelOffsets : Std.HashMap Name Nat := {}
   fixups : Array (Nat × Name) := #[]
+  /-- Synthetic closure classes generated for `.pap` sites; written as separate .class files. -/
+  syntheticClasses : Array ClassFile := #[]
+  nextClosureId : Nat := 0
 
 abbrev EmitJVMM := ReaderT JVMContext (StateRefT JVMState CompilerM)
 
@@ -108,6 +111,238 @@ def captureCode (act : EmitJVMM Unit) : EmitJVMM ByteArray := do
   let captured := (← get).code
   modify fun s => { s with code := savedCode }
   return captured
+
+/--
+Builds a synthetic closure classfile for a `.pap` site.
+
+Given:
+- `synClassName`  — JVM binary name of the new class, e.g. `lean/mod_Foo$Clo_3`
+- `targetClass`   — JVM binary name of the class holding the target static method
+- `targetMethod`  — JVM method name of the target static method
+- `totalArity`    — total number of parameters the target method accepts
+- `numCaptured`   — number of arguments already captured (= `args.size` at the `.pap` site)
+
+The generated class stores captured args in `this.captured` (passed to the super constructor),
+so `LeanClosure.apply` correctly merges them when building the `fullArgs` array. `invokeBody`
+receives the fully-merged `fullArgs` array and calls `invokestatic` directly on it.
+`copyCurried` delegates to `LeanDynamicClosure` for further partial application.
+-/
+def buildSyntheticClosureClass
+    (synClassName targetClass targetMethod : String)
+    (totalArity numCaptured : Nat) : ClassFile :=
+  Id.run do
+    let mut cf : ClassFile := {
+      className  := synClassName
+      superClass := "lean/runtime/LeanClosure"
+    }
+    let (leanObjClassIdx, cp0) := cf.cp.addClass "lean/runtime/LeanObject"
+    cf := { cf with cp := cp0 }
+
+    -- ========== <init>(cap0..capN-1) ==========
+    -- Builds a LeanObject?[] from the constructor parameters and passes it to super, so
+    -- this.captured holds all captured args. LeanClosure.apply then merges them correctly.
+    let mut initParamDesc := ""
+    for _ in List.range numCaptured do
+      initParamDesc := initParamDesc ++ leanObjTypeDesc
+    let initDesc := s!"({initParamDesc})V"
+    let mut initCode := ByteArray.empty
+    let (superInitIdx, cp0) := cf.cp.addMethodRef
+      "lean/runtime/LeanClosure" "<init>" "(I[Llean/runtime/LeanObject;)V"
+    cf := { cf with cp := cp0 }
+    -- aload this
+    initCode := (Opcode.aload 0).emit initCode
+    -- push totalArity (LeanClosure.arity = total arity of underlying function)
+    if totalArity <= 5 then
+      initCode := match totalArity with
+        | 0 => Opcode.iconst_0.emit initCode
+        | 1 => Opcode.iconst_1.emit initCode
+        | 2 => Opcode.iconst_2.emit initCode
+        | 3 => Opcode.iconst_3.emit initCode
+        | 4 => Opcode.iconst_4.emit initCode
+        | _ => Opcode.iconst_5.emit initCode
+    else if totalArity <= 127 then
+      initCode := (Opcode.bipush totalArity.toUInt8).emit initCode
+    else
+      initCode := (Opcode.sipush totalArity.toUInt16).emit initCode
+    -- push captured array
+    if numCaptured == 0 then
+      initCode := Opcode.aconst_null.emit initCode
+    else
+      -- anewarray of size numCaptured
+      if numCaptured <= 5 then
+        initCode := match numCaptured with
+          | 0 => Opcode.iconst_0.emit initCode
+          | 1 => Opcode.iconst_1.emit initCode
+          | 2 => Opcode.iconst_2.emit initCode
+          | 3 => Opcode.iconst_3.emit initCode
+          | 4 => Opcode.iconst_4.emit initCode
+          | _ => Opcode.iconst_5.emit initCode
+      else if numCaptured <= 127 then
+        initCode := (Opcode.bipush numCaptured.toUInt8).emit initCode
+      else
+        initCode := (Opcode.sipush numCaptured.toUInt16).emit initCode
+      initCode := (Opcode.anewarray leanObjClassIdx).emit initCode
+      let mut slot : UInt8 := 1
+      for i in List.range numCaptured do
+        initCode := Opcode.dup.emit initCode
+        if i <= 5 then
+          initCode := match i with
+            | 0 => Opcode.iconst_0.emit initCode
+            | 1 => Opcode.iconst_1.emit initCode
+            | 2 => Opcode.iconst_2.emit initCode
+            | 3 => Opcode.iconst_3.emit initCode
+            | 4 => Opcode.iconst_4.emit initCode
+            | _ => Opcode.iconst_5.emit initCode
+        else if i <= 127 then
+          initCode := (Opcode.bipush i.toUInt8).emit initCode
+        else
+          initCode := (Opcode.sipush i.toUInt16).emit initCode
+        initCode := (Opcode.aload slot).emit initCode
+        initCode := Opcode.aastore.emit initCode
+        slot := slot + 1
+    initCode := (Opcode.invokespecial superInitIdx).emit initCode
+    initCode := Opcode.return_void.emit initCode
+    let initMethod : MethodDef := {
+      accessFlags := ClassFile.ACC_PUBLIC
+      name := "<init>"
+      descriptor := initDesc
+      maxStack := 6
+      maxLocals := (numCaptured + 1).toUInt16
+      bytecodes := initCode
+    }
+    cf := { cf with methods := cf.methods.push initMethod }
+
+    -- ========== invokeBody(args) ==========
+    -- `args` is the fully-merged array built by LeanClosure.apply:
+    --   args[0..numCaptured-1] = captured values
+    --   args[numCaptured..totalArity-1] = newly supplied arguments
+    -- We simply push args[0..totalArity-1] in order and call invokestatic.
+    let invokeBodyDesc := s!"([{leanObjTypeDesc}){leanObjTypeDesc}"
+    let mut bodyCode := ByteArray.empty
+    for i in List.range totalArity do
+      bodyCode := (Opcode.aload 1).emit bodyCode    -- load args array (slot 1)
+      if i <= 5 then
+        bodyCode := match i with
+          | 0 => Opcode.iconst_0.emit bodyCode
+          | 1 => Opcode.iconst_1.emit bodyCode
+          | 2 => Opcode.iconst_2.emit bodyCode
+          | 3 => Opcode.iconst_3.emit bodyCode
+          | 4 => Opcode.iconst_4.emit bodyCode
+          | _ => Opcode.iconst_5.emit bodyCode
+      else if i <= 127 then
+        bodyCode := (Opcode.bipush i.toUInt8).emit bodyCode
+      else
+        bodyCode := (Opcode.sipush i.toUInt16).emit bodyCode
+      bodyCode := Opcode.aaload.emit bodyCode
+    -- invokestatic targetClass.targetMethod(LeanObject...LeanObject)LeanObject
+    let mut targetParamDesc := ""
+    for _ in List.range totalArity do
+      targetParamDesc := targetParamDesc ++ leanObjTypeDesc
+    let targetDesc := s!"({targetParamDesc}){leanObjTypeDesc}"
+    let (targetRef, cp') := cf.cp.addMethodRef targetClass targetMethod targetDesc
+    cf := { cf with cp := cp' }
+    bodyCode := (Opcode.invokestatic targetRef).emit bodyCode
+    bodyCode := Opcode.areturn.emit bodyCode
+    let invokeBodyMethod : MethodDef := {
+      accessFlags := ClassFile.ACC_PUBLIC
+      name := "invokeBody"
+      descriptor := invokeBodyDesc
+      maxStack := (totalArity + 2).toUInt16
+      maxLocals := 2
+      bytecodes := bodyCode
+    }
+    cf := { cf with methods := cf.methods.push invokeBodyMethod }
+
+    -- ========== copyCurried(newCaptured) ==========
+    -- Returns a LeanDynamicClosure carrying the merged captured array.
+    -- Since this.captured holds the original caps, LeanClosure.apply passes
+    -- copyCurried([cap0..capN-1, newArg0..]) i.e. the fully merged array.
+    let copyCurriedDesc := s!"([{leanObjTypeDesc}){leanClosureTypeDesc}"
+    let (tcStrIdx, cp2) := cf.cp.addString targetClass
+    cf := { cf with cp := cp2 }
+    let (tmStrIdx, cp2) := cf.cp.addString targetMethod
+    cf := { cf with cp := cp2 }
+    let (dynInitRef, cp2) := cf.cp.addMethodRef
+      "lean/runtime/LeanDynamicClosure" "<init>"
+      "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)V"
+    cf := { cf with cp := cp2 }
+    let (dynClassIdx, cp2) := cf.cp.addClass "lean/runtime/LeanDynamicClosure"
+    cf := { cf with cp := cp2 }
+    let mut copyCode := ByteArray.empty
+    copyCode := (Opcode.new dynClassIdx).emit copyCode
+    copyCode := Opcode.dup.emit copyCode
+    if tcStrIdx <= 255 then
+      copyCode := (Opcode.ldc tcStrIdx.toUInt8).emit copyCode
+    else
+      copyCode := (Opcode.ldc_w tcStrIdx).emit copyCode
+    if tmStrIdx <= 255 then
+      copyCode := (Opcode.ldc tmStrIdx.toUInt8).emit copyCode
+    else
+      copyCode := (Opcode.ldc_w tmStrIdx).emit copyCode
+    if totalArity <= 5 then
+      copyCode := match totalArity with
+        | 0 => Opcode.iconst_0.emit copyCode
+        | 1 => Opcode.iconst_1.emit copyCode
+        | 2 => Opcode.iconst_2.emit copyCode
+        | 3 => Opcode.iconst_3.emit copyCode
+        | 4 => Opcode.iconst_4.emit copyCode
+        | _ => Opcode.iconst_5.emit copyCode
+    else if totalArity <= 127 then
+      copyCode := (Opcode.bipush totalArity.toUInt8).emit copyCode
+    else
+      copyCode := (Opcode.sipush totalArity.toUInt16).emit copyCode
+    -- newCaptured is the merged array from LeanClosure.apply; pass it directly
+    copyCode := (Opcode.aload 1).emit copyCode
+    copyCode := (Opcode.invokespecial dynInitRef).emit copyCode
+    copyCode := Opcode.areturn.emit copyCode
+    let copyCurriedMethod : MethodDef := {
+      accessFlags := ClassFile.ACC_PUBLIC
+      name := "copyCurried"
+      descriptor := copyCurriedDesc
+      maxStack := 6
+      maxLocals := 2
+      bytecodes := copyCode
+    }
+    cf := { cf with methods := cf.methods.push copyCurriedMethod }
+
+    return cf
+
+/--
+Allocates a fresh synthetic closure class for a `.pap` site, registers it in state,
+and emits `new <SynClass>; dup; [push captured args]; invokespecial <init>` into the
+current code buffer.  Returns the binary name of the synthetic class.
+-/
+def emitSyntheticClosure
+    (targetClass targetMethod : String) (totalArity : Nat)
+    (args : Array (Arg .impure)) : EmitJVMM String := do
+  let s ← get
+  let ctx ← read
+  let n := s.nextClosureId
+  let synClassName := s!"{ctx.className}$$Clo_{n}"
+  let numCaptured := args.size
+  let synCF := buildSyntheticClosureClass synClassName targetClass targetMethod totalArity numCaptured
+  modify fun st => { st with
+    syntheticClasses := st.syntheticClasses.push synCF
+    nextClosureId := n + 1
+  }
+  -- Emit allocation in the current code buffer
+  let synClassIdx ← addClass synClassName
+  emitOp (.new synClassIdx)
+  emitOp .dup
+  -- Push each captured arg
+  for arg in args do
+    match arg with
+    | .fvar fvarId => emitLoad fvarId
+    | .erased => emitOp .aconst_null
+  -- Call <init>(cap0..capN)
+  let mut initParamDesc := ""
+  for _ in List.range numCaptured do
+    initParamDesc := initParamDesc ++ leanObjTypeDesc
+  let initDesc := s!"({initParamDesc})V"
+  let initRef ← addMethodRef synClassName "<init>" initDesc
+  emitOp (.invokespecial initRef)
+  return synClassName
+
 
 def emitPushInt (v : Nat) : EmitJVMM Unit := do
   if v <= 5 then
@@ -286,33 +521,61 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
   | .pap fn args =>
     let targetClass ← getDeclClassName fn
     let methodName := toJVMMethodName fn
-    let arity := match ← getImpureSignature? fn with
-      | some sig => sig.params.size
-      | none => args.size
-    let classStrRef ← addString targetClass
-    if classStrRef <= 255 then
-      emitOp (.ldc classStrRef.toUInt8)
-    else
-      emitOp (.ldc_w classStrRef)
-    let methodStrRef ← addString methodName
-    if methodStrRef <= 255 then
-      emitOp (.ldc methodStrRef.toUInt8)
-    else
-      emitOp (.ldc_w methodStrRef)
-    emitPushInt arity
-    emitPushInt args.size
-    let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
-    emitOp (.anewarray leanObjClassIdx)
-    for h : i in 0...args.size do
-      emitOp .dup
-      emitPushInt i
-      let arg := args[i]
-      match arg with
-      | .fvar argId => emitLoad argId
-      | .erased => emitOp .aconst_null
-      emitOp .aastore
-    let allocClosureIdx ← addMethodRef "lean/runtime/LeanClosure" "alloc" "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
-    emitOp (.invokestatic allocClosureIdx)
+    let totalArity? := match ← getImpureSignature? fn with
+      | some sig => some sig.params.size
+      | none => none
+    -- Fall back to dynamic dispatch (LeanClosure.alloc) when we cannot determine the
+    -- total arity statically or when all args are already captured (remainingArity = 0).
+    match totalArity? with
+    | some totalArity =>
+      if totalArity > args.size then
+        discard <| emitSyntheticClosure targetClass methodName totalArity args
+      else
+        -- All args already captured (remainingArity = 0); dynamic fallback.
+        let classStrRef ← addString targetClass
+        if classStrRef <= 255 then emitOp (.ldc classStrRef.toUInt8)
+        else emitOp (.ldc_w classStrRef)
+        let methodStrRef ← addString methodName
+        if methodStrRef <= 255 then emitOp (.ldc methodStrRef.toUInt8)
+        else emitOp (.ldc_w methodStrRef)
+        emitPushInt totalArity
+        emitPushInt args.size
+        let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
+        emitOp (.anewarray leanObjClassIdx)
+        for h : i in 0...args.size do
+          emitOp .dup
+          emitPushInt i
+          let arg := args[i]
+          match arg with
+          | .fvar argId => emitLoad argId
+          | .erased => emitOp .aconst_null
+          emitOp .aastore
+        let allocRef ← addMethodRef "lean/runtime/LeanClosure" "alloc"
+          "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
+        emitOp (.invokestatic allocRef)
+    | none =>
+      -- Arity unknown; dynamic fallback using captured count as best estimate.
+      let classStrRef ← addString targetClass
+      if classStrRef <= 255 then emitOp (.ldc classStrRef.toUInt8)
+      else emitOp (.ldc_w classStrRef)
+      let methodStrRef ← addString methodName
+      if methodStrRef <= 255 then emitOp (.ldc methodStrRef.toUInt8)
+      else emitOp (.ldc_w methodStrRef)
+      emitPushInt args.size
+      emitPushInt args.size
+      let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
+      emitOp (.anewarray leanObjClassIdx)
+      for h : i in 0...args.size do
+        emitOp .dup
+        emitPushInt i
+        let arg := args[i]
+        match arg with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        emitOp .aastore
+      let allocRef ← addMethodRef "lean/runtime/LeanClosure" "alloc"
+        "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
+      emitOp (.invokestatic allocRef)
   | .ctor info args =>
     emitCtor info args
   | .oproj i fvarId =>
@@ -540,8 +803,10 @@ def emitMainIfNeeded : EmitJVMM Unit := do
 
 /--
 Top-level entry point emitting JVM class bytecode for a set of declarations.
+Returns an array of `(className, bytes)` pairs — the first element is always the
+module's main class; additional elements are synthetic closure classes.
 -/
-public def emitJVMForDecls (modName : Name) (decls : Array Name) : CoreM ByteArray := do
+public def emitJVMForDecls (modName : Name) (decls : Array Name) : CoreM (Array (String × ByteArray)) := do
   let (localDecls, otherModuleDecls) ← collectUsedDecls decls
   let env ← getEnv
   let indexMap := getImpureDeclIndices env decls
@@ -566,12 +831,17 @@ public def emitJVMForDecls (modName : Name) (decls : Array Name) : CoreM ByteArr
     emitMainIfNeeded
   ).run ctx |>.run { cf := initialCF } |>.run (phase := .impure)
 
-  return s.cf.toByteArray
+  -- Build result: main class first, then synthetic closure classes
+  let mut result : Array (String × ByteArray) := #[(className, s.cf.toByteArray)]
+  for synCF in s.syntheticClasses do
+    result := result.push (synCF.className, synCF.toByteArray)
+  return result
 
 /--
-Emits JVM bytecode (.class file) for the given module.
+Emits JVM bytecode (.class files) for the given module.
+Returns an array of `(className, bytes)` pairs.
 -/
-public def emitJVM (modName : Name) : CoreM ByteArray := do
+public def emitJVM (modName : Name) : CoreM (Array (String × ByteArray)) := do
   emitJVMForDecls modName (← getLocalImpureDecls)
 
 end JVM
