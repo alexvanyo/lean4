@@ -15,6 +15,11 @@ public final class LeanNat extends LeanObject {
     }
 
     @Override
+    public int getTag() {
+        return (int) smallVal;
+    }
+
+    @Override
     public String toString() {
         return Long.toString(smallVal);
     }

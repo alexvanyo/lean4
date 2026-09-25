@@ -15,6 +15,8 @@ public final class LeanNat(
     @JvmField public val smallVal: Long
 ) : LeanObject() {
 
+    public override val tag: Int get() = smallVal.toInt()
+
     override fun toString(): String = smallVal.toString()
 
     override fun equals(other: Any?): Boolean {
