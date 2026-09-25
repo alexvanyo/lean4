@@ -11,21 +11,45 @@ import kotlin.jvm.JvmStatic
  * Representation of a Lean Nat (arbitrary precision natural number).
  * Small nats are stored as non-negative 64-bit integers.
  */
-public final class LeanNat(
+public final class LeanNat : LeanObject {
     @JvmField public val smallVal: Long
-) : LeanObject() {
+    @JvmField public val bigVal: LeanBigInt?
 
-    public override val tag: Int get() = smallVal.toInt()
+    public constructor(smallVal: Long) {
+        this.smallVal = smallVal
+        this.bigVal = null
+    }
 
-    override fun toString(): String = smallVal.toString()
+    public constructor(bigVal: LeanBigInt?) {
+        if (bigVal != null && bigIntCompare(bigVal, createBigInt(Long.MAX_VALUE)) <= 0 && bigIntCompare(bigVal, createBigInt(0L)) >= 0) {
+            this.smallVal = bigIntToLong(bigVal)
+            this.bigVal = null
+        } else {
+            this.smallVal = -1L
+            this.bigVal = bigVal ?: createBigInt(0L)
+        }
+    }
+
+    public fun toBigInteger(): LeanBigInt {
+        val b = bigVal
+        if (b != null) return b
+        return createBigInt(smallVal)
+    }
+
+    public override val tag: Int get() = bigVal?.let { bigIntToInt(it) } ?: smallVal.toInt()
+
+    override fun toString(): String = bigVal?.toString() ?: smallVal.toString()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is LeanNat) return false
+        if (bigVal != null || other.bigVal != null) {
+            return toBigInteger() == other.toBigInteger()
+        }
         return smallVal == other.smallVal
     }
 
-    override fun hashCode(): Int = smallVal.hashCode()
+    override fun hashCode(): Int = bigVal?.hashCode() ?: smallVal.hashCode()
 
     companion object {
         @JvmStatic
@@ -35,6 +59,13 @@ public final class LeanNat(
 
         @JvmStatic
         public fun ofLong(v: Long): LeanNat = if (v == 0L) ZERO else if (v == 1L) ONE else LeanNat(v)
+
+        @JvmStatic
+        public fun ofBigInteger(b: LeanBigInt?): LeanNat {
+            if (b == null || bigIntIsZero(b)) return ZERO
+            if (bigIntIsOne(b)) return ONE
+            return LeanNat(b)
+        }
 
         @JvmStatic
         public fun add(a: LeanNat, b: LeanNat): LeanNat = LeanNat(a.smallVal + b.smallVal)
