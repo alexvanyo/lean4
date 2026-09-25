@@ -72,6 +72,11 @@ def addString (cp : ConstantPool) (str : String) : UInt16 × ConstantPool :=
   | some idx => ((idx + 1).toUInt16, cp)
   | none => cp.addEntry (.stringRef strIdx)
 
+def addInteger (cp : ConstantPool) (v : UInt32) : UInt16 × ConstantPool :=
+  match cp.entries.findIdx? (fun e => match e with | .integer i => i == v | _ => false) with
+  | some idx => ((idx + 1).toUInt16, cp)
+  | none => cp.addEntry (.integer v)
+
 def addNameAndType (cp : ConstantPool) (name : String) (desc : String) : UInt16 × ConstantPool :=
   let (nameIdx, cp) := cp.addUtf8 name
   let (descIdx, cp) := cp.addUtf8 desc
@@ -141,6 +146,10 @@ def addClass (cf : ClassFile) (className : String) : UInt16 × ClassFile :=
 
 def addString (cf : ClassFile) (str : String) : UInt16 × ClassFile :=
   let (idx, cp) := cf.cp.addString str
+  (idx, { cf with cp := cp })
+
+def addInteger (cf : ClassFile) (v : UInt32) : UInt16 × ClassFile :=
+  let (idx, cp) := cf.cp.addInteger v
   (idx, { cf with cp := cp })
 
 open Opcode (writeU8 writeU16 writeU32)

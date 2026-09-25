@@ -156,6 +156,45 @@ case "$TEST_BASE" in
       rm -f lean/test/SampleModule.class lean/test/SampleModule.lean
     fi
     ;;
+  apply_m_overapp)
+    if [[ -f "lean/test/ApplyOverappTest.class" ]] && command -v java &>/dev/null; then
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ApplyOverappTest)
+      rm -f lean/test/ApplyOverappTest.class lean/test/ChainClosure.class
+      if [[ "$OUTPUT" != "42" ]]; then
+        fail "ApplyOverappTest failed: expected '42', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  uint_fold)
+    if [[ -f "lean/test/UIntFoldTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'12760\n12720\n11\n6\n44'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.UIntFoldTest)
+      rm -f lean/test/UIntFoldTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "UIntFoldTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  bytearray_ops)
+    if [[ -f "lean/test/ByteArrayOpsTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'2\n10\n42'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ByteArrayOpsTest)
+      rm -f lean/test/ByteArrayOpsTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "ByteArrayOpsTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  reusebug)
+    if [[ -f "lean/test/ReuseBugTest.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'2\n0\n2'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.ReuseBugTest)
+      rm -f lean/test/ReuseBugTest.class
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "ReuseBugTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 run_after "$1"
