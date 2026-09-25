@@ -37,18 +37,8 @@ def leanCtorClass := "lean/runtime/LeanCtor"
 def leanNatClass := "lean/runtime/LeanNat"
 def leanStringClass := "lean/runtime/LeanString"
 
-def toJVMTypeDesc (type : Expr) : String :=
-  match type with
-  | .const ``UInt8 _ => "B"
-  | .const ``UInt16 _ => "S"
-  | .const ``UInt32 _ => "I"
-  | .const ``UInt64 _ => "J"
-  | .const ``USize _ => "J"
-  | .const ``Float _ => "D"
-  | .const ``Float32 _ => "F"
-  | .const ``String _ => leanStringTypeDesc
-  | .const ``Nat _ => leanNatTypeDesc
-  | _ => leanObjTypeDesc
+def toJVMTypeDesc (_type : Expr) : String :=
+  leanObjTypeDesc
 
 def toJVMClassName (modName : Name) : String :=
   "lean/mod_" ++ modName.mangle
@@ -65,6 +55,7 @@ structure JVMContext where
   currParams       : Array (Param .impure) := #[]
   varSlotMap       : Std.HashMap FVarId UInt8 := {}
   nextSlot         : UInt8 := 0
+  joinPoints       : Std.HashMap FVarId (FunDecl .impure) := {}
 
 structure JVMState where
   cf : ClassFile
@@ -98,39 +89,129 @@ def emitStore (fvarId : FVarId) : EmitJVMM Unit := do
   let slot ← getSlot fvarId
   emitOp (.astore slot)
 
-/--
-Emits a literal value onto the operand stack.
--/
-def emitLit (v : LitValue) : EmitJVMM Unit := do
-  match v with
-  | .uint8 b => emitOp (.bipush b)
-  | .uint16 s => emitOp (.sipush s)
-  | .uint32 i =>
-    if i <= 5 then emitOp (.iconst_0) -- simplified iconst
-    else emitOp (.bipush i.toUInt8)
-  | .uint64 l =>
-    if l == 0 then emitOp .lconst_0
-    else if l == 1 then emitOp .lconst_1
-    else emitOp (.bipush l.toUInt8); emitOp .i2l
-  | .usize u =>
-    if u == 0 then emitOp .lconst_0 else emitOp (.bipush u.toUInt8); emitOp .i2l
-  | .nat n =>
-    -- Push small Nat as LeanNat.ofLong(n)
-    emitOp (.bipush n.toUInt8)
-    emitOp .i2l
-    -- In full implementation: constant pool index for invokestatic LeanNat.ofLong
-    -- For now emits iconst / bipush
-  | .str _s =>
-    -- In full implementation: ldc string index + LeanString.of
-    emitOp .aconst_null
+def addMethodRef (className : String) (methodName : String) (desc : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addMethodRef className methodName desc
+  set { s with cf := cf' }
+  return idx
+
+def addClass (className : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addClass className
+  set { s with cf := cf' }
+  return idx
+
+def captureCode (act : EmitJVMM Unit) : EmitJVMM ByteArray := do
+  let savedCode := (← get).code
+  modify fun s => { s with code := ByteArray.empty }
+  act
+  let captured := (← get).code
+  modify fun s => { s with code := savedCode }
+  return captured
+
+def emitPushInt (v : Nat) : EmitJVMM Unit := do
+  if v <= 5 then
+    match v with
+    | 0 => emitOp .iconst_0
+    | 1 => emitOp .iconst_1
+    | 2 => emitOp .iconst_2
+    | 3 => emitOp .iconst_3
+    | 4 => emitOp .iconst_4
+    | _ => emitOp .iconst_5
+  else if v <= 127 then
+    emitOp (.bipush v.toUInt8)
+  else
+    emitOp (.sipush v.toUInt16)
+
+def addString (str : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addString str
+  set { s with cf := cf' }
+  return idx
+
+def getDeclClassName (fn : Name) : EmitJVMM String := do
+  let ctx ← read
+  if ctx.localDecls.any (·.name == fn) then
+    return ctx.className
+  let env ← getEnv
+  match env.getModuleIdxFor? fn with
+  | some modIdx =>
+    let modName := env.header.moduleNames[modIdx]!
+    return toJVMClassName modName
+  | none =>
+    return ctx.className
+
+def emitCtor (info : CtorInfo) (args : Array (Arg .impure)) : EmitJVMM Unit := do
+  emitPushInt info.cidx
+  emitPushInt info.size
+  let numScalars :=
+    if info.usize == 0 && info.ssize == 0 then 0
+    else if info.ssize > info.usize + (info.ssize + 7) / 8 then info.ssize
+    else info.usize + (info.ssize + 7) / 8
+  emitPushInt numScalars
+  let allocIdx ← addMethodRef "lean/runtime/LeanCtor" "alloc" "(III)Llean/runtime/LeanCtor;"
+  emitOp (.invokestatic allocIdx)
+  if args.size > 0 then
+    let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
+    for h : i in 0...args.size do
+      let arg := args[i]
+      emitOp .dup
+      emitPushInt i
+      match arg with
+      | .fvar fvarId => emitLoad fvarId
+      | .erased => emitOp .aconst_null
+      emitOp (.invokevirtual setObjIdx)
 
 /--
-Emits let declarations.
+Emits let declarations to JVM bytecode.
 -/
 def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
   match decl.value with
   | .lit v =>
-    emitLit v
+    match v with
+    | .nat n =>
+      if n <= 127 then
+        emitOp (.bipush n.toUInt8)
+        emitOp .i2l
+      else
+        emitOp (.sipush n.toUInt16)
+        emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
+    | .str s =>
+      let strIdx ← addString s
+      if strIdx <= 255 then
+        emitOp (.ldc strIdx.toUInt8)
+      else
+        emitOp (.ldc_w strIdx)
+      let ofStrIdx ← addMethodRef "lean/runtime/LeanString" "of" "(Ljava/lang/String;)Llean/runtime/LeanString;"
+      emitOp (.invokestatic ofStrIdx)
+    | .uint8 b =>
+      emitOp (.bipush b)
+      emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
+    | .uint16 s =>
+      emitOp (.sipush s)
+      emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
+    | .uint32 i =>
+      if i <= 127 then emitOp (.bipush i.toUInt8) else emitOp (.sipush i.toUInt16)
+      emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
+    | .uint64 l =>
+      if l == 0 then emitOp .lconst_0
+      else if l == 1 then emitOp .lconst_1
+      else emitOp (.bipush l.toUInt8); emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
+    | .usize u =>
+      if u == 0 then emitOp .lconst_0
+      else emitOp (.bipush u.toUInt8); emitOp .i2l
+      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+      emitOp (.invokestatic ofLongIdx)
   | .erased =>
     emitOp .aconst_null
   | .fvar fvarId args =>
@@ -138,27 +219,107 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
       emitLoad fvarId
     else
       emitLoad fvarId
-      -- apply dynamic closure invocation
-  | .fap _fn args =>
+      let closureClassIdx ← addClass "lean/runtime/LeanClosure"
+      emitOp (.checkcast closureClassIdx)
+      if args.size == 1 then
+        match args[0]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        let applyIdx ← addMethodRef "lean/runtime/LeanClosure" "apply1" "(Llean/runtime/LeanObject;)Llean/runtime/LeanObject;"
+        emitOp (.invokevirtual applyIdx)
+      else if args.size == 2 then
+        match args[0]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        match args[1]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        let applyIdx ← addMethodRef "lean/runtime/LeanClosure" "apply2" "(Llean/runtime/LeanObject;Llean/runtime/LeanObject;)Llean/runtime/LeanObject;"
+        emitOp (.invokevirtual applyIdx)
+      else if args.size == 3 then
+        match args[0]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        match args[1]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        match args[2]! with
+        | .fvar argId => emitLoad argId
+        | .erased => emitOp .aconst_null
+        let applyIdx ← addMethodRef "lean/runtime/LeanClosure" "apply3" "(Llean/runtime/LeanObject;Llean/runtime/LeanObject;Llean/runtime/LeanObject;)Llean/runtime/LeanObject;"
+        emitOp (.invokevirtual applyIdx)
+      else
+        emitOp .aconst_null
+  | .fap fn args =>
+    let targetClass ← getDeclClassName fn
+    let methodName := toJVMMethodName fn
+    let sig? ← getImpureSignature? fn
+    let (paramDescs, retDesc) := match sig? with
+      | some sig => Id.run do
+        let mut pDescs := ""
+        for p in sig.params do
+          pDescs := pDescs ++ toJVMTypeDesc p.type
+        return (pDescs, toJVMTypeDesc sig.type)
+      | none => Id.run do
+        let mut pDescs := ""
+        for _ in args do
+          pDescs := pDescs ++ leanObjTypeDesc
+        return (pDescs, leanObjTypeDesc)
+    let descriptor := s!"({paramDescs}){retDesc}"
     for arg in args do
       match arg with
       | .fvar fvarId => emitLoad fvarId
       | .erased => emitOp .aconst_null
-    -- emit invokestatic TargetClass.fn
+    let methodRef ← addMethodRef targetClass methodName descriptor
+    emitOp (.invokestatic methodRef)
+  | .pap fn args =>
+    let arity := match ← getImpureSignature? fn with
+      | some sig => sig.params.size
+      | none => args.size
+    emitOp (.bipush arity.toUInt8)
+    let allocClosureIdx ← addMethodRef "lean/runtime/LeanClosure" "alloc" "(I)Llean/runtime/LeanClosure;"
+    emitOp (.invokestatic allocClosureIdx)
   | .ctor info args =>
-    -- Allocate constructor object
-    emitOp (.bipush info.cidx.toUInt8)
-    emitOp (.bipush args.size.toUInt8)
-    emitOp (.bipush (info.usize + info.ssize / 8).toUInt8)
-    -- invoke LeanCtor.alloc(tag, numObjs, numScalars)
+    emitCtor info args
   | .oproj i fvarId =>
     emitLoad fvarId
-    emitOp (.bipush i.toUInt8)
-    -- invokevirtual LeanCtor.getObj
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    emitPushInt i
+    let getObjIdx ← addMethodRef "lean/runtime/LeanCtor" "getObj" "(I)Llean/runtime/LeanObject;"
+    emitOp (.invokevirtual getObjIdx)
+  | .uproj i fvarId =>
+    emitLoad fvarId
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    emitPushInt i
+    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getScalar" "(I)J"
+    emitOp (.invokevirtual getScalarIdx)
+    let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofLongIdx)
+  | .sproj _n offset fvarId =>
+    emitLoad fvarId
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    let scalarIdx := if offset >= 8 then offset / 8 else offset
+    emitPushInt scalarIdx
+    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getScalar" "(I)J"
+    emitOp (.invokevirtual getScalarIdx)
+    let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofLongIdx)
   | .box _ fvarId =>
     emitLoad fvarId
   | .unbox fvarId =>
     emitLoad fvarId
+  | .reuse _ info _ args =>
+    emitCtor info args
+  | .reset .. =>
+    emitOp .aconst_null
+  | .isShared _fvarId =>
+    emitOp .iconst_1
+    emitOp .i2l
+    let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofLongIdx)
   | _ =>
     emitOp .aconst_null
 
@@ -180,28 +341,105 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     emitOp .aconst_null
     emitOp .areturn
   | .cases cs =>
-    emitLoad cs.discr
-    -- In full implementation: extract tag and branch with tableswitch/lookupswitch
-    if h : cs.alts.size > 0 then
-      match cs.alts[0] with
+    if cs.alts.isEmpty then
+      emitOp .aconst_null
+      emitOp .areturn
+    else if cs.alts.size == 1 then
+      match cs.alts[0]! with
       | .ctorAlt _ k => emitCode k
       | .default k => emitCode k
     else
+      let ctx ← read
+      let tagSlot := ctx.nextSlot
+      let branchCtx := { ctx with nextSlot := ctx.nextSlot + 1 }
+      emitLoad cs.discr
+      let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
+      emitOp (.invokevirtual getTagIdx)
+      emitOp (.istore tagSlot)
+      withReader (fun _ => branchCtx) do
+        for alt in cs.alts do
+          match alt with
+          | .ctorAlt info k =>
+            let altCode ← captureCode (emitCode k)
+            emitOp (.iload tagSlot)
+            emitPushInt info.cidx
+            let jumpOffset := (3 + altCode.size).toUInt16
+            emitOp (.if_icmpne jumpOffset)
+            modify fun s => { s with code := s.code ++ altCode }
+          | .default k =>
+            emitCode k
+        emitOp .aconst_null
+        emitOp .areturn
+  | .jmp fvarId args =>
+    let ctx ← read
+    match ctx.joinPoints[fvarId]? with
+    | some decl =>
+      let mut nextSlot := ctx.nextSlot
+      let mut newVarSlotMap := ctx.varSlotMap
+      let mut paramSlots : Array (Param .impure × UInt8) := #[]
+      for p in decl.params do
+        paramSlots := paramSlots.push (p, nextSlot)
+        newVarSlotMap := newVarSlotMap.insert p.fvarId nextSlot
+        nextSlot := nextSlot + 1
+
+      for h : i in 0...args.size do
+        let arg := args[i]
+        if h2 : i < paramSlots.size then
+          let (_, slot) := paramSlots[i]
+          match arg with
+          | .fvar id => emitLoad id
+          | .erased => emitOp .aconst_null
+          emitOp (.astore slot)
+      let newCtx := { ctx with varSlotMap := newVarSlotMap, nextSlot := nextSlot }
+      withReader (fun _ => newCtx) do
+        emitCode decl.value
+    | none =>
       emitOp .aconst_null
       emitOp .areturn
-  | .jmp fvarId args =>
-    for arg in args do
-      match arg with
-      | .fvar id => emitLoad id
-      | .erased => emitOp .aconst_null
-    -- emit goto join point
   | .jp decl k =>
-    -- Define join point target block
-    emitCode k
+    let newCtx := { (← read) with joinPoints := (← read).joinPoints.insert decl.fvarId decl }
+    withReader (fun _ => newCtx) do
+      emitCode k
   | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
     -- Tracing GC: Reference counting instructions are no-ops!
     emitCode k
-  | .setTag _ _ k | .oset _ _ _ k | .uset _ _ _ k | .sset _ _ _ _ _ k =>
+  | .oset fvarId i y k =>
+    emitLoad fvarId
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    emitPushInt i
+    match y with
+    | .fvar yId => emitLoad yId
+    | .erased => emitOp .aconst_null
+    let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
+    emitOp (.invokevirtual setObjIdx)
+    emitCode k
+  | .uset fvarId i y k =>
+    emitLoad fvarId
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    emitPushInt i
+    emitLoad y
+    let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
+    emitOp (.invokevirtual getTagIdx)
+    emitOp .i2l
+    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
+    emitOp (.invokevirtual setScalarIdx)
+    emitCode k
+  | .sset fvarId _i offset y _ty k =>
+    emitLoad fvarId
+    let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
+    emitOp (.checkcast ctorClassIdx)
+    let scalarIdx := if offset >= 8 then offset / 8 else offset
+    emitPushInt scalarIdx
+    emitLoad y
+    let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
+    emitOp (.invokevirtual getTagIdx)
+    emitOp .i2l
+    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
+    emitOp (.invokevirtual setScalarIdx)
+    emitCode k
+  | .setTag _ _ k =>
     emitCode k
 
 /--
@@ -242,8 +480,8 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
       accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
       name := methodName
       descriptor := descriptor
-      maxStack := 32
-      maxLocals := (slot + 16).toUInt16
+      maxStack := 64
+      maxLocals := 255
       bytecodes := bytecodes
     }
 
