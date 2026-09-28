@@ -6,10 +6,21 @@ package lean.runtime
 
 import java.lang.invoke.MethodHandle
 
+public actual fun formatDouble6(v: Double): String =
+    java.lang.String.format(java.util.Locale.US, "%.6f", v)
+
 /**
  * JVM-specific Lean runtime utilities and MethodHandle-based closures.
  */
 public object LeanRuntimeJVM {
+
+    @JvmStatic
+    public fun getScalar64(obj: LeanObject?): Long {
+        if (obj is LeanFloat) return obj.value.toRawBits()
+        if (obj is LeanNat) return obj.smallVal
+        if (obj is LeanCtor && obj.scalars.isNotEmpty()) return obj.scalars[0]
+        return obj?.tag?.toLong() ?: 0L
+    }
 
     @JvmStatic
     public fun boxUInt8(v: Byte): LeanObject = LeanNat.ofLong((v.toInt() and 0xFF).toLong())
