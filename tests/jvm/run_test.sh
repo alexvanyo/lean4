@@ -304,6 +304,26 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  module_init)
+    if [[ -f "lean/mod_l_lean_test_ModuleInitModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'started the program\nhello world\n30\n#[hello, world, foo]'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_ModuleInitModule)
+      rm -f lean/mod_l_lean_test_ModuleInitModule*.class lean/test/ModuleInitModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "ModuleInit failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  module_init_unboxed)
+    if [[ -f "lean/mod_l_lean_test_ModuleInitUnboxedModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'0\nfalse\n1\n0.500000\n16'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_ModuleInitUnboxedModule)
+      rm -f lean/mod_l_lean_test_ModuleInitUnboxedModule*.class lean/test/ModuleInitUnboxedModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "ModuleInitUnboxed failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true

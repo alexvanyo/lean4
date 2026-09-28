@@ -62,4 +62,51 @@ public object LeanRuntimeJVM {
     public fun printLnString(str: LeanString) {
         System.out.println(str.toString())
     }
+
+    @JvmStatic
+    public fun ioResultGetValue(obj: LeanObject?): LeanObject? {
+        if (obj is LeanCtor) {
+            return obj.getObj(0)
+        }
+        return obj
+    }
+
+    @JvmStatic
+    public fun handleIOResult(obj: LeanObject?) {
+        if (obj is LeanCtor && obj.tag != 0) {
+            val err = obj.getObj(0)
+            System.err.println("Uncaught Lean exception: " + err)
+            System.exit(1)
+        }
+    }
+
+    @JvmStatic
+    public fun stringArrayToList(args: Array<String>): LeanObject {
+        var list: LeanObject = LeanNat.ZERO
+        for (i in args.indices.reversed()) {
+            val s = LeanString.of(args[i])
+            val cons = LeanCtor.alloc(1, 2, 0)
+            cons.setObj(0, s)
+            cons.setObj(1, list)
+            list = cons
+        }
+        return list
+    }
+
+    @JvmStatic
+    public fun initializeModule(className: String) {
+        try {
+            val cls = Class.forName(className.replace('/', '.'))
+            try {
+                val m = cls.getMethod("initialize")
+                m.invoke(null)
+            } catch (_: NoSuchMethodException) {
+            }
+        } catch (_: ClassNotFoundException) {
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+            val cause = e.cause ?: e
+            if (cause is RuntimeException) throw cause
+            throw RuntimeException(cause)
+        }
+    }
 }

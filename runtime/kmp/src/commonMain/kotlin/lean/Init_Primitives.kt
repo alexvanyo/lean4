@@ -19,6 +19,7 @@ import lean.runtime.LeanCtor
 import lean.runtime.LeanFloat
 import lean.runtime.LeanNat
 import lean.runtime.LeanObject
+import lean.runtime.LeanRef
 import lean.runtime.LeanString
 import lean.runtime.LeanThunk
 import kotlin.jvm.JvmStatic
@@ -199,6 +200,27 @@ public object mod_l_Init_Prelude {
     }
 
     @JvmStatic
+    public fun f_USize_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
+        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
+        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
+        return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
+    }
+
+    @JvmStatic
+    public fun f_USize_decLt(a: LeanObject?, b: LeanObject?): LeanObject {
+        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
+        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
+        return if (aVal < bVal) LeanNat.ONE else LeanNat.ZERO
+    }
+
+    @JvmStatic
+    public fun f_USize_decLe(a: LeanObject?, b: LeanObject?): LeanObject {
+        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
+        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
+        return if (aVal <= bVal) LeanNat.ONE else LeanNat.ZERO
+    }
+
+    @JvmStatic
     public fun f_UInt32_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
         val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
         val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
@@ -217,6 +239,13 @@ public object mod_l_Init_Prelude {
         val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
         val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
         return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
+    }
+
+    @JvmStatic
+    public fun f_String_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
+        val s1 = a?.toString() ?: ""
+        val s2 = b?.toString() ?: ""
+        return if (s1 == s2) LeanNat.ONE else LeanNat.ZERO
     }
 
     @JvmStatic
@@ -266,6 +295,20 @@ public object mod_l_Init_Data_UInt_BasicAux {
 
     @JvmStatic
     public fun f_USize_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_USize_add(a: LeanObject?, b: LeanObject?): LeanObject {
+        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
+        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
+        return LeanNat.ofLong(aVal + bVal)
+    }
+
+    @JvmStatic
+    public fun f_USize_sub(a: LeanObject?, b: LeanObject?): LeanObject {
+        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
+        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
+        return LeanNat.ofLong(aVal - bVal)
+    }
 }
 
 public object mod_l_Init_Data_Option_Basic {
@@ -508,6 +551,12 @@ public object mod_l_Init_Data_Array_Basic {
 
     @JvmStatic
     public fun f_Array_uget(type: LeanObject?, arr: LeanObject?, usize: LeanObject?, h: LeanObject?): LeanObject? {
+        val idx = (usize as? LeanNat)?.smallVal?.toInt() ?: usize?.tag ?: 0
+        return (arr as? LeanArray)?.get(idx)
+    }
+
+    @JvmStatic
+    public fun f_Array_ugetBorrowed(type: LeanObject?, arr: LeanObject?, usize: LeanObject?, h: LeanObject?): LeanObject? {
         val idx = (usize as? LeanNat)?.smallVal?.toInt() ?: usize?.tag ?: 0
         return (arr as? LeanArray)?.get(idx)
     }
@@ -897,6 +946,100 @@ public object mod_l_Init_Data_Float_Float {
         pair.setObj(1, intObj)
         return pair
     }
+}
+
+public object mod_l_Init_System_ST {
+    @JvmStatic
+    public fun f_ST_Prim_mkRef(sigma: LeanObject?, alpha: LeanObject?, a: LeanObject?, world: LeanObject?): LeanObject =
+        LeanRef(a)
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_get(sigma: LeanObject?, alpha: LeanObject?, ref: LeanObject?, world: LeanObject?): LeanObject? =
+        (ref as? LeanRef)?.value
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_take(sigma: LeanObject?, alpha: LeanObject?, ref: LeanObject?, world: LeanObject?): LeanObject? =
+        (ref as? LeanRef)?.value
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_set(sigma: LeanObject?, alpha: LeanObject?, ref: LeanObject?, a: LeanObject?, world: LeanObject?): LeanObject {
+        (ref as? LeanRef)?.value = a
+        return LeanNat.ZERO
+    }
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_put(sigma: LeanObject?, alpha: LeanObject?, ref: LeanObject?, a: LeanObject?, world: LeanObject?): LeanObject {
+        (ref as? LeanRef)?.value = a
+        return LeanNat.ZERO
+    }
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_swap(sigma: LeanObject?, alpha: LeanObject?, ref: LeanObject?, a: LeanObject?, world: LeanObject?): LeanObject? {
+        val r = ref as? LeanRef
+        val old = r?.value
+        r?.value = a
+        return old
+    }
+
+    @JvmStatic
+    public fun f_ST_Prim_Ref_ptrEq(sigma: LeanObject?, alpha: LeanObject?, r1: LeanObject?, r2: LeanObject?, world: LeanObject?): LeanObject =
+        if (r1 === r2) LeanNat.ONE else LeanNat.ZERO
+}
+
+public object mod_l_Init_System_IO {
+    @JvmStatic
+    public fun f_stdout_flush(world: LeanObject?): LeanObject {
+        val res = LeanCtor.alloc(0, 2, 0)
+        res.setObj(0, LeanNat.ZERO)
+        res.setObj(1, world ?: LeanNat.ZERO)
+        return res
+    }
+
+    @JvmStatic
+    public fun f_stdout_putStr(s: LeanObject?, world: LeanObject?): LeanObject {
+        print(s?.toString() ?: "")
+        val res = LeanCtor.alloc(0, 2, 0)
+        res.setObj(0, LeanNat.ZERO)
+        res.setObj(1, world ?: LeanNat.ZERO)
+        return res
+    }
+
+    @JvmStatic
+    public fun f_stdout_getLine(world: LeanObject?): LeanObject {
+        val line = readLine() ?: ""
+        val res = LeanCtor.alloc(0, 2, 0)
+        res.setObj(0, LeanString.of(line))
+        res.setObj(1, world ?: LeanNat.ZERO)
+        return res
+    }
+
+    @JvmStatic
+    public fun f_stdout_isTty(world: LeanObject?): LeanObject {
+        val res = LeanCtor.alloc(0, 2, 0)
+        res.setObj(0, LeanNat.ZERO)
+        res.setObj(1, world ?: LeanNat.ZERO)
+        return res
+    }
+
+    private val stdoutStream: LeanCtor by lazy {
+        val stream = LeanCtor.alloc(0, 6, 0)
+        stream.setObj(0, LeanClosure.alloc("lean/mod_l_Init_System_IO", "f_stdout_flush", 1, emptyArray()))
+        stream.setObj(1, LeanNat.ZERO)
+        stream.setObj(2, LeanNat.ZERO)
+        stream.setObj(3, LeanClosure.alloc("lean/mod_l_Init_System_IO", "f_stdout_getLine", 1, emptyArray()))
+        stream.setObj(4, LeanClosure.alloc("lean/mod_l_Init_System_IO", "f_stdout_putStr", 2, emptyArray()))
+        stream.setObj(5, LeanClosure.alloc("lean/mod_l_Init_System_IO", "f_stdout_isTty", 1, emptyArray()))
+        stream
+    }
+
+    @JvmStatic
+    public fun f_IO_getStdout(world: LeanObject?): LeanObject = stdoutStream
+
+    @JvmStatic
+    public fun f_IO_getStderr(world: LeanObject?): LeanObject = stdoutStream
+
+    @JvmStatic
+    public fun f_IO_getStdin(world: LeanObject?): LeanObject = stdoutStream
 }
 
 
