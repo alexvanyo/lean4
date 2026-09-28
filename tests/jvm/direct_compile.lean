@@ -32,7 +32,7 @@ def main : IO Unit := do
     throw <| IO.userError s!"Invalid class file magic: {magic}"
 
   let major := (bytes.get! 6).toUInt16 <<< 8 ||| (bytes.get! 7).toUInt16
-  if major != 50 then
-    throw <| IO.userError s!"Expected major version 50, got {major}"
+  if major != 61 then
+    throw <| IO.userError s!"Expected major version 61, got {major}"
 
   IO.println s!"SampleModule.class generated successfully with {bytes.size} bytes."

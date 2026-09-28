@@ -99,11 +99,13 @@ def main : IO Unit := do
   }
   -/
   let mut pbCode := ByteArray.empty
-  pbCode := Opcode.getstatic sysOutRef |>.emit pbCode
   pbCode := Opcode.iload 0 |>.emit pbCode
-  pbCode := Opcode.ifeq 8 |>.emit pbCode
+  pbCode := Opcode.ifeq 12 |>.emit pbCode
+  pbCode := Opcode.getstatic sysOutRef |>.emit pbCode
   pbCode := Opcode.ldc (strTrueRef.toUInt8) |>.emit pbCode
-  pbCode := Opcode.goto 5 |>.emit pbCode
+  pbCode := Opcode.invokevirtual printlnStrRef |>.emit pbCode
+  pbCode := Opcode.return_void |>.emit pbCode
+  pbCode := Opcode.getstatic sysOutRef |>.emit pbCode
   pbCode := Opcode.ldc (strFalseRef.toUInt8) |>.emit pbCode
   pbCode := Opcode.invokevirtual printlnStrRef |>.emit pbCode
   pbCode := Opcode.return_void |>.emit pbCode

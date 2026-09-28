@@ -658,6 +658,9 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
       emitOp (.invokevirtual getTagIdx)
       emitOp (.istore tagSlot)
       withReader (fun _ => branchCtx) do
+        let hasDefault := cs.alts.any fun
+          | .default .. => true
+          | _ => false
         for alt in cs.alts do
           match alt with
           | .ctorAlt info k =>
@@ -669,8 +672,9 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
             modify fun s => { s with code := s.code ++ altCode }
           | .default k =>
             emitCode k
-        emitOp .aconst_null
-        emitOp .areturn
+        if !hasDefault then
+          emitOp .aconst_null
+          emitOp .areturn
   | .jmp fvarId args =>
     let ctx ← read
     match ctx.joinPoints[fvarId]? with
