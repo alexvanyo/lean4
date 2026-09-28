@@ -15,6 +15,7 @@ public expect fun bigIntOr(a: LeanBigInt, b: LeanBigInt): LeanBigInt
 public expect fun bigIntXor(a: LeanBigInt, b: LeanBigInt): LeanBigInt
 public expect fun bigIntToLong(a: LeanBigInt): Long
 public expect fun bigIntToInt(a: LeanBigInt): Int
+public expect fun bigIntToDouble(a: LeanBigInt): Double
 public expect fun bigIntCompare(a: LeanBigInt, b: LeanBigInt): Int
 public expect fun bigIntIsZero(a: LeanBigInt): Boolean
 public expect fun bigIntIsOne(a: LeanBigInt): Boolean

@@ -17,6 +17,7 @@ public actual fun bigIntOr(a: LeanBigInt, b: LeanBigInt): LeanBigInt = a.or(b)
 public actual fun bigIntXor(a: LeanBigInt, b: LeanBigInt): LeanBigInt = a.xor(b)
 public actual fun bigIntToLong(a: LeanBigInt): Long = a.toLong()
 public actual fun bigIntToInt(a: LeanBigInt): Int = a.toInt()
+public actual fun bigIntToDouble(a: LeanBigInt): Double = a.toDouble()
 public actual fun bigIntCompare(a: LeanBigInt, b: LeanBigInt): Int = a.compareTo(b)
 public actual fun bigIntIsZero(a: LeanBigInt): Boolean = a == BigInteger.ZERO
 public actual fun bigIntIsOne(a: LeanBigInt): Boolean = a == BigInteger.ONE

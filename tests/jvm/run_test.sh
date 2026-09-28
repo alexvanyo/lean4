@@ -284,6 +284,26 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  float_ops)
+    if [[ -f "lean/test/FloatOpsRunner.class" ]] && command -v java &>/dev/null; then
+      EXPECTED="3.000000|-1.000000|6.000000|1.500000|8.000000|false|true|false|true|false|true|0.000000|42.000000|-42.000000|255|65535|4294967295|true|true|true|2.333333|3.500000|[1.500000, 2.000000]|true"
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.FloatOpsRunner)
+      rm -f lean/test/FloatOpsRunner.class lean/mod_l_lean_test_FloatOpsModule*.class lean/test/FloatOpsModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "FloatOpsRunner failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  char_escape)
+    if [[ -f "lean/test/CharEscapeRunner.class" ]] && command -v java &>/dev/null; then
+      EXPECTED="4|4|4|1|97|98|99"
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.test.CharEscapeRunner)
+      rm -f lean/test/CharEscapeRunner.class lean/mod_l_lean_test_CharEscapeModule*.class lean/test/CharEscapeModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "CharEscapeRunner failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true

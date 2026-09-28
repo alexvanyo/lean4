@@ -397,6 +397,26 @@ def emitCtor (info : CtorInfo) (args : Array (Arg .impure)) : EmitJVMM Unit := d
       | .erased => emitOp .aconst_null
       emitOp (.invokevirtual setObjIdx)
 
+def emitPushNatLiteral (n : Nat) : EmitJVMM Unit := do
+  if n <= 127 then
+    emitOp (.bipush n.toUInt8)
+    emitOp .i2l
+    let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofLongIdx)
+  else if n <= 32767 then
+    emitOp (.sipush n.toUInt16)
+    emitOp .i2l
+    let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofLongIdx)
+  else
+    let strIdx ← addString (toString n)
+    if strIdx <= 255 then
+      emitOp (.ldc strIdx.toUInt8)
+    else
+      emitOp (.ldc_w strIdx)
+    let ofDecStringIdx ← addMethodRef "lean/runtime/LeanNat" "ofDecString" "(Ljava/lang/String;)Llean/runtime/LeanNat;"
+    emitOp (.invokestatic ofDecStringIdx)
+
 /--
 Emits let declarations to JVM bytecode.
 -/
@@ -404,15 +424,7 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
   match decl.value with
   | .lit v =>
     match v with
-    | .nat n =>
-      if n <= 127 then
-        emitOp (.bipush n.toUInt8)
-        emitOp .i2l
-      else
-        emitOp (.sipush n.toUInt16)
-        emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
+    | .nat n => emitPushNatLiteral n
     | .str s =>
       let strIdx ← addString s
       if strIdx <= 255 then
@@ -421,32 +433,11 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
         emitOp (.ldc_w strIdx)
       let ofStrIdx ← addMethodRef "lean/runtime/LeanString" "of" "(Ljava/lang/String;)Llean/runtime/LeanString;"
       emitOp (.invokestatic ofStrIdx)
-    | .uint8 b =>
-      emitOp (.bipush b)
-      emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
-    | .uint16 s =>
-      emitOp (.sipush s)
-      emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
-    | .uint32 i =>
-      if i <= 127 then emitOp (.bipush i.toUInt8) else emitOp (.sipush i.toUInt16)
-      emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
-    | .uint64 l =>
-      if l == 0 then emitOp .lconst_0
-      else if l == 1 then emitOp .lconst_1
-      else emitOp (.bipush l.toUInt8); emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
-    | .usize u =>
-      if u == 0 then emitOp .lconst_0
-      else emitOp (.bipush u.toUInt8); emitOp .i2l
-      let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
-      emitOp (.invokestatic ofLongIdx)
+    | .uint8 b => emitPushNatLiteral b.toNat
+    | .uint16 s => emitPushNatLiteral s.toNat
+    | .uint32 i => emitPushNatLiteral i.toNat
+    | .uint64 l => emitPushNatLiteral l.toNat
+    | .usize u => emitPushNatLiteral u.toNat
   | .erased =>
     emitOp .aconst_null
   | .fvar fvarId args =>
@@ -717,9 +708,8 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     emitOp (.checkcast ctorClassIdx)
     emitPushInt i
     emitLoad y
-    let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
-    emitOp (.invokevirtual getTagIdx)
-    emitOp .i2l
+    let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+    emitOp (.invokestatic getScalar64Idx)
     let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
     emitOp (.invokevirtual setScalarIdx)
     emitCode k
@@ -730,9 +720,8 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     let scalarIdx := if offset >= 8 then offset / 8 else offset
     emitPushInt scalarIdx
     emitLoad y
-    let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
-    emitOp (.invokevirtual getTagIdx)
-    emitOp .i2l
+    let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+    emitOp (.invokestatic getScalar64Idx)
     let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
     emitOp (.invokevirtual setScalarIdx)
     emitCode k

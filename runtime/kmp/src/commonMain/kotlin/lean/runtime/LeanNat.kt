@@ -68,6 +68,13 @@ public final class LeanNat : LeanObject {
         }
 
         @JvmStatic
+        public fun ofDecString(s: String): LeanNat {
+            val l = s.toLongOrNull()
+            if (l != null) return ofLong(l)
+            return LeanNat(createBigInt(s))
+        }
+
+        @JvmStatic
         public fun add(a: LeanNat, b: LeanNat): LeanNat = LeanNat(a.smallVal + b.smallVal)
 
         @JvmStatic
