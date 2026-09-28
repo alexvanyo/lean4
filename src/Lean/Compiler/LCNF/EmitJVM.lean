@@ -364,6 +364,12 @@ def addString (str : String) : EmitJVMM UInt16 := do
   set { s with cf := cf' }
   return idx
 
+def addFieldRef (className : String) (fieldName : String) (desc : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addFieldRef className fieldName desc
+  set { s with cf := cf' }
+  return idx
+
 def getDeclClassName (fn : Name) : EmitJVMM String := do
   let ctx ← read
   if ctx.localDecls.any (·.name == fn) then
@@ -733,7 +739,32 @@ Emits a function declaration as a static method in the classfile.
 -/
 def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
   match decl.value with
-  | .extern .. => return ()
+  | .extern .. =>
+    let env ← getEnv
+    if (getInitFnNameFor? env decl.name).isSome then
+      let fieldName := toJVMMethodName decl.name
+      let fieldDef : FieldDef := {
+        accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
+        name := fieldName
+        descriptor := leanObjTypeDesc
+      }
+      modify fun s => { s with cf := { s.cf with fields := s.cf.fields.push fieldDef } }
+
+      let className := (← read).className
+      let fieldRef ← addFieldRef className fieldName leanObjTypeDesc
+      let mut getterCode := ByteArray.empty
+      getterCode := (Opcode.getstatic fieldRef).emit getterCode
+      getterCode := Opcode.areturn.emit getterCode
+      let getterDef : MethodDef := {
+        accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
+        name := fieldName
+        descriptor := s!"(){leanObjTypeDesc}"
+        maxStack := 1
+        maxLocals := 0
+        bytecodes := getterCode
+      }
+      modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push getterDef } }
+    return ()
   | .code code =>
     let methodName := toJVMMethodName decl.name
     let mut paramDescs := ""
@@ -774,21 +805,163 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push methodDef } }
 
 /--
+Emits module-level initialization code (<clinit> and public static void initialize()).
+Initializes imported modules, then runs local initializers in declaration order.
+-/
+def emitModuleInit (decls : Array Name) : EmitJVMM Unit := do
+  let env ← getEnv
+  let className := (← read).className
+  let indexMap := getImpureDeclIndices env decls
+
+  -- Add static field: private static boolean _G_initialized = false
+  let initFieldDef : FieldDef := {
+    accessFlags := ClassFile.ACC_PRIVATE ||| ClassFile.ACC_STATIC
+    name := "_G_initialized"
+    descriptor := "Z"
+  }
+  modify fun s => { s with cf := { s.cf with fields := s.cf.fields.push initFieldDef } }
+
+  let initFieldRef ← addFieldRef className "_G_initialized" "Z"
+
+  -- Build initialize() method body
+  let mut initBody := ByteArray.empty
+
+  -- 1. Initialize imported modules
+  for imp in env.imports do
+    let impClass := toJVMClassName imp.module
+    let impClassIdx ← addString impClass
+    if impClassIdx <= 255 then
+      initBody := (Opcode.ldc impClassIdx.toUInt8).emit initBody
+    else
+      initBody := (Opcode.ldc_w impClassIdx).emit initBody
+    let initModRef ← addMethodRef "lean/runtime/LeanRuntimeJVM" "initializeModule" "(Ljava/lang/String;)V"
+    initBody := (Opcode.invokestatic initModRef).emit initBody
+
+  -- 2. Sort decls by declaration index to run local initializers in order
+  let sortedDecls := decls.qsort fun l r =>
+    indexMap.getD l 0 < indexMap.getD r 0
+
+  for declName in sortedDecls do
+    if isIOUnitInitFn env declName then
+      let methodName := toJVMMethodName declName
+      let methodRef ← addMethodRef className methodName s!"({leanObjTypeDesc}){leanObjTypeDesc}"
+      initBody := Opcode.aconst_null.emit initBody
+      initBody := (Opcode.invokestatic methodRef).emit initBody
+      initBody := Opcode.pop.emit initBody
+    else if let some initFn := getInitFnNameFor? env declName then
+      let initMethodName := toJVMMethodName initFn
+      let initMethodRef ← addMethodRef className initMethodName s!"({leanObjTypeDesc}){leanObjTypeDesc}"
+      initBody := Opcode.aconst_null.emit initBody
+      initBody := (Opcode.invokestatic initMethodRef).emit initBody
+      let getValRef ← addMethodRef "lean/runtime/LeanRuntimeJVM" "ioResultGetValue" s!"({leanObjTypeDesc}){leanObjTypeDesc}"
+      initBody := (Opcode.invokestatic getValRef).emit initBody
+      let declFieldRef ← addFieldRef className (toJVMMethodName declName) leanObjTypeDesc
+      initBody := (Opcode.putstatic declFieldRef).emit initBody
+
+  -- Method code for initialize():
+  -- if (_G_initialized) return;
+  -- _G_initialized = true;
+  -- <initBody>
+  -- return;
+  let mut fullCode := ByteArray.empty
+  fullCode := (Opcode.getstatic initFieldRef).emit fullCode
+  let skipOffset := (7 + initBody.size).toUInt16
+  fullCode := (Opcode.ifne skipOffset).emit fullCode
+  fullCode := Opcode.iconst_1.emit fullCode
+  fullCode := (Opcode.putstatic initFieldRef).emit fullCode
+  fullCode := fullCode ++ initBody
+  fullCode := Opcode.return_void.emit fullCode
+
+  let initMethod : MethodDef := {
+    accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
+    name := "initialize"
+    descriptor := "()V"
+    maxStack := 4
+    maxLocals := 0
+    bytecodes := fullCode
+  }
+  modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push initMethod } }
+
+  -- Emit <clinit>()V:
+  -- invokestatic className.initialize:()V
+  -- return
+  let selfInitRef ← addMethodRef className "initialize" "()V"
+  let mut clinitCode := ByteArray.empty
+  clinitCode := (Opcode.invokestatic selfInitRef).emit clinitCode
+  clinitCode := Opcode.return_void.emit clinitCode
+  let clinitMethod : MethodDef := {
+    accessFlags := ClassFile.ACC_STATIC
+    name := "<clinit>"
+    descriptor := "()V"
+    maxStack := 1
+    maxLocals := 0
+    bytecodes := clinitCode
+  }
+  modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push clinitMethod } }
+
+/--
 Emits a public static void main entry point if the module contains a `main` declaration.
 -/
 def emitMainIfNeeded : EmitJVMM Unit := do
-  let hasMain := (← read).localDecls.any (·.name == `main)
-  if hasMain then
+  let mainDecl? := (← read).localDecls.find? (·.name == `main)
+  if let some decl := mainDecl? then
+    let arity := decl.params.size
+    let className := (← read).className
+    let descriptor := if arity == 2 then s!"({leanObjTypeDesc}{leanObjTypeDesc}){leanObjTypeDesc}" else s!"({leanObjTypeDesc}){leanObjTypeDesc}"
+    let mainMethodRef ← addMethodRef className "f_main" descriptor
+    let mut code := ByteArray.empty
+    if arity == 2 then
+      let convRef ← addMethodRef "lean/runtime/LeanRuntimeJVM" "stringArrayToList" s!"([Ljava/lang/String;){leanObjTypeDesc}"
+      code := (Opcode.aload 0).emit code
+      code := (Opcode.invokestatic convRef).emit code
+      code := Opcode.aconst_null.emit code
+      code := (Opcode.invokestatic mainMethodRef).emit code
+    else
+      code := Opcode.aconst_null.emit code
+      code := (Opcode.invokestatic mainMethodRef).emit code
+    let handleRef ← addMethodRef "lean/runtime/LeanRuntimeJVM" "handleIOResult" s!"({leanObjTypeDesc})V"
+    code := (Opcode.invokestatic handleRef).emit code
+    code := Opcode.return_void.emit code
+
     let mainMethod : MethodDef := {
       accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
       name := "main"
       descriptor := "([Ljava/lang/String;)V"
       maxStack := 4
-      maxLocals := 2
-      -- invokes module's _lean_main and exits
-      bytecodes := (Opcode.return_void.emit ByteArray.empty)
+      maxLocals := 1
+      bytecodes := code
     }
     modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push mainMethod } }
+
+/--
+Emits static fields and getter methods for initialized declarations that do not have their own function body in LCNF.
+-/
+def emitMissingInitGetters (decls : Array Name) : EmitJVMM Unit := do
+  let env ← getEnv
+  let className := (← read).className
+  for declName in decls do
+    if (getInitFnNameFor? env declName).isSome then
+      let fieldName := toJVMMethodName declName
+      if !(← get).cf.fields.any (·.name == fieldName) then
+        let fieldDef : FieldDef := {
+          accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
+          name := fieldName
+          descriptor := leanObjTypeDesc
+        }
+        modify fun (s : JVMState) => { s with cf := { s.cf with fields := s.cf.fields.push fieldDef } }
+        let fieldRef ← addFieldRef className fieldName leanObjTypeDesc
+        let mut getterCode := ByteArray.empty
+        getterCode := (Opcode.getstatic fieldRef).emit getterCode
+        getterCode := Opcode.areturn.emit getterCode
+        let getterDef : MethodDef := {
+          accessFlags := ClassFile.ACC_PUBLIC ||| ClassFile.ACC_STATIC
+          name := fieldName
+          descriptor := s!"(){leanObjTypeDesc}"
+          maxStack := 1
+          maxLocals := 0
+          bytecodes := getterCode
+        }
+        modify fun (s : JVMState) => { s with cf := { s.cf with methods := s.cf.methods.push getterDef } }
 
 /--
 Top-level entry point emitting JVM class bytecode for a set of declarations.
@@ -817,8 +990,10 @@ public def emitJVMForDecls (modName : Name) (decls : Array Name) : CoreM (Array 
   let (_, s) ← (do
     for decl in localDecls do
       emitFnDecl decl
+    emitMissingInitGetters decls
+    emitModuleInit decls
     emitMainIfNeeded
-  ).run ctx |>.run { cf := initialCF } |>.run (phase := .impure)
+  : EmitJVMM Unit).run ctx |>.run { cf := initialCF } |>.run (phase := .impure)
 
   -- Build result: main class first, then synthetic closure classes
   let mut result : Array (String × ByteArray) := #[(className, s.cf.toByteArray)]
