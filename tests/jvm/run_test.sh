@@ -364,6 +364,16 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  java17_verification)
+    if [[ -f "lean/mod_l_lean_test_Java17VerifyModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'Java 17 verification passed\n42\nbranch true'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_Java17VerifyModule)
+      rm -f lean/mod_l_lean_test_Java17VerifyModule*.class lean/test/Java17VerifyModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "Java17Verify failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true
