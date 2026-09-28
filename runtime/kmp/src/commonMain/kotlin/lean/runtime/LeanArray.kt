@@ -24,7 +24,7 @@ public final class LeanArray(
 
     public fun push(value: LeanObject?): LeanArray {
         val newArr = arrayOfNulls<LeanObject>(data.size + 1)
-        for (i in data.indices) newArr[i] = data[i]
+        data.copyInto(newArr)
         newArr[data.size] = value
         return LeanArray(newArr)
     }

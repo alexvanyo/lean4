@@ -9,31 +9,26 @@ import kotlin.jvm.JvmStatic
 
 /**
  * Representation of a Lean Nat (arbitrary precision natural number).
- * Small nats are stored as non-negative 64-bit integers.
+ * Small nats (up to 2^64 - 1) are stored as unsigned 64-bit integers in [smallVal].
  */
 public final class LeanNat : LeanObject {
-    @JvmField public val smallVal: Long
+    public val smallVal: ULong
     @JvmField public val bigVal: LeanBigInt?
 
-    public constructor(smallVal: Long) {
-        if (smallVal >= 0L) {
-            this.smallVal = smallVal
-            this.bigVal = null
-        } else {
-            this.smallVal = -1L
-            this.bigVal = bigIntFromULong(smallVal)
-        }
+    public constructor(smallVal: ULong) {
+        this.smallVal = smallVal
+        this.bigVal = null
     }
 
     public constructor(bigVal: LeanBigInt?) {
         if (bigVal == null || bigIntSignum(bigVal) <= 0) {
-            this.smallVal = 0L
+            this.smallVal = 0uL
             this.bigVal = null
-        } else if (bigIntCompare(bigVal, BIG_LONG_MAX) <= 0) {
-            this.smallVal = bigIntToLong(bigVal)
+        } else if (bigIntCompare(bigVal, BIG_ULONG_MAX) <= 0) {
+            this.smallVal = bigIntToLong(bigVal).toULong()
             this.bigVal = null
         } else {
-            this.smallVal = -1L
+            this.smallVal = 0uL
             this.bigVal = bigVal
         }
     }
@@ -41,10 +36,10 @@ public final class LeanNat : LeanObject {
     public fun toBigInteger(): LeanBigInt {
         val b = bigVal
         if (b != null) return b
-        return createBigInt(smallVal)
+        return bigIntFromULong(smallVal.toLong())
     }
 
-    public fun isZero(): Boolean = bigVal == null && smallVal == 0L
+    public fun isZero(): Boolean = bigVal == null && smallVal == 0uL
     public fun add(other: LeanNat): LeanNat = LeanNat.add(this, other)
     public fun sub(other: LeanNat): LeanNat = LeanNat.sub(this, other)
     public fun mul(other: LeanNat): LeanNat = LeanNat.mul(this, other)
@@ -60,7 +55,7 @@ public final class LeanNat : LeanObject {
         get() {
             val b = bigVal
             if (b != null) return -1
-            return if (smallVal in 0L..Int.MAX_VALUE.toLong()) smallVal.toInt() else -1
+            return if (smallVal <= Int.MAX_VALUE.toULong()) smallVal.toInt() else -1
         }
 
     override fun toString(): String = bigVal?.toString() ?: smallVal.toString()
@@ -77,16 +72,28 @@ public final class LeanNat : LeanObject {
     override fun hashCode(): Int = bigVal?.hashCode() ?: smallVal.hashCode()
 
     companion object {
-        private val BIG_LONG_MAX: LeanBigInt = createBigInt(Long.MAX_VALUE)
+        private val BIG_ULONG_MAX: LeanBigInt = bigIntFromULong(-1L)
+
+        @JvmField
+        public val SMALL_CACHE: Array<LeanNat> = Array(256) { LeanNat(it.toULong()) }
 
         @JvmStatic
-        public val ZERO: LeanNat = LeanNat(0L)
+        public val ZERO: LeanNat = SMALL_CACHE[0]
         @JvmStatic
-        public val ONE: LeanNat = LeanNat(1L)
+        public val ONE: LeanNat = SMALL_CACHE[1]
 
         @JvmStatic
-        public fun ofLong(v: Long): LeanNat =
-            if (v == 0L) ZERO else if (v == 1L) ONE else LeanNat(v)
+        public fun ofULong(v: ULong): LeanNat {
+            if (v <= 255uL) return SMALL_CACHE[v.toInt()]
+            return LeanNat(v)
+        }
+
+        @JvmStatic
+        public fun ofLong(v: Long): LeanNat = ofULong(v.toULong())
+
+        @JvmStatic public fun ofUByte(v: UByte): LeanNat = SMALL_CACHE[v.toInt()]
+        @JvmStatic public fun ofUShort(v: UShort): LeanNat = ofULong(v.toULong())
+        @JvmStatic public fun ofUInt(v: UInt): LeanNat = ofULong(v.toULong())
 
         @JvmStatic
         public fun ofBigInteger(b: LeanBigInt?): LeanNat {
@@ -97,8 +104,8 @@ public final class LeanNat : LeanObject {
 
         @JvmStatic
         public fun ofDecString(s: String): LeanNat {
-            val l = s.toLongOrNull()
-            if (l != null && l >= 0L) return ofLong(l)
+            val u = s.toULongOrNull()
+            if (u != null) return ofULong(u)
             return LeanNat(createBigInt(s))
         }
 
@@ -106,7 +113,7 @@ public final class LeanNat : LeanObject {
         public fun add(a: LeanNat, b: LeanNat): LeanNat {
             if (a.bigVal == null && b.bigVal == null) {
                 val sum = a.smallVal + b.smallVal
-                if (sum >= 0L) return ofLong(sum)
+                if (sum >= a.smallVal) return ofULong(sum)
             }
             return ofBigInteger(bigIntAdd(a.toBigInteger(), b.toBigInteger()))
         }
@@ -114,7 +121,7 @@ public final class LeanNat : LeanObject {
         @JvmStatic
         public fun sub(a: LeanNat, b: LeanNat): LeanNat {
             if (a.bigVal == null && b.bigVal == null) {
-                return if (a.smallVal <= b.smallVal) ZERO else ofLong(a.smallVal - b.smallVal)
+                return if (a.smallVal <= b.smallVal) ZERO else ofULong(a.smallVal - b.smallVal)
             }
             val aBig = a.toBigInteger()
             val bBig = b.toBigInteger()
@@ -125,11 +132,11 @@ public final class LeanNat : LeanObject {
         @JvmStatic
         public fun mul(a: LeanNat, b: LeanNat): LeanNat {
             if (a.bigVal == null && b.bigVal == null) {
-                if (a.smallVal == 0L || b.smallVal == 0L) return ZERO
-                if (a.smallVal == 1L) return b
-                if (b.smallVal == 1L) return a
-                if (a.smallVal <= Long.MAX_VALUE / b.smallVal) {
-                    return ofLong(a.smallVal * b.smallVal)
+                if (a.smallVal == 0uL || b.smallVal == 0uL) return ZERO
+                if (a.smallVal == 1uL) return b
+                if (b.smallVal == 1uL) return a
+                if (a.smallVal <= ULong.MAX_VALUE / b.smallVal) {
+                    return ofULong(a.smallVal * b.smallVal)
                 }
             }
             return ofBigInteger(bigIntMul(a.toBigInteger(), b.toBigInteger()))
@@ -137,9 +144,9 @@ public final class LeanNat : LeanObject {
 
         @JvmStatic
         public fun div(a: LeanNat, b: LeanNat): LeanNat {
-            if (b.bigVal == null && b.smallVal == 0L) return ZERO
+            if (b.bigVal == null && b.smallVal == 0uL) return ZERO
             if (a.bigVal == null && b.bigVal == null) {
-                return ofLong(a.smallVal / b.smallVal)
+                return ofULong(a.smallVal / b.smallVal)
             }
             val bBig = b.toBigInteger()
             if (bigIntIsZero(bBig)) return ZERO
@@ -148,9 +155,9 @@ public final class LeanNat : LeanObject {
 
         @JvmStatic
         public fun mod(a: LeanNat, b: LeanNat): LeanNat {
-            if (b.bigVal == null && b.smallVal == 0L) return ZERO
+            if (b.bigVal == null && b.smallVal == 0uL) return ZERO
             if (a.bigVal == null && b.bigVal == null) {
-                return ofLong(a.smallVal % b.smallVal)
+                return ofULong(a.smallVal % b.smallVal)
             }
             val bBig = b.toBigInteger()
             if (bigIntIsZero(bBig)) return ZERO
@@ -179,11 +186,11 @@ public final class LeanNat : LeanObject {
 
         @JvmStatic
         public fun pow(a: LeanNat, b: LeanNat): LeanNat {
-            if (b.bigVal == null && b.smallVal == 0L) return ONE
-            if (a.bigVal == null && a.smallVal == 0L) return ZERO
-            if (a.bigVal == null && a.smallVal == 1L) return ONE
+            if (b.bigVal == null && b.smallVal == 0uL) return ONE
+            if (a.bigVal == null && a.smallVal == 0uL) return ZERO
+            if (a.bigVal == null && a.smallVal == 1uL) return ONE
             if (b.bigVal != null) return ZERO
-            if (b.smallVal > Int.MAX_VALUE) return ZERO
+            if (b.smallVal > Int.MAX_VALUE.toULong()) return ZERO
             return ofBigInteger(bigIntPow(a.toBigInteger(), b.smallVal.toInt()))
         }
 
@@ -192,12 +199,12 @@ public final class LeanNat : LeanObject {
             if (a.bigVal == null && b.bigVal == null) {
                 var x = a.smallVal
                 var y = b.smallVal
-                while (y != 0L) {
+                while (y != 0uL) {
                     val t = y
                     y = x % y
                     x = t
                 }
-                return ofLong(x)
+                return ofULong(x)
             }
             return ofBigInteger(bigIntGcd(a.toBigInteger(), b.toBigInteger()))
         }

@@ -43,7 +43,7 @@ public final class LeanFloat(
         public fun toDouble(obj: LeanObject?): Double {
             if (obj is LeanFloat) return obj.value
             if (obj is LeanNat) {
-                return Double.fromBits(obj.smallVal)
+                return Double.fromBits(obj.smallVal.toLong())
             }
             if (obj is LeanCtor && obj.scalars.isNotEmpty()) {
                 return Double.fromBits(obj.scalars[0])

@@ -45,23 +45,22 @@ public abstract class LeanClosure(
         return when {
             total == arity -> {
                 val fullArgs = arrayOfNulls<LeanObject>(arity)
-                for (i in captured.indices) fullArgs[i] = captured[i]
-                for (i in args.indices) fullArgs[captured.size + i] = args[i]
+                captured.copyInto(fullArgs)
+                args.copyInto(fullArgs, destinationOffset = captured.size)
                 invokeBody(fullArgs)
             }
             total < arity -> {
                 val newCaptured = arrayOfNulls<LeanObject>(total)
-                for (i in captured.indices) newCaptured[i] = captured[i]
-                for (i in args.indices) newCaptured[captured.size + i] = args[i]
+                captured.copyInto(newCaptured)
+                args.copyInto(newCaptured, destinationOffset = captured.size)
                 copyCurried(newCaptured)
             }
             else -> {
-                // Over-application: satisfy arity first, then apply remaining to the resulting closure
                 val needed = arity - captured.size
                 val firstBatch = arrayOfNulls<LeanObject>(needed)
-                for (i in 0 until needed) firstBatch[i] = args[i]
+                args.copyInto(firstBatch, startIndex = 0, endIndex = needed)
                 val remaining = arrayOfNulls<LeanObject>(args.size - needed)
-                for (i in needed until args.size) remaining[i - needed] = args[i]
+                args.copyInto(remaining, destinationOffset = 0, startIndex = needed, endIndex = args.size)
 
                 val intermediate = apply(*firstBatch) as LeanClosure
                 intermediate.apply(*remaining)
@@ -69,9 +68,68 @@ public abstract class LeanClosure(
         }
     }
 
-    public fun apply1(a1: LeanObject?): LeanObject? = apply(a1)
-    public fun apply2(a1: LeanObject?, a2: LeanObject?): LeanObject? = apply(a1, a2)
-    public fun apply3(a1: LeanObject?, a2: LeanObject?, a3: LeanObject?): LeanObject? = apply(a1, a2, a3)
+    public fun apply1(a1: LeanObject?): LeanObject? {
+        val total = captured.size + 1
+        return when {
+            total == arity -> {
+                val fullArgs = arrayOfNulls<LeanObject>(arity)
+                captured.copyInto(fullArgs)
+                fullArgs[captured.size] = a1
+                invokeBody(fullArgs)
+            }
+            total < arity -> {
+                val newCaptured = arrayOfNulls<LeanObject>(total)
+                captured.copyInto(newCaptured)
+                newCaptured[captured.size] = a1
+                copyCurried(newCaptured)
+            }
+            else -> apply(a1)
+        }
+    }
+
+    public fun apply2(a1: LeanObject?, a2: LeanObject?): LeanObject? {
+        val total = captured.size + 2
+        return when {
+            total == arity -> {
+                val fullArgs = arrayOfNulls<LeanObject>(arity)
+                captured.copyInto(fullArgs)
+                fullArgs[captured.size] = a1
+                fullArgs[captured.size + 1] = a2
+                invokeBody(fullArgs)
+            }
+            total < arity -> {
+                val newCaptured = arrayOfNulls<LeanObject>(total)
+                captured.copyInto(newCaptured)
+                newCaptured[captured.size] = a1
+                newCaptured[captured.size + 1] = a2
+                copyCurried(newCaptured)
+            }
+            else -> apply(a1, a2)
+        }
+    }
+
+    public fun apply3(a1: LeanObject?, a2: LeanObject?, a3: LeanObject?): LeanObject? {
+        val total = captured.size + 3
+        return when {
+            total == arity -> {
+                val fullArgs = arrayOfNulls<LeanObject>(arity)
+                captured.copyInto(fullArgs)
+                fullArgs[captured.size] = a1
+                fullArgs[captured.size + 1] = a2
+                fullArgs[captured.size + 2] = a3
+                invokeBody(fullArgs)
+            }
+            total < arity -> {
+                val newCaptured = arrayOfNulls<LeanObject>(total)
+                captured.copyInto(newCaptured)
+                newCaptured[captured.size] = a1
+                newCaptured[captured.size + 1] = a2
+                newCaptured[captured.size + 2] = a3
+                copyCurried(newCaptured)
+            }
+            else -> apply(a1, a2, a3)
+        }
+    }
 
     companion object {
         @JvmField
