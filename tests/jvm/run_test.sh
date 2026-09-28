@@ -324,6 +324,46 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  nat_bigint_ops)
+    if [[ -f "lean/mod_l_lean_test_NatBigIntOpsModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'36893488147419103233\n1\n0\n18446744073709551575\n36893488147419103232\n9223372036854775808\n1\ntrue\nfalse\ntrue\nfalse\ntrue\nfalse\ntrue\nfalse'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_NatBigIntOpsModule)
+      rm -f lean/mod_l_lean_test_NatBigIntOpsModule*.class lean/test/NatBigIntOpsModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "NatBigIntOps failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  int_ops)
+    if [[ -f "lean/mod_l_lean_test_IntOpsModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'-32\n-52\n52\n-420\n0\n18446744073709551617\n-18446744073709551617\n42\n18446744073709551616\n18446744073709551616\n42\ntrue\nfalse\ntrue\nfalse\ntrue\ntrue\nfalse'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_IntOpsModule)
+      rm -f lean/mod_l_lean_test_IntOpsModule*.class lean/test/IntOpsModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "IntOps failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  uint_ops)
+    if [[ -f "lean/mod_l_lean_test_UIntOpsModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'44\n100\n156\n144\n20\n20\n64\n236\n172\n200\n100\ntrue\n4464\n10000\n705032704\n1000000000\ntrue\n0\n18446744073709551614\ntrue\ntrue'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_UIntOpsModule)
+      rm -f lean/mod_l_lean_test_UIntOpsModule*.class lean/test/UIntOpsModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "UIntOps failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  ctor_scalar_packing)
+    if [[ -f "lean/mod_l_lean_test_CtorScalarPackingModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'10\n20\n99999'
+      OUTPUT=$(java -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_CtorScalarPackingModule)
+      rm -f lean/mod_l_lean_test_CtorScalarPackingModule*.class lean/test/CtorScalarPackingModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "CtorScalarPacking failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true

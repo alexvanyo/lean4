@@ -28,6 +28,23 @@ import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.pow
 
+internal fun toNat(obj: LeanObject?): LeanNat =
+    when (obj) {
+        is LeanNat -> obj
+        null -> LeanNat.ZERO
+        else -> LeanNat.ofLong(obj.tag.toLong())
+    }
+
+internal fun toULong(obj: LeanObject?): Long =
+    when (obj) {
+        is LeanNat -> obj.bigVal?.let { lean.runtime.bigIntToLong(it) } ?: obj.smallVal
+        is LeanCtor -> {
+            val nat = obj.getObj(0) as? LeanNat
+            nat?.bigVal?.let { lean.runtime.bigIntToLong(it) } ?: nat?.smallVal ?: 0L
+        }
+        else -> (obj?.tag ?: 0).toLong()
+    }
+
 /**
  * Kotlin Multiplatform runtime primitives for Lean's standard `Init` library modules.
  */
@@ -156,90 +173,74 @@ public object mod_l_Init_Prelude {
         return LeanNat.ofLong(count)
     }
     @JvmStatic
-    public fun f_Nat_add(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return LeanNat.ofLong(aVal + bVal)
-    }
+    public fun f_Nat_add(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).add(toNat(b))
 
     @JvmStatic
-    public fun f_Nat_sub(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return LeanNat.ofLong(if (aVal < bVal) 0L else aVal - bVal)
-    }
+    public fun f_Nat_sub(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).sub(toNat(b))
 
     @JvmStatic
-    public fun f_Nat_mul(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return LeanNat.ofLong(aVal * bVal)
-    }
+    public fun f_Nat_mul(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).mul(toNat(b))
 
     @JvmStatic
-    public fun f_Nat_div(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        if (bVal == 0L) return LeanNat.ZERO
-        return LeanNat.ofLong(aVal / bVal)
-    }
+    public fun f_Nat_div(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).div(toNat(b))
 
     @JvmStatic
-    public fun f_Nat_mod(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        if (bVal == 0L) return LeanNat.ZERO
-        return LeanNat.ofLong(aVal % bVal)
-    }
+    public fun f_Nat_mod(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).mod(toNat(b))
 
     @JvmStatic
-    public fun f_UInt64_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_pow(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).pow(toNat(b))
 
     @JvmStatic
-    public fun f_USize_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_gcd(a: LeanObject?, b: LeanObject?): LeanObject = toNat(a).gcd(toNat(b))
 
     @JvmStatic
-    public fun f_USize_decLt(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal < bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toNat(a).le(toNat(b))) LeanNat.ONE else LeanNat.ZERO
 
     @JvmStatic
-    public fun f_USize_decLe(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal <= bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toNat(a).eq(toNat(b))) LeanNat.ONE else LeanNat.ZERO
 
     @JvmStatic
-    public fun f_UInt32_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if ((aVal and 0xFFFFFFFFL) == (bVal and 0xFFFFFFFFL)) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toNat(a).lt(toNat(b))) LeanNat.ONE else LeanNat.ZERO
 
     @JvmStatic
-    public fun f_Nat_decLe(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal <= bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_ble(a: LeanObject?, b: LeanObject?): LeanObject = f_Nat_decLe(a, b)
 
     @JvmStatic
-    public fun f_Nat_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
-    }
+    public fun f_Nat_blt(a: LeanObject?, b: LeanObject?): LeanObject = f_Nat_decLt(a, b)
+
+    @JvmStatic
+    public fun f_Nat_beq(a: LeanObject?, b: LeanObject?): LeanObject = f_Nat_decEq(a, b)
+
+    @JvmStatic
+    public fun f_UInt64_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a) == toULong(b)) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_UInt32_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFFFFFL) == (toULong(b) and 0xFFFFFFFFL)) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_UInt16_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFL) == (toULong(b) and 0xFFFFL)) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_UInt8_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFL) == (toULong(b) and 0xFFL)) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_USize_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a) == toULong(b)) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_USize_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() < toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
+
+    @JvmStatic
+    public fun f_USize_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() <= toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
 
     @JvmStatic
     public fun f_String_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
@@ -247,68 +248,199 @@ public object mod_l_Init_Prelude {
         val s2 = b?.toString() ?: ""
         return if (s1 == s2) LeanNat.ONE else LeanNat.ZERO
     }
+}
 
-    @JvmStatic
-    public fun f_Nat_decLt(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return if (aVal < bVal) LeanNat.ONE else LeanNat.ZERO
+public object mod_l_Init_Data_UInt_Basic {
+    // UInt8
+    @JvmStatic public fun f_UInt8_ofNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFL)
+    @JvmStatic public fun f_UInt8_toNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFL)
+    @JvmStatic public fun f_UInt8_add(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) + toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_sub(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) - toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_mul(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) * toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFL
+        return if (bVal == 0L) LeanNat.ZERO else LeanNat.ofLong(((toULong(a) and 0xFFL) / bVal) and 0xFFL)
     }
+    @JvmStatic public fun f_UInt8_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFL
+        return if (bVal == 0L) LeanNat.ofLong(toULong(a) and 0xFFL) else LeanNat.ofLong(((toULong(a) and 0xFFL) % bVal) and 0xFFL)
+    }
+    @JvmStatic public fun f_UInt8_land(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) and toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_lor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) or toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_xor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) xor toULong(b)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFL) % 8L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFL) shl shift) and 0xFFL)
+    }
+    @JvmStatic public fun f_UInt8_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFL) % 8L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFL) ushr shift) and 0xFFL)
+    }
+    @JvmStatic public fun f_UInt8_complement(a: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a).inv()) and 0xFFL)
+    @JvmStatic public fun f_UInt8_neg(a: LeanObject?): LeanObject = LeanNat.ofLong((-toULong(a)) and 0xFFL)
+    @JvmStatic public fun f_UInt8_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFL) == (toULong(b) and 0xFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt8_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFL) < (toULong(b) and 0xFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt8_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFL) <= (toULong(b) and 0xFFL)) LeanNat.ONE else LeanNat.ZERO
 
-    @JvmStatic
-    public fun f_Nat_ble(a: LeanObject?, b: LeanObject?): LeanObject = f_Nat_decLe(a, b)
+    // UInt16
+    @JvmStatic public fun f_UInt16_ofNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_toNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_add(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) + toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_sub(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) - toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_mul(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) * toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFFFL
+        return if (bVal == 0L) LeanNat.ZERO else LeanNat.ofLong(((toULong(a) and 0xFFFFL) / bVal) and 0xFFFFL)
+    }
+    @JvmStatic public fun f_UInt16_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFFFL
+        return if (bVal == 0L) LeanNat.ofLong(toULong(a) and 0xFFFFL) else LeanNat.ofLong(((toULong(a) and 0xFFFFL) % bVal) and 0xFFFFL)
+    }
+    @JvmStatic public fun f_UInt16_land(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) and toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_lor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) or toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_xor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) xor toULong(b)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFFFL) % 16L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFFFL) shl shift) and 0xFFFFL)
+    }
+    @JvmStatic public fun f_UInt16_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFFFL) % 16L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFFFL) ushr shift) and 0xFFFFL)
+    }
+    @JvmStatic public fun f_UInt16_complement(a: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a).inv()) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_neg(a: LeanObject?): LeanObject = LeanNat.ofLong((-toULong(a)) and 0xFFFFL)
+    @JvmStatic public fun f_UInt16_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFL) == (toULong(b) and 0xFFFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt16_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFL) < (toULong(b) and 0xFFFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt16_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFL) <= (toULong(b) and 0xFFFFL)) LeanNat.ONE else LeanNat.ZERO
 
-    @JvmStatic
-    public fun f_Nat_blt(a: LeanObject?, b: LeanObject?): LeanObject = f_Nat_decLt(a, b)
+    // UInt32
+    @JvmStatic public fun f_UInt32_ofNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_toNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_add(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) + toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_sub(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) - toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_mul(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) * toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFFFFFFFL
+        return if (bVal == 0L) LeanNat.ZERO else LeanNat.ofLong(((toULong(a) and 0xFFFFFFFFL) / bVal) and 0xFFFFFFFFL)
+    }
+    @JvmStatic public fun f_UInt32_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b) and 0xFFFFFFFFL
+        return if (bVal == 0L) LeanNat.ofLong(toULong(a) and 0xFFFFFFFFL) else LeanNat.ofLong(((toULong(a) and 0xFFFFFFFFL) % bVal) and 0xFFFFFFFFL)
+    }
+    @JvmStatic public fun f_UInt32_land(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) and toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_lor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) or toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_xor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a) xor toULong(b)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFFFFFFFL) % 32L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFFFFFFFL) shl shift) and 0xFFFFFFFFL)
+    }
+    @JvmStatic public fun f_UInt32_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = ((toULong(b) and 0xFFFFFFFFL) % 32L).toInt()
+        return LeanNat.ofLong(((toULong(a) and 0xFFFFFFFFL) ushr shift) and 0xFFFFFFFFL)
+    }
+    @JvmStatic public fun f_UInt32_complement(a: LeanObject?): LeanObject = LeanNat.ofLong((toULong(a).inv()) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_neg(a: LeanObject?): LeanObject = LeanNat.ofLong((-toULong(a)) and 0xFFFFFFFFL)
+    @JvmStatic public fun f_UInt32_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFFFFFL) == (toULong(b) and 0xFFFFFFFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt32_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFFFFFL) < (toULong(b) and 0xFFFFFFFFL)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt32_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if ((toULong(a) and 0xFFFFFFFFL) <= (toULong(b) and 0xFFFFFFFFL)) LeanNat.ONE else LeanNat.ZERO
+
+    // UInt64
+    @JvmStatic public fun f_UInt64_ofNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a))
+    @JvmStatic public fun f_UInt64_toNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a))
+    @JvmStatic public fun f_UInt64_add(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) + toULong(b))
+    @JvmStatic public fun f_UInt64_sub(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) - toULong(b))
+    @JvmStatic public fun f_UInt64_mul(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) * toULong(b))
+    @JvmStatic public fun f_UInt64_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b).toULong()
+        return if (bVal == 0UL) LeanNat.ZERO else LeanNat.ofLong((toULong(a).toULong() / bVal).toLong())
+    }
+    @JvmStatic public fun f_UInt64_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b).toULong()
+        return if (bVal == 0UL) LeanNat.ofLong(toULong(a)) else LeanNat.ofLong((toULong(a).toULong() % bVal).toLong())
+    }
+    @JvmStatic public fun f_UInt64_land(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and toULong(b))
+    @JvmStatic public fun f_UInt64_lor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) or toULong(b))
+    @JvmStatic public fun f_UInt64_xor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) xor toULong(b))
+    @JvmStatic public fun f_UInt64_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = (toULong(b).toULong() % 64UL).toInt()
+        return LeanNat.ofLong(toULong(a) shl shift)
+    }
+    @JvmStatic public fun f_UInt64_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = (toULong(b).toULong() % 64UL).toInt()
+        return LeanNat.ofLong(toULong(a) ushr shift)
+    }
+    @JvmStatic public fun f_UInt64_complement(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a).inv())
+    @JvmStatic public fun f_UInt64_neg(a: LeanObject?): LeanObject = LeanNat.ofLong(-toULong(a))
+    @JvmStatic public fun f_UInt64_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a) == toULong(b)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt64_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() < toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_UInt64_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() <= toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
+
+    // USize
+    @JvmStatic public fun f_USize_ofNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a))
+    @JvmStatic public fun f_USize_toNat(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a))
+    @JvmStatic public fun f_USize_add(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) + toULong(b))
+    @JvmStatic public fun f_USize_sub(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) - toULong(b))
+    @JvmStatic public fun f_USize_mul(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) * toULong(b))
+    @JvmStatic public fun f_USize_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b).toULong()
+        return if (bVal == 0UL) LeanNat.ZERO else LeanNat.ofLong((toULong(a).toULong() / bVal).toLong())
+    }
+    @JvmStatic public fun f_USize_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = toULong(b).toULong()
+        return if (bVal == 0UL) LeanNat.ofLong(toULong(a)) else LeanNat.ofLong((toULong(a).toULong() % bVal).toLong())
+    }
+    @JvmStatic public fun f_USize_land(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) and toULong(b))
+    @JvmStatic public fun f_USize_lor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) or toULong(b))
+    @JvmStatic public fun f_USize_xor(a: LeanObject?, b: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a) xor toULong(b))
+    @JvmStatic public fun f_USize_shiftLeft(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = (toULong(b).toULong() % 64UL).toInt()
+        return LeanNat.ofLong(toULong(a) shl shift)
+    }
+    @JvmStatic public fun f_USize_shiftRight(a: LeanObject?, b: LeanObject?): LeanObject {
+        val shift = (toULong(b).toULong() % 64UL).toInt()
+        return LeanNat.ofLong(toULong(a) ushr shift)
+    }
+    @JvmStatic public fun f_USize_complement(a: LeanObject?): LeanObject = LeanNat.ofLong(toULong(a).inv())
+    @JvmStatic public fun f_USize_neg(a: LeanObject?): LeanObject = LeanNat.ofLong(-toULong(a))
+    @JvmStatic public fun f_USize_decEq(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a) == toULong(b)) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_USize_decLt(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() < toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
+    @JvmStatic public fun f_USize_decLe(a: LeanObject?, b: LeanObject?): LeanObject =
+        if (toULong(a).toULong() <= toULong(b).toULong()) LeanNat.ONE else LeanNat.ZERO
 }
 
 public object mod_l_Init_Data_UInt_BasicAux {
-    @JvmStatic
-    public fun f_UInt64_ofNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt64_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt32_ofNat(a: LeanObject?): LeanObject =
-        if (a is LeanNat) LeanNat.ofLong(a.smallVal and 0xFFFFFFFFL) else a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt32_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt16_ofNat(a: LeanObject?): LeanObject =
-        if (a is LeanNat) LeanNat.ofLong(a.smallVal and 0xFFFFL) else a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt16_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt8_ofNat(a: LeanObject?): LeanObject =
-        if (a is LeanNat) LeanNat.ofLong(a.smallVal and 0xFFL) else a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_UInt8_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_USize_ofNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_USize_toNat(a: LeanObject?): LeanObject = a ?: LeanNat.ZERO
-
-    @JvmStatic
-    public fun f_USize_add(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return LeanNat.ofLong(aVal + bVal)
-    }
-
-    @JvmStatic
-    public fun f_USize_sub(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = if (a is LeanNat) a.smallVal else (a?.tag?.toLong() ?: 0L)
-        val bVal = if (b is LeanNat) b.smallVal else (b?.tag?.toLong() ?: 0L)
-        return LeanNat.ofLong(aVal - bVal)
-    }
+    @JvmStatic public fun f_UInt64_ofNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt64_ofNat(a)
+    @JvmStatic public fun f_UInt64_toNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt64_toNat(a)
+    @JvmStatic public fun f_UInt32_ofNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt32_ofNat(a)
+    @JvmStatic public fun f_UInt32_toNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt32_toNat(a)
+    @JvmStatic public fun f_UInt16_ofNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt16_ofNat(a)
+    @JvmStatic public fun f_UInt16_toNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt16_toNat(a)
+    @JvmStatic public fun f_UInt8_ofNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt8_ofNat(a)
+    @JvmStatic public fun f_UInt8_toNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_UInt8_toNat(a)
+    @JvmStatic public fun f_USize_ofNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_ofNat(a)
+    @JvmStatic public fun f_USize_toNat(a: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_toNat(a)
+    @JvmStatic public fun f_USize_add(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_add(a, b)
+    @JvmStatic public fun f_USize_sub(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_sub(a, b)
+    @JvmStatic public fun f_USize_mul(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_mul(a, b)
+    @JvmStatic public fun f_USize_div(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_div(a, b)
+    @JvmStatic public fun f_USize_mod(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_mod(a, b)
+    @JvmStatic public fun f_USize_decEq(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_decEq(a, b)
+    @JvmStatic public fun f_USize_decLt(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_decLt(a, b)
+    @JvmStatic public fun f_USize_decLe(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_UInt_Basic.f_USize_decLe(a, b)
 }
 
 public object mod_l_Init_Data_Option_Basic {
@@ -368,89 +500,177 @@ public object mod_l_Init_Data_String_Bootstrap {
 }
 
 public object mod_l_Init_Data_Int_Basic {
-    private fun getIntVal(obj: LeanObject?): Long {
-        if (obj is LeanNat) return obj.smallVal
+    internal fun getBigIntVal(obj: LeanObject?): lean.runtime.LeanBigInt {
+        if (obj is LeanNat) return obj.toBigInteger()
         if (obj is LeanCtor) {
-            val nat = obj.getObj(0) as? LeanNat ?: LeanNat.ZERO
-            return if (obj.tag == 0) nat.smallVal else -(nat.smallVal + 1)
+            val nat = (obj.getObj(0) as? LeanNat)?.toBigInteger() ?: lean.runtime.createBigInt(0L)
+            return if (obj.tag == 0) {
+                nat
+            } else {
+                lean.runtime.bigIntNeg(lean.runtime.bigIntAdd(nat, lean.runtime.createBigInt(1L)))
+            }
         }
-        return 0L
+        val tag = obj?.tag ?: 0
+        return lean.runtime.createBigInt(tag.toLong())
+    }
+
+    internal fun toLeanInt(v: lean.runtime.LeanBigInt): LeanObject {
+        val sign = lean.runtime.bigIntSignum(v)
+        return if (sign >= 0) {
+            val nat = LeanNat(v)
+            val res = LeanCtor.alloc(0, 1, 0)
+            res.setObj(0, nat)
+            res
+        } else {
+            val abs = lean.runtime.bigIntAbs(v)
+            val pred = lean.runtime.bigIntSub(abs, lean.runtime.createBigInt(1L))
+            val nat = LeanNat(pred)
+            val res = LeanCtor.alloc(1, 1, 0)
+            res.setObj(0, nat)
+            res
+        }
     }
 
     @JvmStatic
-    public fun f_Int_ofNat(n: LeanObject?): LeanObject = n ?: LeanNat.ZERO
+    public fun f_Int_ofNat(n: LeanObject?): LeanObject {
+        val nat = toNat(n)
+        val res = LeanCtor.alloc(0, 1, 0)
+        res.setObj(0, nat)
+        return res
+    }
 
     @JvmStatic
-    public fun f_Int_neg(n: LeanObject?): LeanObject {
+    public fun f_Int_negSucc(n: LeanObject?): LeanObject {
+        val nat = toNat(n)
+        val res = LeanCtor.alloc(1, 1, 0)
+        res.setObj(0, nat)
+        return res
+    }
+
+    @JvmStatic
+    public fun f_Int_natAbs(n: LeanObject?): LeanObject {
         if (n is LeanCtor) {
-            if (n.tag == 0) {
-                val natVal = n.getObj(0) as? LeanNat ?: LeanNat.ZERO
-                if (natVal.smallVal == 0L && natVal.bigVal == null) return n
-                val pred = LeanNat.sub(natVal, LeanNat.ONE)
-                val res = LeanCtor.alloc(1, 1, 0)
-                res.setObj(0, pred)
-                return res
-            } else {
-                val natVal = n.getObj(0) as? LeanNat ?: LeanNat.ZERO
-                val succ = LeanNat.add(natVal, LeanNat.ONE)
-                val res = LeanCtor.alloc(0, 1, 0)
-                res.setObj(0, succ)
-                return res
-            }
+            val natVal = (n.getObj(0) as? LeanNat) ?: LeanNat.ZERO
+            return if (n.tag == 0) natVal else natVal.add(LeanNat.ONE)
         }
         if (n is LeanNat) {
-            return LeanNat.ofLong(-n.smallVal)
+            return n
         }
         return LeanNat.ZERO
     }
 
     @JvmStatic
+    public fun f_Int_neg(n: LeanObject?): LeanObject {
+        val v = getBigIntVal(n)
+        return toLeanInt(lean.runtime.bigIntNeg(v))
+    }
+
+    @JvmStatic
     public fun f_Int_negOfNat(n: LeanObject?): LeanObject {
-        val v = if (n is LeanNat) n.smallVal else 0L
-        return LeanNat.ofLong(-v)
+        val nat = toNat(n)
+        if (nat.isZero()) return f_Int_ofNat(nat)
+        val pred = nat.sub(LeanNat.ONE)
+        return f_Int_negSucc(pred)
     }
 
     @JvmStatic
     public fun f_Int_add(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return LeanNat.ofLong(aVal + bVal)
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return toLeanInt(lean.runtime.bigIntAdd(aVal, bVal))
     }
 
     @JvmStatic
     public fun f_Int_sub(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return LeanNat.ofLong(aVal - bVal)
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return toLeanInt(lean.runtime.bigIntSub(aVal, bVal))
     }
 
     @JvmStatic
     public fun f_Int_mul(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return LeanNat.ofLong(aVal * bVal)
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return toLeanInt(lean.runtime.bigIntMul(aVal, bVal))
+    }
+
+    @JvmStatic
+    public fun f_Int_div(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = getBigIntVal(b)
+        if (lean.runtime.bigIntIsZero(bVal)) return toLeanInt(lean.runtime.createBigInt(0L))
+        val aVal = getBigIntVal(a)
+        return toLeanInt(lean.runtime.bigIntDiv(aVal, bVal))
+    }
+
+    @JvmStatic
+    public fun f_Int_mod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = getBigIntVal(b)
+        val aVal = getBigIntVal(a)
+        if (lean.runtime.bigIntIsZero(bVal)) return toLeanInt(aVal)
+        return toLeanInt(lean.runtime.bigIntMod(aVal, bVal))
+    }
+
+    @JvmStatic
+    public fun f_Int_ediv(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = getBigIntVal(b)
+        if (lean.runtime.bigIntIsZero(bVal)) return toLeanInt(lean.runtime.createBigInt(0L))
+        val aVal = getBigIntVal(a)
+        val q = lean.runtime.bigIntDiv(aVal, bVal)
+        val r = lean.runtime.bigIntMod(aVal, bVal)
+        if (lean.runtime.bigIntSignum(r) < 0) {
+            return if (lean.runtime.bigIntSignum(bVal) > 0) {
+                toLeanInt(lean.runtime.bigIntSub(q, lean.runtime.createBigInt(1L)))
+            } else {
+                toLeanInt(lean.runtime.bigIntAdd(q, lean.runtime.createBigInt(1L)))
+            }
+        }
+        return toLeanInt(q)
+    }
+
+    @JvmStatic
+    public fun f_Int_emod(a: LeanObject?, b: LeanObject?): LeanObject {
+        val bVal = getBigIntVal(b)
+        val aVal = getBigIntVal(a)
+        if (lean.runtime.bigIntIsZero(bVal)) return toLeanInt(aVal)
+        val r = lean.runtime.bigIntMod(aVal, bVal)
+        if (lean.runtime.bigIntSignum(r) < 0) {
+            return if (lean.runtime.bigIntSignum(bVal) > 0) {
+                toLeanInt(lean.runtime.bigIntAdd(r, bVal))
+            } else {
+                toLeanInt(lean.runtime.bigIntSub(r, bVal))
+            }
+        }
+        return toLeanInt(r)
     }
 
     @JvmStatic
     public fun f_Int_decEq(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return if (aVal == bVal) LeanNat.ONE else LeanNat.ZERO
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return if (lean.runtime.bigIntCompare(aVal, bVal) == 0) LeanNat.ONE else LeanNat.ZERO
     }
 
     @JvmStatic
     public fun f_Int_decLe(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return if (aVal <= bVal) LeanNat.ONE else LeanNat.ZERO
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return if (lean.runtime.bigIntCompare(aVal, bVal) <= 0) LeanNat.ONE else LeanNat.ZERO
     }
 
     @JvmStatic
     public fun f_Int_decLt(a: LeanObject?, b: LeanObject?): LeanObject {
-        val aVal = getIntVal(a)
-        val bVal = getIntVal(b)
-        return if (aVal < bVal) LeanNat.ONE else LeanNat.ZERO
+        val aVal = getBigIntVal(a)
+        val bVal = getBigIntVal(b)
+        return if (lean.runtime.bigIntCompare(aVal, bVal) < 0) LeanNat.ONE else LeanNat.ZERO
     }
+}
+
+public object mod_l_Init_Data_Int_DivMod_Basic {
+    @JvmStatic public fun f_Int_div(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_Int_Basic.f_Int_div(a, b)
+    @JvmStatic public fun f_Int_mod(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_Int_Basic.f_Int_mod(a, b)
+    @JvmStatic public fun f_Int_ediv(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_Int_Basic.f_Int_ediv(a, b)
+    @JvmStatic public fun f_Int_emod(a: LeanObject?, b: LeanObject?): LeanObject = mod_l_Init_Data_Int_Basic.f_Int_emod(a, b)
+    @JvmStatic public fun f_Int_divExact(a: LeanObject?, b: LeanObject?, h: LeanObject?): LeanObject = mod_l_Init_Data_Int_Basic.f_Int_ediv(a, b)
 }
 
 public object mod_l_Init_Data_Nat_Bitwise_Basic {
@@ -517,14 +737,14 @@ public object mod_l_Init_Data_Repr {
 
     @JvmStatic
     public fun f_Bool_repr___redArg(b: LeanObject?): LeanObject {
-        val isTrue = if (b is LeanNat) b.smallVal != 0L else ((b?.tag ?: 0) != 0)
+        val isTrue = if (b is LeanNat) !b.isZero() else ((b?.tag ?: 0) != 0)
         return LeanString.of(if (isTrue) "true" else "false")
     }
 
     @JvmStatic
     public fun f_Nat_reprFast(n: LeanObject?): LeanObject {
-        val v = if (n is LeanNat) n.smallVal else 0L
-        return LeanString.of(v.toString())
+        val v = if (n is LeanNat) n.toString() else (n?.tag ?: 0).toString()
+        return LeanString.of(v)
     }
 
     @JvmStatic
@@ -746,8 +966,8 @@ public object mod_l_Init_Data_Int_Repr {
                 natVal?.toString() ?: "0"
             } else {
                 val natVal = n.getObj(0)
-                val v = if (natVal is LeanNat) natVal.smallVal + 1 else 1L
-                "-$v"
+                val succ = (natVal as? LeanNat)?.add(LeanNat.ONE) ?: LeanNat.ONE
+                "-$succ"
             }
         } else if (n is LeanNat) {
             n.toString()
@@ -782,7 +1002,8 @@ public object mod_l_Init_Data_OfScientific {
                 return f_Float_ofNat(n.getObj(0))
             } else {
                 val natVal = n.getObj(0)
-                val d = if (natVal is LeanNat) (natVal.smallVal + 1).toDouble() else 1.0
+                val succ = (natVal as? LeanNat)?.add(LeanNat.ONE) ?: LeanNat.ONE
+                val d = if (succ.bigVal != null) lean.runtime.bigIntToDouble(succ.bigVal) else succ.smallVal.toDouble()
                 return LeanFloat.ofDouble(-d)
             }
         }

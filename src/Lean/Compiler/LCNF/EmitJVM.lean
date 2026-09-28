@@ -37,6 +37,14 @@ def leanCtorClass := "lean/runtime/LeanCtor"
 def leanNatClass := "lean/runtime/LeanNat"
 def leanStringClass := "lean/runtime/LeanString"
 
+def getScalarNumBytes (ty : Expr) : Nat :=
+  match ty with
+  | ImpureType.uint8 => 1
+  | ImpureType.uint16 => 2
+  | ImpureType.uint32 | ImpureType.float32 => 4
+  | ImpureType.uint64 | ImpureType.usize | ImpureType.float => 8
+  | _ => 8
+
 def toJVMTypeDesc (_type : Expr) : String :=
   leanObjTypeDesc
 
@@ -385,10 +393,7 @@ def getDeclClassName (fn : Name) : EmitJVMM String := do
 def emitCtor (info : CtorInfo) (args : Array (Arg .impure)) : EmitJVMM Unit := do
   emitPushInt info.cidx
   emitPushInt info.size
-  let numScalars :=
-    if info.usize == 0 && info.ssize == 0 then 0
-    else if info.ssize > info.usize + (info.ssize + 7) / 8 then info.ssize
-    else info.usize + (info.ssize + 7) / 8
+  let numScalars := info.usize + (info.ssize + 7) / 8
   emitPushInt numScalars
   let allocIdx ← addMethodRef "lean/runtime/LeanCtor" "alloc" "(III)Llean/runtime/LeanCtor;"
   emitOp (.invokestatic allocIdx)
@@ -591,13 +596,15 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     emitOp (.invokevirtual getScalarIdx)
     let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
     emitOp (.invokestatic ofLongIdx)
-  | .sproj _n offset fvarId =>
+  | .sproj n offset fvarId =>
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    let scalarIdx := if offset >= 8 then offset / 8 else offset
-    emitPushInt scalarIdx
-    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getScalar" "(I)J"
+    emitPushInt n
+    emitPushInt offset
+    let numBytes := getScalarNumBytes decl.type
+    emitPushInt numBytes
+    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getByteScalar" "(III)J"
     emitOp (.invokevirtual getScalarIdx)
     let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
     emitOp (.invokestatic ofLongIdx)
@@ -719,16 +726,18 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
     emitOp (.invokevirtual setScalarIdx)
     emitCode k
-  | .sset fvarId _i offset y _ty k =>
+  | .sset fvarId i offset y ty k =>
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    let scalarIdx := if offset >= 8 then offset / 8 else offset
-    emitPushInt scalarIdx
+    emitPushInt i
+    emitPushInt offset
+    let numBytes := getScalarNumBytes ty
+    emitPushInt numBytes
     emitLoad y
     let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
     emitOp (.invokestatic getScalar64Idx)
-    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
+    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setByteScalar" "(IIIJ)V"
     emitOp (.invokevirtual setScalarIdx)
     emitCode k
   | .setTag _ _ k =>

@@ -32,10 +32,12 @@ public object LeanRuntimeJVM {
     public fun boxUInt32(v: Int): LeanObject = LeanNat.ofLong(v.toLong() and 0xFFFFFFFFL)
 
     @JvmStatic
-    public fun boxUInt64(v: Long): LeanObject = LeanNat.ofLong(v)
+    public fun boxUInt64(v: Long): LeanObject =
+        if (v >= 0L) LeanNat.ofLong(v) else LeanNat.ofBigInteger(bigIntFromULong(v))
 
     @JvmStatic
-    public fun boxUSize(v: Long): LeanObject = LeanNat.ofLong(v)
+    public fun boxUSize(v: Long): LeanObject =
+        if (v >= 0L) LeanNat.ofLong(v) else LeanNat.ofBigInteger(bigIntFromULong(v))
 
     @JvmStatic
     public fun unboxUInt32(obj: LeanObject?): Int {

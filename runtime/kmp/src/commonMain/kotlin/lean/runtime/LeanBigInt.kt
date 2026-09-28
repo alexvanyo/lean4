@@ -19,3 +19,14 @@ public expect fun bigIntToDouble(a: LeanBigInt): Double
 public expect fun bigIntCompare(a: LeanBigInt, b: LeanBigInt): Int
 public expect fun bigIntIsZero(a: LeanBigInt): Boolean
 public expect fun bigIntIsOne(a: LeanBigInt): Boolean
+public expect fun bigIntAdd(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntSub(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntMul(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntDiv(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntMod(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntPow(a: LeanBigInt, exp: Int): LeanBigInt
+public expect fun bigIntGcd(a: LeanBigInt, b: LeanBigInt): LeanBigInt
+public expect fun bigIntAbs(a: LeanBigInt): LeanBigInt
+public expect fun bigIntNeg(a: LeanBigInt): LeanBigInt
+public expect fun bigIntSignum(a: LeanBigInt): Int
+public expect fun bigIntFromULong(u: Long): LeanBigInt
