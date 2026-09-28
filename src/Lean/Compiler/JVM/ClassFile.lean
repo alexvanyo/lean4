@@ -10,7 +10,9 @@ public import Init.Data.ByteArray
 public import Init.Data.UInt.Basic
 public import Init.Data.UInt.Bitwise
 public import Init.Data.String.Basic
+public import Init.Data.Hashable
 public import Lean.Compiler.JVM.Opcode
+public import Std.Data.HashMap.Basic
 
 public section
 
@@ -31,7 +33,14 @@ inductive CPEntry where
   deriving Inhabited
 
 structure ConstantPool where
-  entries : Array CPEntry := #[]
+  entries         : Array CPEntry := #[]
+  utf8Map         : Std.HashMap String UInt16 := {}
+  classMap        : Std.HashMap UInt16 UInt16 := {}
+  stringMap       : Std.HashMap UInt16 UInt16 := {}
+  integerMap      : Std.HashMap UInt32 UInt16 := {}
+  nameAndTypeMap  : Std.HashMap (UInt16 × UInt16) UInt16 := {}
+  methodRefMap    : Std.HashMap (UInt16 × UInt16) UInt16 := {}
+  fieldRefMap     : Std.HashMap (UInt16 × UInt16) UInt16 := {}
   deriving Inhabited
 
 namespace ConstantPool
@@ -51,52 +60,69 @@ def addEntry (cp : ConstantPool) (entry : CPEntry) : UInt16 × ConstantPool :=
   | .long _ =>
     -- Long takes two pool entries (second is unused dummy)
     let newEntries := cp.entries.push entry |>.push (.utf8 "")
-    (idx, { entries := newEntries })
+    (idx, { cp with entries := newEntries })
   | _ =>
-    (idx, { entries := cp.entries.push entry })
+    (idx, { cp with entries := cp.entries.push entry })
 
 def addUtf8 (cp : ConstantPool) (s : String) : UInt16 × ConstantPool :=
-  match cp.entries.findIdx? (fun e => match e with | .utf8 s' => s == s' | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.utf8 s)
+  match cp.utf8Map[s]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.utf8 s)
+    (idx, { cp' with utf8Map := cp'.utf8Map.insert s idx })
 
 def addClass (cp : ConstantPool) (className : String) : UInt16 × ConstantPool :=
   let (nameIdx, cp) := cp.addUtf8 className
-  match cp.entries.findIdx? (fun e => match e with | .classRef i => i == nameIdx | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.classRef nameIdx)
+  match cp.classMap[nameIdx]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.classRef nameIdx)
+    (idx, { cp' with classMap := cp'.classMap.insert nameIdx idx })
 
 def addString (cp : ConstantPool) (str : String) : UInt16 × ConstantPool :=
   let (strIdx, cp) := cp.addUtf8 str
-  match cp.entries.findIdx? (fun e => match e with | .stringRef i => i == strIdx | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.stringRef strIdx)
+  match cp.stringMap[strIdx]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.stringRef strIdx)
+    (idx, { cp' with stringMap := cp'.stringMap.insert strIdx idx })
 
 def addInteger (cp : ConstantPool) (v : UInt32) : UInt16 × ConstantPool :=
-  match cp.entries.findIdx? (fun e => match e with | .integer i => i == v | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.integer v)
+  match cp.integerMap[v]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.integer v)
+    (idx, { cp' with integerMap := cp'.integerMap.insert v idx })
 
 def addNameAndType (cp : ConstantPool) (name : String) (desc : String) : UInt16 × ConstantPool :=
   let (nameIdx, cp) := cp.addUtf8 name
   let (descIdx, cp) := cp.addUtf8 desc
-  match cp.entries.findIdx? (fun e => match e with | .nameAndType n d => n == nameIdx && d == descIdx | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.nameAndType nameIdx descIdx)
+  let key := (nameIdx, descIdx)
+  match cp.nameAndTypeMap[key]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.nameAndType nameIdx descIdx)
+    (idx, { cp' with nameAndTypeMap := cp'.nameAndTypeMap.insert key idx })
 
 def addMethodRef (cp : ConstantPool) (className : String) (methodName : String) (desc : String) : UInt16 × ConstantPool :=
   let (classIdx, cp) := cp.addClass className
   let (ntIdx, cp) := cp.addNameAndType methodName desc
-  match cp.entries.findIdx? (fun e => match e with | .methodRef c nt => c == classIdx && nt == ntIdx | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.methodRef classIdx ntIdx)
+  let key := (classIdx, ntIdx)
+  match cp.methodRefMap[key]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.methodRef classIdx ntIdx)
+    (idx, { cp' with methodRefMap := cp'.methodRefMap.insert key idx })
 
 def addFieldRef (cp : ConstantPool) (className : String) (fieldName : String) (desc : String) : UInt16 × ConstantPool :=
   let (classIdx, cp) := cp.addClass className
   let (ntIdx, cp) := cp.addNameAndType fieldName desc
-  match cp.entries.findIdx? (fun e => match e with | .fieldRef c nt => c == classIdx && nt == ntIdx | _ => false) with
-  | some idx => ((idx + 1).toUInt16, cp)
-  | none => cp.addEntry (.fieldRef classIdx ntIdx)
+  let key := (classIdx, ntIdx)
+  match cp.fieldRefMap[key]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.fieldRef classIdx ntIdx)
+    (idx, { cp' with fieldRefMap := cp'.fieldRefMap.insert key idx })
 
 end ConstantPool
 

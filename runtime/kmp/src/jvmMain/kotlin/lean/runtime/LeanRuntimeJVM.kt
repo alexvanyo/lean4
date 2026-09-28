@@ -17,7 +17,7 @@ public object LeanRuntimeJVM {
     @JvmStatic
     public fun getScalar64(obj: LeanObject?): Long {
         if (obj is LeanFloat) return obj.value.toRawBits()
-        if (obj is LeanNat) return obj.smallVal
+        if (obj is LeanNat) return obj.smallVal.toLong()
         if (obj is LeanCtor && obj.scalars.isNotEmpty()) return obj.scalars[0]
         return obj?.tag?.toLong() ?: 0L
     }
@@ -26,34 +26,69 @@ public object LeanRuntimeJVM {
     public fun boxUInt8(v: Byte): LeanObject = LeanNat.ofLong((v.toInt() and 0xFF).toLong())
 
     @JvmStatic
+    public fun boxUInt8(v: UByte): LeanObject = LeanNat.ofUByte(v)
+
+    @JvmStatic
     public fun boxUInt16(v: Short): LeanObject = LeanNat.ofLong((v.toInt() and 0xFFFF).toLong())
 
     @JvmStatic
+    public fun boxUInt16(v: UShort): LeanObject = LeanNat.ofUShort(v)
+
+    @JvmStatic
     public fun boxUInt32(v: Int): LeanObject = LeanNat.ofLong(v.toLong() and 0xFFFFFFFFL)
+
+    @JvmStatic
+    public fun boxUInt32(v: UInt): LeanObject = LeanNat.ofUInt(v)
 
     @JvmStatic
     public fun boxUInt64(v: Long): LeanObject =
         if (v >= 0L) LeanNat.ofLong(v) else LeanNat.ofBigInteger(bigIntFromULong(v))
 
     @JvmStatic
+    public fun boxUInt64(v: ULong): LeanObject = LeanNat.ofULong(v)
+
+    @JvmStatic
     public fun boxUSize(v: Long): LeanObject =
         if (v >= 0L) LeanNat.ofLong(v) else LeanNat.ofBigInteger(bigIntFromULong(v))
 
     @JvmStatic
-    public fun unboxUInt32(obj: LeanObject?): Int {
+    public fun boxUSize(v: ULong): LeanObject = LeanNat.ofULong(v)
+
+    @JvmStatic
+    public fun unboxUInt8(obj: LeanObject?): UByte =
+        when (obj) {
+            is LeanNat -> obj.smallVal.toUByte()
+            else -> 0u
+        }
+
+    @JvmStatic
+    public fun unboxUInt16(obj: LeanObject?): UShort =
+        when (obj) {
+            is LeanNat -> obj.smallVal.toUShort()
+            else -> 0u
+        }
+
+    @JvmStatic
+    public fun unboxUInt32(obj: LeanObject?): UInt {
         return when (obj) {
-            is LeanNat -> obj.smallVal.toInt()
-            else -> 0
+            is LeanNat -> obj.smallVal.toUInt()
+            else -> 0u
         }
     }
 
     @JvmStatic
-    public fun unboxUInt64(obj: LeanObject?): Long {
+    public fun unboxUInt64(obj: LeanObject?): ULong {
         return when (obj) {
-            is LeanNat -> obj.smallVal
-            else -> 0L
+            is LeanNat -> {
+                val b = obj.bigVal
+                if (b != null) bigIntToLong(b).toULong() else obj.smallVal
+            }
+            else -> 0uL
         }
     }
+
+    @JvmStatic
+    public fun unboxUSize(obj: LeanObject?): ULong = unboxUInt64(obj)
 
     @JvmStatic
     public fun printString(str: LeanString) {

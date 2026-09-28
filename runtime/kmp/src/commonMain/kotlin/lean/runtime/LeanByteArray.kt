@@ -17,6 +17,7 @@ public final class LeanByteArray(
     public fun size(): Int = data.size
 
     public fun get(index: Int): Byte = data[index]
+    public fun getUByte(index: Int): UByte = data[index].toUByte()
 
     public fun push(b: Byte): LeanByteArray {
         val copy = data.copyOf(data.size + 1)
@@ -24,11 +25,15 @@ public final class LeanByteArray(
         return LeanByteArray(copy)
     }
 
+    public fun push(b: UByte): LeanByteArray = push(b.toByte())
+
     public fun set(index: Int, b: Byte): LeanByteArray {
         val copy = data.copyOf()
         copy[index] = b
         return LeanByteArray(copy)
     }
+
+    public fun set(index: Int, b: UByte): LeanByteArray = set(index, b.toByte())
 
     companion object {
         private val EMPTY_BYTES = ByteArray(0)
