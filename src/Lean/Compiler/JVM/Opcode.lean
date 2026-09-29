@@ -79,8 +79,16 @@ inductive Opcode where
   | lcmp
   | ifeq (target : UInt16)
   | ifne (target : UInt16)
+  | iflt (target : UInt16)
+  | ifge (target : UInt16)
+  | ifgt (target : UInt16)
+  | ifle (target : UInt16)
   | if_icmpeq (target : UInt16)
   | if_icmpne (target : UInt16)
+  | if_icmplt (target : UInt16)
+  | if_icmpge (target : UInt16)
+  | if_icmpgt (target : UInt16)
+  | if_icmple (target : UInt16)
   | if_acmpeq (target : UInt16)
   | if_acmpne (target : UInt16)
   | ifnull (target : UInt16)
@@ -235,8 +243,16 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
   | .lcmp => writeU8 ba 0x94
   | .ifeq target => writeU16 (writeU8 ba 0x99) target
   | .ifne target => writeU16 (writeU8 ba 0x9a) target
+  | .iflt target => writeU16 (writeU8 ba 0x9b) target
+  | .ifge target => writeU16 (writeU8 ba 0x9c) target
+  | .ifgt target => writeU16 (writeU8 ba 0x9d) target
+  | .ifle target => writeU16 (writeU8 ba 0x9e) target
   | .if_icmpeq target => writeU16 (writeU8 ba 0x9f) target
   | .if_icmpne target => writeU16 (writeU8 ba 0xa0) target
+  | .if_icmplt target => writeU16 (writeU8 ba 0xa1) target
+  | .if_icmpge target => writeU16 (writeU8 ba 0xa2) target
+  | .if_icmpgt target => writeU16 (writeU8 ba 0xa3) target
+  | .if_icmple target => writeU16 (writeU8 ba 0xa4) target
   | .if_acmpeq target => writeU16 (writeU8 ba 0xa5) target
   | .if_acmpne target => writeU16 (writeU8 ba 0xa6) target
   | .ifnull target => writeU16 (writeU8 ba 0xc6) target
