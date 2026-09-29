@@ -38,10 +38,14 @@ inductive Opcode where
   | ldc2_w (cpIdx : UInt16)
   | iload (slot : UInt8)
   | lload (slot : UInt8)
+  | fload (slot : UInt8)
+  | dload (slot : UInt8)
   | aload (slot : UInt8)
   | aaload
   | istore (slot : UInt8)
   | lstore (slot : UInt8)
+  | fstore (slot : UInt8)
+  | dstore (slot : UInt8)
   | astore (slot : UInt8)
   | aastore
   | pop
@@ -85,6 +89,8 @@ inductive Opcode where
   | tableswitch (low high : UInt32) (defOffset : UInt32) (offsets : Array UInt32)
   | ireturn
   | lreturn
+  | freturn
+  | dreturn
   | areturn
   | return_void
   | getstatic (cpIdx : UInt16)
@@ -148,6 +154,18 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
     else if slot == 2 then writeU8 ba 0x20
     else if slot == 3 then writeU8 ba 0x21
     else writeU8 (writeU8 ba 0x16) slot
+  | .fload slot =>
+    if slot == 0 then writeU8 ba 0x22
+    else if slot == 1 then writeU8 ba 0x23
+    else if slot == 2 then writeU8 ba 0x24
+    else if slot == 3 then writeU8 ba 0x25
+    else writeU8 (writeU8 ba 0x17) slot
+  | .dload slot =>
+    if slot == 0 then writeU8 ba 0x26
+    else if slot == 1 then writeU8 ba 0x27
+    else if slot == 2 then writeU8 ba 0x28
+    else if slot == 3 then writeU8 ba 0x29
+    else writeU8 (writeU8 ba 0x18) slot
   | .aload slot =>
     if slot == 0 then writeU8 ba 0x2a
     else if slot == 1 then writeU8 ba 0x2b
@@ -167,6 +185,18 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
     else if slot == 2 then writeU8 ba 0x41
     else if slot == 3 then writeU8 ba 0x42
     else writeU8 (writeU8 ba 0x37) slot
+  | .fstore slot =>
+    if slot == 0 then writeU8 ba 0x43
+    else if slot == 1 then writeU8 ba 0x44
+    else if slot == 2 then writeU8 ba 0x45
+    else if slot == 3 then writeU8 ba 0x46
+    else writeU8 (writeU8 ba 0x38) slot
+  | .dstore slot =>
+    if slot == 0 then writeU8 ba 0x47
+    else if slot == 1 then writeU8 ba 0x48
+    else if slot == 2 then writeU8 ba 0x49
+    else if slot == 3 then writeU8 ba 0x4a
+    else writeU8 (writeU8 ba 0x39) slot
   | .astore slot =>
     if slot == 0 then writeU8 ba 0x4b
     else if slot == 1 then writeU8 ba 0x4c
@@ -228,6 +258,8 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
       return ba
   | .ireturn => writeU8 ba 0xac
   | .lreturn => writeU8 ba 0xad
+  | .freturn => writeU8 ba 0xae
+  | .dreturn => writeU8 ba 0xaf
   | .areturn => writeU8 ba 0xb0
   | .return_void => writeU8 ba 0xb1
   | .getstatic idx => writeU16 (writeU8 ba 0xb2) idx

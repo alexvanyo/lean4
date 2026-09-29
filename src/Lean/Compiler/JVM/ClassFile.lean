@@ -32,6 +32,7 @@ inductive CPEntry where
   | fieldRef (classIdx : UInt16) (nameAndTypeIdx : UInt16)
   | methodRef (classIdx : UInt16) (nameAndTypeIdx : UInt16)
   | nameAndType (nameIdx : UInt16) (descIdx : UInt16)
+  | unused
   deriving Inhabited
 
 structure ConstantPool where
@@ -40,6 +41,7 @@ structure ConstantPool where
   classMap        : Std.HashMap UInt16 UInt16 := {}
   stringMap       : Std.HashMap UInt16 UInt16 := {}
   integerMap      : Std.HashMap UInt32 UInt16 := {}
+  longMap         : Std.HashMap UInt64 UInt16 := {}
   nameAndTypeMap  : Std.HashMap (UInt16 × UInt16) UInt16 := {}
   methodRefMap    : Std.HashMap (UInt16 × UInt16) UInt16 := {}
   fieldRefMap     : Std.HashMap (UInt16 × UInt16) UInt16 := {}
@@ -61,7 +63,7 @@ def addEntry (cp : ConstantPool) (entry : CPEntry) : UInt16 × ConstantPool :=
   match entry with
   | .long _ =>
     -- Long takes two pool entries (second is unused dummy)
-    let newEntries := cp.entries.push entry |>.push (.utf8 "")
+    let newEntries := cp.entries.push entry |>.push .unused
     (idx, { cp with entries := newEntries })
   | _ =>
     (idx, { cp with entries := cp.entries.push entry })
@@ -95,6 +97,13 @@ def addInteger (cp : ConstantPool) (v : UInt32) : UInt16 × ConstantPool :=
   | none =>
     let (idx, cp') := cp.addEntry (.integer v)
     (idx, { cp' with integerMap := cp'.integerMap.insert v idx })
+
+def addLong (cp : ConstantPool) (v : UInt64) : UInt16 × ConstantPool :=
+  match cp.longMap[v]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.long v)
+    (idx, { cp' with longMap := cp'.longMap.insert v idx })
 
 def addNameAndType (cp : ConstantPool) (name : String) (desc : String) : UInt16 × ConstantPool :=
   let (nameIdx, cp) := cp.addUtf8 name
@@ -180,6 +189,10 @@ def addInteger (cf : ClassFile) (v : UInt32) : UInt16 × ClassFile :=
   let (idx, cp) := cf.cp.addInteger v
   (idx, { cf with cp := cp })
 
+def addLong (cf : ClassFile) (v : UInt64) : UInt16 × ClassFile :=
+  let (idx, cp) := cf.cp.addLong v
+  (idx, { cf with cp := cp })
+
 open Opcode (writeU8 writeU16 writeU32)
 
 /--
@@ -190,6 +203,7 @@ def encodeConstantPool (ba : ByteArray) (cp : ConstantPool) : ByteArray :=
     let mut ba := ba
     for entry in cp.entries do
       match entry with
+      | .unused => pure ()
       | .utf8 s =>
         let utf8Bytes := s.toUTF8
         ba := writeU8 ba 1 -- Tag 1: CONSTANT_Utf8
@@ -443,6 +457,22 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
       | 0x42 =>
         currentLocals := setLocal currentLocals 3 .long
         currentLocals := setLocal currentLocals 4 .top
+      | 0x43 => currentLocals := setLocal currentLocals 0 .float
+      | 0x44 => currentLocals := setLocal currentLocals 1 .float
+      | 0x45 => currentLocals := setLocal currentLocals 2 .float
+      | 0x46 => currentLocals := setLocal currentLocals 3 .float
+      | 0x47 =>
+        currentLocals := setLocal currentLocals 0 .double
+        currentLocals := setLocal currentLocals 1 .top
+      | 0x48 =>
+        currentLocals := setLocal currentLocals 1 .double
+        currentLocals := setLocal currentLocals 2 .top
+      | 0x49 =>
+        currentLocals := setLocal currentLocals 2 .double
+        currentLocals := setLocal currentLocals 3 .top
+      | 0x4a =>
+        currentLocals := setLocal currentLocals 3 .double
+        currentLocals := setLocal currentLocals 4 .top
       | 0x4b => currentLocals := setLocal currentLocals 0 (.object leanObjIdx)
       | 0x4c => currentLocals := setLocal currentLocals 1 (.object leanObjIdx)
       | 0x4d => currentLocals := setLocal currentLocals 2 (.object leanObjIdx)
@@ -505,8 +535,17 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
       else
         sm := writeU8 sm 255
         sm := writeU16 sm delta.toUInt16
-        sm := writeU16 sm localsAtT.size.toUInt16
-        for vt in localsAtT do
+        let mut encodedLocals : Array VerificationType := #[]
+        let mut idx := 0
+        while idx < localsAtT.size do
+          let vt := localsAtT[idx]!
+          encodedLocals := encodedLocals.push vt
+          if (vt == .long || vt == .double) && idx + 1 < localsAtT.size && localsAtT[idx + 1]! == .top then
+            idx := idx + 2
+          else
+            idx := idx + 1
+        sm := writeU16 sm encodedLocals.size.toUInt16
+        for vt in encodedLocals do
           sm := encodeVerificationType sm vt
         sm := writeU16 sm 0
 
