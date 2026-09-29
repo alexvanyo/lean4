@@ -14,6 +14,7 @@ import Lean.Compiler.ExportAttr
 import Lean.Compiler.ModPkgExt
 import Lean.Compiler.LCNF.Internalize
 import Lean.Compiler.InitAttr
+public import Lean.Compiler.LCNF.ToImpureType
 public import Lean.Compiler.JVM.ClassFile
 public import Lean.Compiler.JVM.Opcode
 public import Init.Data.ByteArray
@@ -80,6 +81,7 @@ structure JVMContext where
   currParams       : Array (Param .impure) := #[]
   varSlotMap       : Std.HashMap FVarId UInt8 := {}
   varTypeMap       : Std.HashMap FVarId Expr := {}
+  ctorClassMap     : Std.HashMap FVarId (Name × CtorLayout) := {}
   nextSlot         : UInt8 := 0
   joinPoints       : Std.HashMap FVarId (FunDecl .impure) := {}
 
@@ -552,7 +554,349 @@ def emitCtorArg (arg : Arg .impure) : EmitJVMM Unit := do
   | .fvar fvarId => emitLoadAs fvarId ImpureType.object
   | .erased => emitOp .aconst_null
 
+
+
+
+
+
+def emitCtorClass (ctorName : Name) (layout : CtorLayout) : EmitJVMM String := do
+  let className := "lean/ctor_" ++ ctorName.mangle
+  let s ← get
+  if s.syntheticClasses.any (·.className == className) then
+    return className
+
+  let mut cf : ClassFile := {
+    className := className
+    superClass := "lean/runtime/LeanCtor"
+  }
+
+  let csize := layout.ctorInfo.size
+  let usize := layout.ctorInfo.usize
+
+  for i in [0:csize] do
+    cf := { cf with fields := cf.fields.push { accessFlags := ClassFile.ACC_PUBLIC, name := s!"obj_{i}", descriptor := "Llean/runtime/LeanObject;" } }
+
+  for i in [0:usize] do
+    cf := { cf with fields := cf.fields.push { accessFlags := ClassFile.ACC_PUBLIC, name := s!"usize_{csize + i}", descriptor := "J" } }
+
+  let mut hasScalars := false
+  for f in layout.fieldInfo do
+    if let .scalar _ offset type := f then
+      hasScalars := true
+      cf := { cf with fields := cf.fields.push { accessFlags := ClassFile.ACC_PUBLIC, name := s!"s_{offset}", descriptor := toJVMTypeDesc type } }
+
+  let mut initDesc := "("
+  for _ in [0:csize] do
+    initDesc := initDesc ++ "Llean/runtime/LeanObject;"
+  initDesc := initDesc ++ ")V"
+
+  let (initRef, cf') := cf.addMethodRef "lean/runtime/LeanCtor" "<init>" "(I)V"
+  cf := cf'
+  
+  let mut initCode := ByteArray.empty
+  initCode := (Opcode.aload 0).emit initCode
+  if layout.ctorInfo.cidx <= 127 then
+    initCode := (Opcode.bipush layout.ctorInfo.cidx.toUInt8).emit initCode
+  else
+    initCode := (Opcode.sipush layout.ctorInfo.cidx.toUInt16).emit initCode
+  initCode := (Opcode.invokespecial initRef).emit initCode
+
+  for i in [0:csize] do
+    initCode := (Opcode.aload 0).emit initCode
+    if i == 0 then initCode := (Opcode.aload 1).emit initCode
+    else if i == 1 then initCode := (Opcode.aload 2).emit initCode
+    else if i == 2 then initCode := (Opcode.aload 3).emit initCode
+    else initCode := (Opcode.aload (i + 1).toUInt8).emit initCode
+    let (fieldRef, cf') := cf.addFieldRef className s!"obj_{i}" "Llean/runtime/LeanObject;"
+    cf := cf'
+    initCode := (Opcode.putfield fieldRef).emit initCode
+
+  initCode := Opcode.return_void.emit initCode
+
+  let initMethod : MethodDef := {
+    accessFlags := ClassFile.ACC_PUBLIC
+    name := "<init>"
+    descriptor := initDesc
+    maxStack := 3
+    maxLocals := (csize + 1).toUInt16
+    bytecodes := initCode
+  }
+  cf := { cf with methods := cf.methods.push initMethod }
+
+  let mut getObjCode := ByteArray.empty
+  let mut setObjCode := ByteArray.empty
+
+  for i in [0:csize] do
+    let (fieldRef, cf') := cf.addFieldRef className s!"obj_{i}" "Llean/runtime/LeanObject;"
+    cf := cf'
+    
+    getObjCode := (Opcode.iload 1).emit getObjCode
+    if i <= 127 then getObjCode := (Opcode.bipush i.toUInt8).emit getObjCode
+    else getObjCode := (Opcode.sipush i.toUInt16).emit getObjCode
+    let mut blk := ByteArray.empty
+    blk := (Opcode.aload 0).emit blk
+    blk := (Opcode.getfield fieldRef).emit blk
+    blk := Opcode.areturn.emit blk
+    getObjCode := (Opcode.if_icmpne (3 + blk.size).toUInt16).emit getObjCode
+    getObjCode := getObjCode ++ blk
+    
+    setObjCode := (Opcode.iload 1).emit setObjCode
+    if i <= 127 then setObjCode := (Opcode.bipush i.toUInt8).emit setObjCode
+    else setObjCode := (Opcode.sipush i.toUInt16).emit setObjCode
+    let mut blk2 := ByteArray.empty
+    blk2 := (Opcode.aload 0).emit blk2
+    blk2 := (Opcode.aload 2).emit blk2
+    blk2 := (Opcode.putfield fieldRef).emit blk2
+    blk2 := Opcode.return_void.emit blk2
+    setObjCode := (Opcode.if_icmpne (3 + blk2.size).toUInt16).emit setObjCode
+    setObjCode := setObjCode ++ blk2
+    
+    if i == 0 then
+      let mut gb0 := ByteArray.empty
+      gb0 := (Opcode.aload 0).emit gb0
+      gb0 := (Opcode.getfield fieldRef).emit gb0
+      gb0 := Opcode.areturn.emit gb0
+      let mDef : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getObj0", descriptor := "()Llean/runtime/LeanObject;", maxStack := 1, maxLocals := 1, bytecodes := gb0 }
+      cf := { cf with methods := cf.methods.push mDef }
+      let mut sb0 := ByteArray.empty
+      sb0 := (Opcode.aload 0).emit sb0
+      sb0 := (Opcode.aload 1).emit sb0
+      sb0 := (Opcode.putfield fieldRef).emit sb0
+      sb0 := Opcode.return_void.emit sb0
+      let mDef2 : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setObj0", descriptor := "(Llean/runtime/LeanObject;)V", maxStack := 2, maxLocals := 2, bytecodes := sb0 }
+      cf := { cf with methods := cf.methods.push mDef2 }
+    else if i == 1 then
+      let mut gb1 := ByteArray.empty
+      gb1 := (Opcode.aload 0).emit gb1
+      gb1 := (Opcode.getfield fieldRef).emit gb1
+      gb1 := Opcode.areturn.emit gb1
+      let mDef : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getObj1", descriptor := "()Llean/runtime/LeanObject;", maxStack := 1, maxLocals := 1, bytecodes := gb1 }
+      cf := { cf with methods := cf.methods.push mDef }
+      let mut sb1 := ByteArray.empty
+      sb1 := (Opcode.aload 0).emit sb1
+      sb1 := (Opcode.aload 1).emit sb1
+      sb1 := (Opcode.putfield fieldRef).emit sb1
+      sb1 := Opcode.return_void.emit sb1
+      let mDef2 : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setObj1", descriptor := "(Llean/runtime/LeanObject;)V", maxStack := 2, maxLocals := 2, bytecodes := sb1 }
+      cf := { cf with methods := cf.methods.push mDef2 }
+
+  getObjCode := Opcode.aconst_null.emit getObjCode
+  getObjCode := Opcode.areturn.emit getObjCode
+  let mDefGetObj : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getObj", descriptor := "(I)Llean/runtime/LeanObject;", maxStack := 2, maxLocals := 2, bytecodes := getObjCode }
+  cf := { cf with methods := cf.methods.push mDefGetObj }
+
+  setObjCode := Opcode.return_void.emit setObjCode
+  let mDefSetObj : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setObj", descriptor := "(ILlean/runtime/LeanObject;)V", maxStack := 3, maxLocals := 3, bytecodes := setObjCode }
+  cf := { cf with methods := cf.methods.push mDefSetObj }
+
+  let mut getScCode := ByteArray.empty
+  let mut setScCode := ByteArray.empty
+
+  for i in [0:usize] do
+    let uidx := csize + i
+    let (fieldRef, cf') := cf.addFieldRef className s!"usize_{uidx}" "J"
+    cf := cf'
+    
+    getScCode := (Opcode.iload 1).emit getScCode
+    if uidx <= 127 then getScCode := (Opcode.bipush uidx.toUInt8).emit getScCode
+    else getScCode := (Opcode.sipush uidx.toUInt16).emit getScCode
+    let mut blk := ByteArray.empty
+    blk := (Opcode.aload 0).emit blk
+    blk := (Opcode.getfield fieldRef).emit blk
+    blk := Opcode.lreturn.emit blk
+    getScCode := (Opcode.if_icmpne (3 + blk.size).toUInt16).emit getScCode
+    getScCode := getScCode ++ blk
+    
+    setScCode := (Opcode.iload 1).emit setScCode
+    if uidx <= 127 then setScCode := (Opcode.bipush uidx.toUInt8).emit setScCode
+    else setScCode := (Opcode.sipush uidx.toUInt16).emit setScCode
+    let mut blk2 := ByteArray.empty
+    blk2 := (Opcode.aload 0).emit blk2
+    blk2 := (Opcode.lload 2).emit blk2
+    blk2 := (Opcode.putfield fieldRef).emit blk2
+    blk2 := Opcode.return_void.emit blk2
+    setScCode := (Opcode.if_icmpne (3 + blk2.size).toUInt16).emit setScCode
+    setScCode := setScCode ++ blk2
+    
+    if uidx == 0 then
+      let mut gs0 := ByteArray.empty
+      gs0 := (Opcode.aload 0).emit gs0
+      gs0 := (Opcode.getfield fieldRef).emit gs0
+      gs0 := Opcode.lreturn.emit gs0
+      let mDef : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getScalar0", descriptor := "()J", maxStack := 2, maxLocals := 1, bytecodes := gs0 }
+      cf := { cf with methods := cf.methods.push mDef }
+      let mut ss0 := ByteArray.empty
+      ss0 := (Opcode.aload 0).emit ss0
+      ss0 := (Opcode.lload 1).emit ss0
+      ss0 := (Opcode.putfield fieldRef).emit ss0
+      ss0 := Opcode.return_void.emit ss0
+      let mDef2 : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setScalar0", descriptor := "(J)V", maxStack := 3, maxLocals := 3, bytecodes := ss0 }
+      cf := { cf with methods := cf.methods.push mDef2 }
+
+  getScCode := Opcode.lconst_0.emit getScCode
+  getScCode := Opcode.lreturn.emit getScCode
+  let mDefGetSc : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getScalar", descriptor := "(I)J", maxStack := 2, maxLocals := 2, bytecodes := getScCode }
+  cf := { cf with methods := cf.methods.push mDefGetSc }
+
+  setScCode := Opcode.return_void.emit setScCode
+  let mDefSetSc : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setScalar", descriptor := "(IJ)V", maxStack := 4, maxLocals := 4, bytecodes := setScCode }
+  cf := { cf with methods := cf.methods.push mDefSetSc }
+
+  if hasScalars then
+    let mut getBsCode := ByteArray.empty
+    let mut setBsCode := ByteArray.empty
+    
+    for f in layout.fieldInfo do
+      if let .scalar sz offset type := f then
+        let (fieldRef, cf') := cf.addFieldRef className s!"s_{offset}" (toJVMTypeDesc type)
+        cf := cf'
+        
+        getBsCode := (Opcode.iload 1).emit getBsCode
+        if offset <= 127 then getBsCode := (Opcode.bipush offset.toUInt8).emit getBsCode
+        else getBsCode := (Opcode.sipush offset.toUInt16).emit getBsCode
+        let mut blk := ByteArray.empty
+        blk := (Opcode.aload 0).emit blk
+        blk := (Opcode.getfield fieldRef).emit blk
+        let desc := toJVMTypeDesc type
+        if desc == "I" then blk := Opcode.i2l.emit blk
+        else if desc == "F" then
+          let (f2i, cf'') := cf.addMethodRef "java/lang/Float" "floatToRawIntBits" "(F)I"
+          cf := cf''
+          blk := (Opcode.invokestatic f2i).emit blk
+          blk := Opcode.i2l.emit blk
+        else if desc == "D" then
+          let (d2l, cf'') := cf.addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+          cf := cf''
+          blk := (Opcode.invokestatic d2l).emit blk
+        if desc == "I" then
+          let mut maskCode := ByteArray.empty
+          if sz == 1 then
+            let (cIdx, cp') := cf.cp.addLong 255
+            cf := { cf with cp := cp' }
+            maskCode := (Opcode.ldc2_w cIdx).emit maskCode
+            maskCode := Opcode.land.emit maskCode
+          else if sz == 2 then
+            let (cIdx, cp') := cf.cp.addLong 65535
+            cf := { cf with cp := cp' }
+            maskCode := (Opcode.ldc2_w cIdx).emit maskCode
+            maskCode := Opcode.land.emit maskCode
+          else if sz == 4 then
+            let (cIdx, cp') := cf.cp.addLong 4294967295
+            cf := { cf with cp := cp' }
+            maskCode := (Opcode.ldc2_w cIdx).emit maskCode
+            maskCode := Opcode.land.emit maskCode
+          blk := blk ++ maskCode
+        blk := Opcode.lreturn.emit blk
+        getBsCode := (Opcode.if_icmpne (3 + blk.size).toUInt16).emit getBsCode
+        getBsCode := getBsCode ++ blk
+
+        setBsCode := (Opcode.iload 1).emit setBsCode
+        if offset <= 127 then setBsCode := (Opcode.bipush offset.toUInt8).emit setBsCode
+        else setBsCode := (Opcode.sipush offset.toUInt16).emit setBsCode
+        let mut blk2 := ByteArray.empty
+        blk2 := (Opcode.aload 0).emit blk2
+        blk2 := (Opcode.lload 3).emit blk2
+        if desc == "I" then blk2 := Opcode.l2i.emit blk2
+        else if desc == "F" then
+          blk2 := Opcode.l2i.emit blk2
+          let (i2f, cf'') := cf.addMethodRef "java/lang/Float" "intBitsToFloat" "(I)F"
+          cf := cf''
+          blk2 := (Opcode.invokestatic i2f).emit blk2
+        else if desc == "D" then
+          let (l2d, cf'') := cf.addMethodRef "java/lang/Double" "longBitsToDouble" "(J)D"
+          cf := cf''
+          blk2 := (Opcode.invokestatic l2d).emit blk2
+        blk2 := (Opcode.putfield fieldRef).emit blk2
+        blk2 := Opcode.return_void.emit blk2
+        setBsCode := (Opcode.if_icmpne (3 + blk2.size).toUInt16).emit setBsCode
+        setBsCode := setBsCode ++ blk2
+        
+    getBsCode := Opcode.lconst_0.emit getBsCode
+    getBsCode := Opcode.lreturn.emit getBsCode
+    let mDefGetBs : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getByteScalar0", descriptor := "(II)J", maxStack := 4, maxLocals := 3, bytecodes := getBsCode }
+    cf := { cf with methods := cf.methods.push mDefGetBs }
+
+    setBsCode := Opcode.return_void.emit setBsCode
+    let mDefSetBs : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setByteScalar0", descriptor := "(IIJ)V", maxStack := 4, maxLocals := 5, bytecodes := setBsCode }
+    cf := { cf with methods := cf.methods.push mDefSetBs }
+
+    let (gb0Ref, cf'') := cf.addMethodRef className "getByteScalar0" "(II)J"
+    cf := cf''
+    let mut gbCode := ByteArray.empty
+    gbCode := (Opcode.aload 0).emit gbCode
+    gbCode := (Opcode.iload 2).emit gbCode
+    gbCode := (Opcode.iload 3).emit gbCode
+    gbCode := (Opcode.invokevirtual gb0Ref).emit gbCode
+    gbCode := Opcode.lreturn.emit gbCode
+    let mDefGb : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getByteScalar", descriptor := "(III)J", maxStack := 3, maxLocals := 4, bytecodes := gbCode }
+    cf := { cf with methods := cf.methods.push mDefGb }
+
+    let (sb0Ref, cf'') := cf.addMethodRef className "setByteScalar0" "(IIJ)V"
+    cf := cf''
+    let mut sbCode := ByteArray.empty
+    sbCode := (Opcode.aload 0).emit sbCode
+    sbCode := (Opcode.iload 2).emit sbCode
+    sbCode := (Opcode.iload 3).emit sbCode
+    sbCode := (Opcode.lload 4).emit sbCode
+    sbCode := (Opcode.invokevirtual sb0Ref).emit sbCode
+    sbCode := Opcode.return_void.emit sbCode
+    let mDefSb : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setByteScalar", descriptor := "(IIIJ)V", maxStack := 5, maxLocals := 6, bytecodes := sbCode }
+    cf := { cf with methods := cf.methods.push mDefSb }
+
+    if usize == 0 then
+      let mut gs0 := ByteArray.empty
+      gs0 := (Opcode.aload 0).emit gs0
+      gs0 := Opcode.iconst_0.emit gs0
+      gs0 := (Opcode.bipush 8).emit gs0
+      gs0 := (Opcode.invokevirtual gb0Ref).emit gs0
+      gs0 := Opcode.lreturn.emit gs0
+      let mDefGs0 : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "getScalar0", descriptor := "()J", maxStack := 3, maxLocals := 1, bytecodes := gs0 }
+      cf := { cf with methods := cf.methods.push mDefGs0 }
+
+      let mut ss0 := ByteArray.empty
+      ss0 := (Opcode.aload 0).emit ss0
+      ss0 := Opcode.iconst_0.emit ss0
+      ss0 := (Opcode.bipush 8).emit ss0
+      ss0 := (Opcode.lload 1).emit ss0
+      ss0 := (Opcode.invokevirtual sb0Ref).emit ss0
+      ss0 := Opcode.return_void.emit ss0
+      let mDefSs0 : MethodDef := { accessFlags := ClassFile.ACC_PUBLIC, name := "setScalar0", descriptor := "(J)V", maxStack := 5, maxLocals := 3, bytecodes := ss0 }
+      cf := { cf with methods := cf.methods.push mDefSs0 }
+
+  modify fun s => { s with syntheticClasses := s.syntheticClasses.push cf }
+  return className
+def shouldEmitCtorClass (info : CtorInfo) : EmitJVMM Bool := do
+  let numScalars := info.usize + (info.ssize + 7) / 8
+  if info.size > 2 || numScalars > 0 then return true
+  let env ← getEnv
+  match env.find? info.name with
+  | some (.ctorInfo val) =>
+    if isStructure env val.induct then
+      return true
+    return false
+  | _ => return false
+
 def emitCtor (info : CtorInfo) (args : Array (Arg .impure)) : EmitJVMM Unit := do
+  if ← shouldEmitCtorClass info then
+    let layout? ← try
+        let l ← getCtorLayout info.name
+        pure (some l)
+      catch _ => pure none
+    if let some layout := layout? then
+      let className ← emitCtorClass info.name layout
+      let classIdx ← addClass className
+      emitOp (.new classIdx)
+      emitOp .dup
+      for arg in args do
+        emitCtorArg arg
+      let mut initDesc := "("
+      for _ in [0:info.size] do
+        initDesc := initDesc ++ "Llean/runtime/LeanObject;"
+      initDesc := initDesc ++ ")V"
+      let methodIdx ← addMethodRef className "<init>" initDesc
+      emitOp (.invokespecial methodIdx)
+      return ()
+  
   let numScalars := info.usize + (info.ssize + 7) / 8
   if info.size == 0 && numScalars == 0 then
     emitPushInt info.cidx
@@ -1083,7 +1427,16 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     emitOp (.invokestatic ofFnRef)
   | .ctor info args =>
     emitCtor info args
-  | .oproj i fvarId =>
+    | .oproj i fvarId =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      let fieldRef ← addFieldRef className s!"obj_{i}" "Llean/runtime/LeanObject;"
+      emitOp (.getfield fieldRef)
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1097,7 +1450,22 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
       emitPushInt i
       let getObjIdx ← addMethodRef "lean/runtime/LeanCtor" "getObj" "(I)Llean/runtime/LeanObject;"
       emitOp (.invokevirtual getObjIdx)
-  | .uproj i fvarId =>
+    | .uproj i fvarId =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      let fieldRef ← addFieldRef className s!"usize_{i}" "J"
+      emitOp (.getfield fieldRef)
+      if isScalarType decl.type then
+        if toJVMTypeDesc decl.type == "I" then
+          emitOp .l2i
+      else
+        let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
+        emitOp (.invokestatic ofLongIdx)
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1114,7 +1482,22 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     else
       let ofLongIdx ← addMethodRef "lean/runtime/LeanNat" "ofLong" "(J)Llean/runtime/LeanNat;"
       emitOp (.invokestatic ofLongIdx)
-  | .sproj n offset fvarId =>
+    | .sproj n offset fvarId =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      let fieldRef ← addFieldRef className s!"s_{offset}" (toJVMTypeDesc decl.type)
+      emitOp (.getfield fieldRef)
+      -- Wait, if the JVM field is an int, but we want an int, getfield already gives an int!
+      -- We don't need any casting or masking!
+      -- Except for `LeanNat.ofLong` if it's a generic object but wait, scalar fields in Lean 4 structs are always unboxed, so decl.type is scalar!
+      -- Actually, `EmitJVM` checks if it's NOT a scalar type and boxes it using `LeanNat.ofLong`. Wait, scalar struct fields can't be generic LeanNat.
+      -- If `toJVMTypeDesc decl.type == "I"`, `getfield` gives "I". We don't need `l2i`.
+      -- If `decl.type == ImpureType.float`, `getfield` gives "D". No conversion needed!
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1295,7 +1678,19 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
       let actualType := match decl.value with
         | .ctor .. | .box .. | .lit (.nat ..) => ImpureType.object
         | _ => decl.type
-      let (slot, newCtx) ← allocSlot decl.fvarId actualType
+      let (slot, newCtx') ← allocSlot decl.fvarId actualType
+      let mut newCtx := newCtx'
+      match decl.value with
+      | .ctor info _ | .reuse _ info _ _ =>
+        if ← shouldEmitCtorClass info then
+          let layout? ← try
+              let l ← getCtorLayout info.name
+              pure (some l)
+            catch _ => pure none
+          if let some layout := layout? then
+            newCtx := { newCtx with ctorClassMap := newCtx.ctorClassMap.insert decl.fvarId (info.name, layout) }
+      | _ => pure ()
+      
       emitStoreTyped slot actualType
       withReader (fun _ => newCtx) do
         emitCode k
@@ -1476,7 +1871,20 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
   | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
     -- Tracing GC: Reference counting instructions are no-ops!
     emitCode k
-  | .oset fvarId i y k =>
+    | .oset fvarId i y k =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      match y with
+      | .fvar yId => emitLoadAs yId ImpureType.object
+      | .erased => emitOp .aconst_null
+      let fieldRef ← addFieldRef className s!"obj_{i}" "Llean/runtime/LeanObject;"
+      emitOp (.putfield fieldRef)
+      emitCode k
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1500,7 +1908,24 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
       let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
       emitOp (.invokevirtual setObjIdx)
     emitCode k
-  | .uset fvarId i y k =>
+    | .uset fvarId i y k =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      emitLoad y
+      let yType := ctx.varTypeMap[y]?.getD ImpureType.object
+      if toJVMTypeDesc yType == "J" then pure ()
+      else if toJVMTypeDesc yType == "I" then emitOp .i2l
+      else
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let fieldRef ← addFieldRef className s!"usize_{i}" "J"
+      emitOp (.putfield fieldRef)
+      emitCode k
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1530,7 +1955,76 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
       let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
       emitOp (.invokevirtual setScalarIdx)
     emitCode k
-  | .sset fvarId i offset y ty k =>
+    | .sset fvarId i offset y ty k =>
+    let ctx ← read
+    if let some (ctorName, layout) := ctx.ctorClassMap[fvarId]? then
+      let className := "lean/ctor_" ++ ctorName.mangle
+      let classIdx ← addClass className
+      emitLoad fvarId
+      emitOp (.checkcast classIdx)
+      emitLoad y
+      let yType := ctx.varTypeMap[y]?.getD ty
+      let destTypeDesc := toJVMTypeDesc ty
+      -- The value `y` has `yType`, and the field has `destTypeDesc`.
+      -- If they differ, we cast `y` to `destTypeDesc`. But usually `yType` == `ty`, except if `yType` is `object`.
+      -- If `yType` is object (boxed scalar), we must unbox it.
+      if destTypeDesc == "I" then
+        if toJVMTypeDesc yType == "I" then pure ()
+        else if toJVMTypeDesc yType == "J" then emitOp .l2i
+        else if toJVMTypeDesc yType == "D" then
+          let d2lIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+          emitOp (.invokestatic d2lIdx)
+          emitOp .l2i
+        else if toJVMTypeDesc yType == "F" then
+          let f2iIdx ← addMethodRef "java/lang/Float" "floatToRawIntBits" "(F)I"
+          emitOp (.invokestatic f2iIdx)
+        else
+          let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+          emitOp (.invokestatic getScalar64Idx)
+          emitOp .l2i
+      else if destTypeDesc == "J" then
+        if toJVMTypeDesc yType == "I" then emitOp .i2l
+        else if toJVMTypeDesc yType == "J" then pure ()
+        else if toJVMTypeDesc yType == "D" then
+          let d2lIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+          emitOp (.invokestatic d2lIdx)
+        else
+          let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+          emitOp (.invokestatic getScalar64Idx)
+      else if destTypeDesc == "D" then
+        if toJVMTypeDesc yType == "D" then pure ()
+        else if toJVMTypeDesc yType == "J" then
+          let l2dIdx ← addMethodRef "java/lang/Double" "longBitsToDouble" "(J)D"
+          emitOp (.invokestatic l2dIdx)
+        else if toJVMTypeDesc yType == "I" then
+          emitOp .i2l
+          let l2dIdx ← addMethodRef "java/lang/Double" "longBitsToDouble" "(J)D"
+          emitOp (.invokestatic l2dIdx)
+        else
+          let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+          emitOp (.invokestatic getScalar64Idx)
+          let l2dIdx ← addMethodRef "java/lang/Double" "longBitsToDouble" "(J)D"
+          emitOp (.invokestatic l2dIdx)
+      else if destTypeDesc == "F" then
+        if toJVMTypeDesc yType == "F" then pure ()
+        else if toJVMTypeDesc yType == "I" then
+          let i2fIdx ← addMethodRef "java/lang/Float" "intBitsToFloat" "(I)F"
+          emitOp (.invokestatic i2fIdx)
+        else if toJVMTypeDesc yType == "J" then
+          emitOp .l2i
+          let i2fIdx ← addMethodRef "java/lang/Float" "intBitsToFloat" "(I)F"
+          emitOp (.invokestatic i2fIdx)
+        else
+          let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+          emitOp (.invokestatic getScalar64Idx)
+          emitOp .l2i
+          let i2fIdx ← addMethodRef "java/lang/Float" "intBitsToFloat" "(I)F"
+          emitOp (.invokestatic i2fIdx)
+      
+      let fieldRef ← addFieldRef className s!"s_{offset}" destTypeDesc
+      emitOp (.putfield fieldRef)
+      emitCode k
+      return ()
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
@@ -1585,6 +2079,56 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
 /--
 Emits a function declaration as a static method in the classfile.
 -/
+def getStructCtorLayout? (monoType : Expr) : EmitJVMM (Option (Name × CtorLayout)) := do
+  let env ← getEnv
+  let indName := monoType.getAppFn.constName?
+  if let some indName := indName then
+    if (← hasTrivialImpureStructure? indName).isNone then
+      if let some (.inductInfo val) := env.find? indName then
+        if val.ctors.length == 1 then
+          let ctorName := val.ctors[0]!
+          let layout? ← try
+              let l ← getCtorLayout ctorName
+              pure (some l)
+            catch _ => pure none
+          if let some layout := layout? then
+            if ← shouldEmitCtorClass layout.ctorInfo then
+              discard <| emitCtorClass ctorName layout
+              return some (ctorName, layout)
+  return none
+
+partial def collectStructTypes (code : Code .pure) (acc : Std.HashMap FVarId (Name × CtorLayout)) : EmitJVMM (Std.HashMap FVarId (Name × CtorLayout)) := do
+  match code with
+  | .let decl k =>
+    let mut acc := acc
+    if let some entry ← getStructCtorLayout? decl.type then
+      acc := acc.insert decl.fvarId entry
+    collectStructTypes k acc
+  | .fun decl k | .jp decl k =>
+    let mut acc := acc
+    if let some entry ← getStructCtorLayout? decl.type then
+      acc := acc.insert decl.fvarId entry
+    for p in decl.params do
+      if let some entry ← getStructCtorLayout? p.type then
+        acc := acc.insert p.fvarId entry
+    acc ← collectStructTypes decl.value acc
+    collectStructTypes k acc
+  | .cases cs =>
+    let mut acc := acc
+    for alt in cs.alts do
+      acc ← collectStructTypes alt.getCode acc
+    return acc
+  | _ => return acc
+
+def populateCtorClassMap (decl : Decl .impure) : EmitJVMM (Std.HashMap FVarId (Name × CtorLayout)) := do
+  let mut acc : Std.HashMap FVarId (Name × CtorLayout) := {}
+  if let some monoDecl ← getMonoDecl? decl.name then
+    for p in monoDecl.params do
+      if let some entry ← getStructCtorLayout? p.type then
+        acc := acc.insert p.fvarId entry
+    acc ← match monoDecl.value with | .code c => collectStructTypes c acc | _ => pure acc
+  return acc
+
 def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
   match decl.value with
   | .extern .. =>
@@ -1650,6 +2194,7 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     -- Reset code, fixups, and labelOffsets buffer for this method
     modify fun s => { s with code := ByteArray.empty, fixups := #[], labelOffsets := {} }
 
+    let ctorClassMap ← if isBoxed then pure {} else populateCtorClassMap decl
     let ctx ← read
     let methodCtx := { ctx with
       currFn := decl.name
@@ -1657,6 +2202,7 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
       currParams := decl.params
       varSlotMap := slotMap
       varTypeMap := typeMap
+      ctorClassMap := ctorClassMap
       nextSlot := slot
       joinPoints := joinPointMap
     }
@@ -1896,6 +2442,7 @@ public def emitJVMForDecls (modName : Name) (decls : Array Name) : CoreM (Array 
     className := className
     localDecls := localDecls
     otherModuleDecls := otherModuleDecls
+    ctorClassMap := {}
   }
 
   let (_, s) ← (do
