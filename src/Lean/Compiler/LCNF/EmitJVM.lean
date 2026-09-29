@@ -53,6 +53,7 @@ def toJVMTypeDesc (type : Expr) : String :=
   | ImpureType.float => "D"
   | ImpureType.float32 => "F"
   | ImpureType.tagged => "I"
+  | .app (.const `jvmType _) (.lit (.strVal desc)) => desc
   | _ => leanObjTypeDesc
 
 def getSlotSize (type : Expr) : UInt8 :=
@@ -90,6 +91,8 @@ structure JVMState where
   code : ByteArray := ByteArray.empty
   labelOffsets : Std.HashMap Name Nat := {}
   fixups : Array (Nat × Name) := #[]
+  slotTypes : Std.HashMap Nat String := {}
+  maxSlot : UInt8 := 0
   /-- Synthetic closure classes generated for `.pap` sites; written as separate .class files. -/
   syntheticClasses : Array ClassFile := #[]
   nextClosureId : Nat := 0
@@ -105,14 +108,35 @@ def getSlot (fvarId : FVarId) : EmitJVMM UInt8 := do
   | some slot => return slot
   | none => return 0
 
-def allocSlot (fvarId : FVarId) (type : Expr) : EmitJVMM (UInt8 × JVMContext) := do
+def allocTempSlot (type : Expr) : EmitJVMM (UInt8 × JVMContext) := do
   let ctx ← read
-  let slot := ctx.nextSlot
+  let s ← get
+  let desc := toJVMTypeDesc type
   let sz := getSlotSize type
+  let mut slot := ctx.nextSlot
+  let c0 := match s.slotTypes[slot.toNat]? with
+    | some oldDesc => oldDesc != desc
+    | none => false
+  let c1 := if sz == 2 then
+    match s.slotTypes[slot.toNat + 1]? with
+    | some oldDesc => oldDesc != "top"
+    | none => false
+  else false
+  if c0 || c1 then
+    slot := s.maxSlot
+  let mut newSlotTypes := s.slotTypes.insert slot.toNat desc
+  if sz == 2 then
+    newSlotTypes := newSlotTypes.insert (slot.toNat + 1) "top"
+  let newMaxSlot := if slot + sz > s.maxSlot then slot + sz else s.maxSlot
+  modify fun st => { st with slotTypes := newSlotTypes, maxSlot := newMaxSlot }
+  let newCtx := { ctx with nextSlot := slot + sz }
+  return (slot, newCtx)
+
+def allocSlot (fvarId : FVarId) (type : Expr) : EmitJVMM (UInt8 × JVMContext) := do
+  let (slot, ctx) ← allocTempSlot type
   let newMap := ctx.varSlotMap.insert fvarId slot
   let newTypeMap := ctx.varTypeMap.insert fvarId type
-  let newCtx := { ctx with varSlotMap := newMap, varTypeMap := newTypeMap, nextSlot := slot + sz }
-  return (slot, newCtx)
+  return (slot, { ctx with varSlotMap := newMap, varTypeMap := newTypeMap })
 
 def emitLoad (fvarId : FVarId) : EmitJVMM Unit := do
   let ctx ← read
@@ -126,7 +150,14 @@ def emitLoad (fvarId : FVarId) : EmitJVMM Unit := do
   | _   => emitOp (.aload slot)
 
 def emitStoreTyped (slot : UInt8) (type : Expr) : EmitJVMM Unit := do
-  match toJVMTypeDesc type with
+  let desc := toJVMTypeDesc type
+  let sz := getSlotSize type
+  modify fun s =>
+    let st1 := s.slotTypes.insert slot.toNat desc
+    let st2 := if sz == 2 then st1.insert (slot.toNat + 1) "top" else st1
+    let ms := if slot + sz > s.maxSlot then slot + sz else s.maxSlot
+    { s with slotTypes := st2, maxSlot := ms }
+  match desc with
   | "I" => emitOp (.istore slot)
   | "J" => emitOp (.lstore slot)
   | "F" => emitOp (.fstore slot)
@@ -493,12 +524,10 @@ If `expectedType` is scalar and `fvarId` is LeanObject, unboxes it.
 def emitLoadAs (fvarId : FVarId) (expectedType : Expr) : EmitJVMM Unit := do
   let ctx ← read
   let actualType := ctx.varTypeMap[fvarId]?.getD ImpureType.object
-  let actualDesc := toJVMTypeDesc actualType
-  let expectedDesc := toJVMTypeDesc expectedType
   emitLoad fvarId
-  if expectedDesc == leanObjTypeDesc && actualDesc != leanObjTypeDesc then
+  if !isScalarType expectedType && isScalarType actualType then
     emitBoxValue actualType
-  else if expectedDesc != leanObjTypeDesc && actualDesc == leanObjTypeDesc then
+  else if isScalarType expectedType && !isScalarType actualType then
     emitUnboxValue expectedType
 
 /--
@@ -1003,8 +1032,66 @@ def emitBinaryArgs (args : Array (Arg .impure)) : EmitJVMM Unit := do
   emitArg args[1]!
 
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitJVMM Bool := do
-  if args.size != 2 then return false
   let ctx ← read
+  if args.size == 1 then
+    match fn with
+    | `UInt32.toUInt64 | `UInt32.toUSize =>
+      if !isIntArg ctx args[0]! then return false
+      emitArg args[0]!
+      let ref ← addMethodRef "java/lang/Integer" "toUnsignedLong" "(I)J"
+      emitOp (.invokestatic ref)
+      return true
+    | `UInt64.toUInt32 | `USize.toUInt32 =>
+      if !isLongArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitOp .l2i
+      return true
+    | `UInt8.toUInt32 | `UInt32.toUInt8 =>
+      if !isIntArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitPushInt 255
+      emitOp .iand
+      return true
+    | `UInt16.toUInt32 | `UInt32.toUInt16 =>
+      if !isIntArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitPushInt 65535
+      emitOp .iand
+      return true
+    | `UInt8.toUInt64 =>
+      if !isIntArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitPushInt 255
+      emitOp .iand
+      emitOp .i2l
+      return true
+    | `UInt16.toUInt64 =>
+      if !isIntArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitPushInt 65535
+      emitOp .iand
+      emitOp .i2l
+      return true
+    | `UInt64.toUInt8 =>
+      if !isLongArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitOp .l2i
+      emitPushInt 255
+      emitOp .iand
+      return true
+    | `UInt64.toUInt16 =>
+      if !isLongArg ctx args[0]! then return false
+      emitArg args[0]!
+      emitOp .l2i
+      emitPushInt 65535
+      emitOp .iand
+      return true
+    | `USize.toUInt64 | `UInt64.toUSize =>
+      if !isLongArg ctx args[0]! then return false
+      emitArg args[0]!
+      return true
+    | _ => return false
+  if args.size != 2 then return false
   match fn with
   | ``UInt64.add | ``USize.add =>
     if !isLongArg ctx args[0]! || !isLongArg ctx args[1]! then return false
@@ -1212,6 +1299,259 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitJVMM Bool :=
     return true
   | _ => return false
 
+def emitDefaultValue (retType : Expr) : EmitJVMM Unit := do
+  match toJVMTypeDesc retType with
+  | "I" => emitOp .iconst_0
+  | "J" => emitOp .lconst_0
+  | _   => emitOp .aconst_null
+
+def descToImpureType (desc : String) : Expr :=
+  match desc with
+  | "I" | "Z" | "B" | "S" | "C" => ImpureType.uint32
+  | "J" => ImpureType.uint64
+  | "F" => ImpureType.float32
+  | "D" => ImpureType.float
+  | _ => ImpureType.jvmType desc
+
+def splitCharOnce (cs : List Char) (sep : Char) : Option (String × String) :=
+  let rec go (acc : List Char) : List Char → Option (String × String)
+    | [] => none
+    | c :: rest =>
+      if c == sep then
+        some (String.ofList acc.reverse, String.ofList rest)
+      else
+        go (c :: acc) rest
+  go [] cs
+
+def parseJvmMemberSpec? (spec : String) : Option (String × String × String) := do
+  let (lhs, desc) ← splitCharOnce spec.toList ':'
+  let (className, memberName) ← splitCharOnce lhs.toList '.'
+  return (className, memberName, desc)
+
+def emitReceiverWithCast (arg : Arg .impure) (className : String) : EmitJVMM Unit := do
+  let ctx ← read
+  let actualDesc := match arg with
+    | .fvar fvarId =>
+      let ty := ctx.varTypeMap[fvarId]?.getD ImpureType.object
+      toJVMTypeDesc ty
+    | .erased => leanObjTypeDesc
+  emitArg arg
+  if actualDesc != s!"L{className};" then
+    let clsIdx ← addClass className
+    emitOp (.checkcast clsIdx)
+
+def emitExternCallArg (paramTypes? : Option (Array Expr)) (args : Array (Arg .impure)) (i : Nat) : EmitJVMM Unit := do
+  if h : i < args.size then
+    let arg := args[i]
+    match paramTypes? with
+    | some paramTypes =>
+      if h2 : i < paramTypes.size then
+        match arg with
+        | .fvar fvarId => emitLoadAs fvarId paramTypes[i]
+        | .erased => emitDefaultValue paramTypes[i]
+      else
+        emitArg arg
+    | none => emitArg arg
+
+def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (retType : Expr) : EmitJVMM Bool := do
+  let env ← getEnv
+  let some extStr := getExternNameFor env `jvm fn | return false
+  let ctx ← read
+  let sig? ← getImpureSignature? fn
+  let localDecl? := ctx.localDecls.find? (·.name == fn)
+  let paramTypes? := match localDecl? with
+    | some decl => some (decl.params.map (·.type))
+    | none => sig?.map fun sig => sig.params.map (·.type)
+  if extStr.startsWith "jvm_op:" then
+    let op := (extStr.drop 7).toString
+    match op with
+    | "u32_to_u64" =>
+      if args.size < 1 then return false
+      emitExternCallArg paramTypes? args 0
+      let ref ← addMethodRef "java/lang/Integer" "toUnsignedLong" "(I)J"
+      emitOp (.invokestatic ref)
+      return true
+    | "u64_to_u32" | "l2i" =>
+      if args.size < 1 then return false
+      emitExternCallArg paramTypes? args 0
+      emitOp .l2i
+      return true
+    | "i2l" =>
+      if args.size < 1 then return false
+      emitExternCallArg paramTypes? args 0
+      emitOp .i2l
+      return true
+    | "lshr" =>
+      if args.size < 2 then return false
+      emitExternCallArg paramTypes? args 0
+      emitExternCallArg paramTypes? args 1
+      if isLongArg ctx args[1]! then
+        emitOp .l2i
+      emitOp .lshr
+      return true
+    | "if_icmplt" =>
+      if args.size < 2 then return false
+      emitExternCallArg paramTypes? args 0
+      emitExternCallArg paramTypes? args 1
+      emitOp (.if_icmplt 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "if_icmpge" =>
+      if args.size < 2 then return false
+      emitExternCallArg paramTypes? args 0
+      emitExternCallArg paramTypes? args 1
+      emitOp (.if_icmpge 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "if_icmpgt" =>
+      if args.size < 2 then return false
+      emitExternCallArg paramTypes? args 0
+      emitExternCallArg paramTypes? args 1
+      emitOp (.if_icmpgt 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "if_icmple" =>
+      if args.size < 2 then return false
+      emitExternCallArg paramTypes? args 0
+      emitExternCallArg paramTypes? args 1
+      emitOp (.if_icmple 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "if_acmpeq" =>
+      if args.size < 2 then return false
+      emitArg args[0]!
+      emitArg args[1]!
+      emitOp (.if_acmpeq 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "ifnull" =>
+      if args.size < 1 then return false
+      emitArg args[0]!
+      emitOp (.ifnull 7)
+      emitOp .iconst_0
+      emitOp (.goto 4)
+      emitOp .iconst_1
+      return true
+    | "aconst_null" =>
+      emitOp .aconst_null
+      return true
+    | "newarray_long" =>
+      if args.size < 1 then return false
+      emitExternCallArg paramTypes? args 0
+      emitOp (.newarray 11)
+      return true
+    | "anewarray_object" =>
+      if args.size < 1 then return false
+      emitExternCallArg paramTypes? args 0
+      let objClassIdx ← addClass "java/lang/Object"
+      emitOp (.anewarray objClassIdx)
+      return true
+    | "arraylength" =>
+      if args.size < 1 then return false
+      emitArg args[0]!
+      emitOp .arraylength
+      return true
+    | "laload" =>
+      if args.size < 2 then return false
+      emitArg args[0]!
+      emitExternCallArg paramTypes? args 1
+      emitOp .laload
+      return true
+    | "lastore" =>
+      if args.size < 3 then return false
+      emitArg args[0]!
+      emitExternCallArg paramTypes? args 1
+      emitExternCallArg paramTypes? args 2
+      emitOp .lastore
+      emitDefaultValue retType
+      return true
+    | "aaload" =>
+      if args.size < 2 then return false
+      emitArg args[0]!
+      emitExternCallArg paramTypes? args 1
+      emitOp .aaload
+      return true
+    | "aastore" =>
+      if args.size < 3 then return false
+      emitArg args[0]!
+      emitExternCallArg paramTypes? args 1
+      emitArg args[2]!
+      emitOp .aastore
+      emitDefaultValue retType
+      return true
+    | "obj_array_fill_null" =>
+      if args.size < 3 then return false
+      emitArg args[0]!
+      emitExternCallArg paramTypes? args 1
+      emitExternCallArg paramTypes? args 2
+      emitOp .aconst_null
+      let ref ← addMethodRef "java/util/Arrays" "fill" "([Ljava/lang/Object;IILjava/lang/Object;)V"
+      emitOp (.invokestatic ref)
+      emitDefaultValue retType
+      return true
+    | _ => return false
+  else if extStr.startsWith "getstatic:" then
+    let some (className, fieldName, desc) := parseJvmMemberSpec? (extStr.drop 10).toString | return false
+    let fieldRef ← addFieldRef className fieldName desc
+    emitOp (.getstatic fieldRef)
+    return true
+  else if extStr.startsWith "putstatic:" then
+    let some (className, fieldName, desc) := parseJvmMemberSpec? (extStr.drop 10).toString | return false
+    if args.size < 1 then return false
+    emitExternCallArg paramTypes? args 0
+    let fieldRef ← addFieldRef className fieldName desc
+    emitOp (.putstatic fieldRef)
+    emitDefaultValue retType
+    return true
+  else if extStr.startsWith "getfield:" then
+    let some (className, fieldName, desc) := parseJvmMemberSpec? (extStr.drop 9).toString | return false
+    if args.size < 1 then return false
+    emitReceiverWithCast args[0]! className
+    let fieldRef ← addFieldRef className fieldName desc
+    emitOp (.getfield fieldRef)
+    return true
+  else if extStr.startsWith "putfield:" then
+    let some (className, fieldName, desc) := parseJvmMemberSpec? (extStr.drop 9).toString | return false
+    if args.size < 2 then return false
+    emitReceiverWithCast args[0]! className
+    emitExternCallArg paramTypes? args 1
+    let fieldRef ← addFieldRef className fieldName desc
+    emitOp (.putfield fieldRef)
+    emitDefaultValue retType
+    return true
+  else if extStr.startsWith "invokestatic:" then
+    let some (className, methodName, desc) := parseJvmMemberSpec? (extStr.drop 13).toString | return false
+    for i in 0...args.size do
+      emitExternCallArg paramTypes? args i
+    let methodRef ← addMethodRef className methodName desc
+    emitOp (.invokestatic methodRef)
+    if desc.endsWith ")V" then
+      emitDefaultValue retType
+    return true
+  else if extStr.startsWith "invokevirtual:" then
+    let some (className, methodName, desc) := parseJvmMemberSpec? (extStr.drop 14).toString | return false
+    if args.size < 1 then return false
+    emitReceiverWithCast args[0]! className
+    for i in 1...args.size do
+      emitExternCallArg paramTypes? args i
+    let methodRef ← addMethodRef className methodName desc
+    emitOp (.invokevirtual methodRef)
+    if desc.endsWith ")V" then
+      emitDefaultValue retType
+    return true
+  else
+    return false
+
 /--
 Emits let declarations to JVM bytecode.
 -/
@@ -1310,6 +1650,8 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
   | .fap fn args =>
     if (← emitPrimitiveOp? fn args) then
       pure ()
+    else if (← emitExternCall? fn args decl.type) then
+      pure ()
     else
       let targetClass ← getDeclClassName fn
       let methodName := toJVMMethodName fn
@@ -1324,7 +1666,7 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
           | .erased => emitOp .aconst_null
         let methodRef ← addMethodRef targetClass methodName descriptor
         emitOp (.invokestatic methodRef)
-        if toJVMTypeDesc decl.type != leanObjTypeDesc then
+        if isScalarType decl.type then
           emitUnboxValue decl.type
       else
         let sig? ← getImpureSignature? fn
@@ -1529,7 +1871,7 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     let ctx ← read
     let actualType := ctx.varTypeMap[fvarId]?.getD ty
     emitLoad fvarId
-    if toJVMTypeDesc actualType != leanObjTypeDesc then
+    if isScalarType actualType then
       emitBoxValue actualType
   | .unbox fvarId =>
     emitLoadAs fvarId decl.type
@@ -1624,7 +1966,7 @@ def emitTailCall (decl : LetDecl .impure) : EmitJVMM Unit := do
 
   if overwriteParam ps args then
     let mut tmpSlots : Array (Option UInt8) := #[]
-    let mut curSlot := ctx.nextSlot
+    let mut curSlot := (← get).maxSlot
     for h : i in 0...ps.size do
       let p := ps[i]
       let arg := if h2 : i < args.size then args[i] else .erased
@@ -1779,8 +2121,7 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
           appendCode bCode bFixups bLabels
         appendCode defaultCode defaultFixups defaultLabels
       else
-        let tagSlot := ctx.nextSlot
-        let branchCtx := { ctx with nextSlot := ctx.nextSlot + 1 }
+        let (tagSlot, branchCtx) ← allocTempSlot ImpureType.uint32
         let discrTy := ctx.varTypeMap[cs.discr]?.getD ImpureType.object
         if toJVMTypeDesc discrTy == leanObjTypeDesc then
           emitLoad cs.discr
@@ -1815,7 +2156,7 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     | some decl =>
       let ps := decl.params
       if overwriteParam ps args then
-        let mut curSlot := ctx.nextSlot
+        let mut curSlot := (← get).maxSlot
         let mut tmpSlots : Array (Option UInt8) := #[]
         for h : i in 0...ps.size do
           let p := ps[i]
@@ -2170,12 +2511,18 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     let mut slot : UInt8 := 0
     let mut slotMap : Std.HashMap FVarId UInt8 := {}
     let mut typeMap : Std.HashMap FVarId Expr := {}
+    let mut initSlotTypes : Std.HashMap Nat String := {}
     for p in decl.params do
       let pTy := if isBoxed then ImpureType.object else p.type
+      let desc := toJVMTypeDesc pTy
+      let sz := getSlotSize pTy
       slotMap := slotMap.insert p.fvarId slot
       typeMap := typeMap.insert p.fvarId pTy
-      paramDescs := paramDescs ++ toJVMTypeDesc pTy
-      slot := slot + getSlotSize pTy
+      initSlotTypes := initSlotTypes.insert slot.toNat desc
+      if sz == 2 then
+        initSlotTypes := initSlotTypes.insert (slot.toNat + 1) "top"
+      paramDescs := paramDescs ++ desc
+      slot := slot + sz
 
     let retType := if isBoxed then ImpureType.object else decl.type
     let retDesc := toJVMTypeDesc retType
@@ -2187,12 +2534,17 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     for jp in joinPoints do
       joinPointMap := joinPointMap.insert jp.fvarId jp
       for p in jp.params do
+        let desc := toJVMTypeDesc p.type
+        let sz := getSlotSize p.type
         slotMap := slotMap.insert p.fvarId slot
         typeMap := typeMap.insert p.fvarId p.type
-        slot := slot + getSlotSize p.type
+        initSlotTypes := initSlotTypes.insert slot.toNat desc
+        if sz == 2 then
+          initSlotTypes := initSlotTypes.insert (slot.toNat + 1) "top"
+        slot := slot + sz
 
-    -- Reset code, fixups, and labelOffsets buffer for this method
-    modify fun s => { s with code := ByteArray.empty, fixups := #[], labelOffsets := {} }
+    -- Reset code, fixups, labelOffsets, slotTypes, and maxSlot buffer for this method
+    modify fun s => { s with code := ByteArray.empty, fixups := #[], labelOffsets := {}, slotTypes := initSlotTypes, maxSlot := slot }
 
     let ctorClassMap ← if isBoxed then pure {} else populateCtorClassMap decl
     let ctx ← read
@@ -2230,6 +2582,7 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
       maxStack := 64
       maxLocals := 255
       bytecodes := bytecodes
+      slotTypes := (← get).slotTypes
     }
 
     modify fun s => { s with cf := { s.cf with methods := s.cf.methods.push methodDef } }

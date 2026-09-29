@@ -157,6 +157,17 @@ where
     | .return fvarId => return .jmp jpDecl.fvarId #[.fvar fvarId]
     | .jmp .. | .unreach .. => return code
 
+partial def codeHasNeverExtract (env : Environment) (c : Code .pure) : Bool :=
+  match c with
+  | .let decl k =>
+    let declHas := match decl.value with
+      | .const declName _ _ => hasNeverExtractAttribute env declName
+      | _ => false
+    declHas || codeHasNeverExtract env k
+  | .fun decl k | .jp decl k => codeHasNeverExtract env decl.value || codeHasNeverExtract env k
+  | .cases cs => cs.alts.any fun alt => codeHasNeverExtract env alt.getCode
+  | .return .. | .jmp .. | .unreach .. => false
+
 def seqToCode (seq : Array Element) (k : Code .pure) : CompilerM (Code .pure) := do
   go seq seq.size k
 where
@@ -180,6 +191,9 @@ where
           if auxParam.fvarId == fvarId then
             eraseParam auxParam
             go seq (i - 1) (.cases cases)
+          else if codeHasNeverExtract (← getEnv) (.cases cases) then
+            let jpDecl ← mkAuxJpDecl' auxParam c
+            go seq (i - 1) (← bindCases jpDecl cases)
           else
             -- `cases` is dead code
             go seq (i - 1) c

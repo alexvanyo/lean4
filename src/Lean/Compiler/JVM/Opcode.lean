@@ -41,12 +41,16 @@ inductive Opcode where
   | fload (slot : UInt8)
   | dload (slot : UInt8)
   | aload (slot : UInt8)
+  | iaload
+  | laload
   | aaload
   | istore (slot : UInt8)
   | lstore (slot : UInt8)
   | fstore (slot : UInt8)
   | dstore (slot : UInt8)
   | astore (slot : UInt8)
+  | iastore
+  | lastore
   | aastore
   | pop
   | dup
@@ -109,6 +113,7 @@ inductive Opcode where
   | invokespecial (cpIdx : UInt16)
   | invokestatic (cpIdx : UInt16)
   | new (cpIdx : UInt16)
+  | newarray (atype : UInt8)
   | anewarray (cpIdx : UInt16)
   | arraylength
   | checkcast (cpIdx : UInt16)
@@ -181,6 +186,8 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
     else if slot == 2 then writeU8 ba 0x2c
     else if slot == 3 then writeU8 ba 0x2d
     else writeU8 (writeU8 ba 0x19) slot
+  | .iaload => writeU8 ba 0x2e
+  | .laload => writeU8 ba 0x2f
   | .aaload => writeU8 ba 0x32
   | .istore slot =>
     if slot == 0 then writeU8 ba 0x3b
@@ -212,6 +219,8 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
     else if slot == 2 then writeU8 ba 0x4d
     else if slot == 3 then writeU8 ba 0x4e
     else writeU8 (writeU8 ba 0x3a) slot
+  | .iastore => writeU8 ba 0x4f
+  | .lastore => writeU8 ba 0x50
   | .aastore => writeU8 ba 0x53
   | .pop => writeU8 ba 0x57
   | .dup => writeU8 ba 0x59
@@ -287,6 +296,7 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
   | .invokespecial idx => writeU16 (writeU8 ba 0xb7) idx
   | .invokestatic idx => writeU16 (writeU8 ba 0xb8) idx
   | .new idx => writeU16 (writeU8 ba 0xbb) idx
+  | .newarray atype => writeU8 (writeU8 ba 0xbc) atype
   | .anewarray idx => writeU16 (writeU8 ba 0xbd) idx
   | .arraylength => writeU8 ba 0xbe
   | .checkcast idx => writeU16 (writeU8 ba 0xc0) idx

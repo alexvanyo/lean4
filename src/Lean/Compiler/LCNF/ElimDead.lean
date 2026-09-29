@@ -7,6 +7,7 @@ module
 
 prelude
 public import Lean.Compiler.LCNF.PassManager
+public import Lean.Compiler.NeverExtractAttr
 
 /-!
 This module implements a pass that does a syntactic use-def check for all let/fun/jp bindings and
@@ -52,15 +53,18 @@ abbrev collectLetValueM (e : LetValue pu) : M Unit :=
 abbrev collectFVarM (fvarId : FVarId) : M Unit :=
   modify (·.insert fvarId)
 
-def LetValue.safeToElim (val : LetValue pu) : Bool :=
+def LetValue.safeToElim (env : Environment) (val : LetValue pu) : Bool :=
   match pu with
-  | .pure => true
+  | .pure =>
+    match val with
+    | .const declName _ _ => !hasNeverExtractAttribute env declName
+    | _ => true
   | .impure =>
     match val with
     | .ctor .. | .reset .. | .reuse .. | .oproj .. | .uproj .. | .sproj .. | .lit .. | .pap ..
     | .box .. | .unbox .. | .erased .. | .isShared .. => true
-    -- 0-ary full applications are considered constants
-    | .fap _ args => args.isEmpty
+    -- 0-ary full applications are considered constants unless marked never_extract
+    | .fap declName args => args.isEmpty && !hasNeverExtractAttribute env declName
     | .fvar .. => false
 
 mutual
@@ -73,7 +77,7 @@ partial def Code.elimDead (code : Code pu) : M (Code pu) := do
   match code with
   | .let decl k =>
     let k ← k.elimDead
-    if (← get).contains decl.fvarId || !decl.value.safeToElim then
+    if (← get).contains decl.fvarId || !decl.value.safeToElim (← getEnv) then
       /- Remark: we don't need to collect `decl.type` because LCNF local declarations do not occur in types. -/
       collectLetValueM decl.value
       return code.updateCont! k

@@ -9,6 +9,7 @@ prelude
 public import Lean.Compiler.LCNF.FVarUtil
 public import Lean.Compiler.LCNF.PassManager
 import Lean.Compiler.LCNF.PhaseExt
+import Lean.Compiler.NeverExtractAttr
 
 public section
 
@@ -97,8 +98,12 @@ def withNewScope (x : BaseFloatM α) : BaseFloatM α := do
 Whether to ignore `decl` for the floating mechanism. We want to do this if:
 - `decl`' is storing a typeclass instance
 - `decl` is a projection from a variable that is storing a typeclass instance
+- `decl` is a call to a `@[never_extract]` declaration
 -/
 def ignore? (decl : LetDecl .pure) : BaseFloatM Bool :=  do
+   if let .const declName _ _ := decl.value then
+     if hasNeverExtractAttribute (← getEnv) declName then
+       return true
    if (← isArrowClass? decl.type).isSome then
      return true
    else if let .proj _ _ fvarId := decl.value then

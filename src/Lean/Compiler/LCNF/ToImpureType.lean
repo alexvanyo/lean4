@@ -119,8 +119,13 @@ inductive type `name`.
 -/
 public def nameToImpureType (name : Name) : CoreM Expr := do
   if let some type := builtinImpureType? name then return type
-  let some (.inductInfo _) := (← getEnv).find? name | return ImpureType.tobject
-  let some type := impureTypeExt.find? (← getEnv) name
+  let env ← getEnv
+  let some (.inductInfo _) := env.find? name | do
+    if let some desc := getExternNameFor env `jvm name then
+      if desc.startsWith "L" || desc.startsWith "[" || desc == "V" then
+        return ImpureType.jvmType desc
+    return ImpureType.tobject
+  let some type := impureTypeExt.find? env name
     | throwError "`{name}` was not compiled; `compileDecls` must run on inductive types first"
   return type
 
@@ -210,7 +215,7 @@ where
         let monoFieldType ← LCNF.toMonoType lcnfFieldType
         let irFieldType ← toImpureType monoFieldType
         let ctorField ← match irFieldType with
-        | ImpureType.object | ImpureType.tagged | ImpureType.tobject => do
+        | ImpureType.object | ImpureType.tagged | ImpureType.tobject | .app (.const `jvmType _) _ => do
           let i := nextIdx
           nextIdx := nextIdx + 1
           pure <| .object i irFieldType

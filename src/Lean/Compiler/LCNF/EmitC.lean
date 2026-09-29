@@ -41,6 +41,7 @@ def Lean.Expr.toCType : Expr → String
   | tobject => "lean_object*"
   | erased => "lean_object*"
   | void => "lean_object*"
+  | .app (.const `jvmType _) _ => "lean_object*"
   | _ => unreachable!
 
 def Lean.Expr.unboxOpName (t : Expr) : String :=
@@ -90,7 +91,7 @@ def Lean.Expr.closedTermReadOpName (t : Expr) : String :=
   | uint32 => "lean_uint32_once"
   | uint64 => "lean_uint64_once"
   | usize => "lean_usize_once"
-  | object | tobject | tagged | void => "lean_obj_once"
+  | object | tobject | tagged | void | .app (.const `jvmType _) _ => "lean_obj_once"
   | _ => unreachable!
 
 end ImpureType
