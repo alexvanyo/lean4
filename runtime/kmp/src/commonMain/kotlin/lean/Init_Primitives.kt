@@ -1253,7 +1253,7 @@ public object mod_l_Init_System_IO {
 
     @JvmStatic
     public fun f_stdout_getLine(world: LeanObject?): LeanObject {
-        val line = readLine() ?: ""
+        val line = readlnOrNull() ?: ""
         val res = LeanCtor.alloc(0, 2, 0)
         res.setObj(0, LeanString.of(line))
         res.setObj(1, world ?: LeanNat.ZERO)
