@@ -32,6 +32,9 @@ inductive CPEntry where
   | fieldRef (classIdx : UInt16) (nameAndTypeIdx : UInt16)
   | methodRef (classIdx : UInt16) (nameAndTypeIdx : UInt16)
   | nameAndType (nameIdx : UInt16) (descIdx : UInt16)
+  | methodHandle (referenceKind : UInt8) (referenceIdx : UInt16)
+  | methodType (descIdx : UInt16)
+  | invokeDynamic (bootstrapMethodAttrIdx : UInt16) (nameAndTypeIdx : UInt16)
   | unused
   deriving Inhabited
 
@@ -45,6 +48,9 @@ structure ConstantPool where
   nameAndTypeMap  : Std.HashMap (UInt16 × UInt16) UInt16 := {}
   methodRefMap    : Std.HashMap (UInt16 × UInt16) UInt16 := {}
   fieldRefMap     : Std.HashMap (UInt16 × UInt16) UInt16 := {}
+  methodHandleMap : Std.HashMap (UInt8 × UInt16) UInt16 := {}
+  methodTypeMap   : Std.HashMap UInt16 UInt16 := {}
+  invokeDynamicMap: Std.HashMap (UInt16 × UInt16) UInt16 := {}
   deriving Inhabited
 
 namespace ConstantPool
@@ -135,6 +141,30 @@ def addFieldRef (cp : ConstantPool) (className : String) (fieldName : String) (d
     let (idx, cp') := cp.addEntry (.fieldRef classIdx ntIdx)
     (idx, { cp' with fieldRefMap := cp'.fieldRefMap.insert key idx })
 
+def addMethodHandle (cp : ConstantPool) (referenceKind : UInt8) (referenceIdx : UInt16) : UInt16 × ConstantPool :=
+  let key := (referenceKind, referenceIdx)
+  match cp.methodHandleMap[key]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.methodHandle referenceKind referenceIdx)
+    (idx, { cp' with methodHandleMap := cp'.methodHandleMap.insert key idx })
+
+def addMethodType (cp : ConstantPool) (desc : String) : UInt16 × ConstantPool :=
+  let (descIdx, cp) := cp.addUtf8 desc
+  match cp.methodTypeMap[descIdx]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.methodType descIdx)
+    (idx, { cp' with methodTypeMap := cp'.methodTypeMap.insert descIdx idx })
+
+def addInvokeDynamic (cp : ConstantPool) (bootstrapMethodAttrIdx : UInt16) (nameAndTypeIdx : UInt16) : UInt16 × ConstantPool :=
+  let key := (bootstrapMethodAttrIdx, nameAndTypeIdx)
+  match cp.invokeDynamicMap[key]? with
+  | some idx => (idx, cp)
+  | none =>
+    let (idx, cp') := cp.addEntry (.invokeDynamic bootstrapMethodAttrIdx nameAndTypeIdx)
+    (idx, { cp' with invokeDynamicMap := cp'.invokeDynamicMap.insert key idx })
+
 end ConstantPool
 
 structure MethodDef where
@@ -153,12 +183,18 @@ structure FieldDef where
   descriptor  : String
   deriving Inhabited
 
+structure BootstrapMethod where
+  bootstrapMethodRef : UInt16
+  arguments          : Array UInt16 := #[]
+  deriving Inhabited, BEq
+
 structure ClassFile where
-  className  : String
-  superClass : String := "java/lang/Object"
-  cp         : ConstantPool := ConstantPool.empty
-  fields     : Array FieldDef := #[]
-  methods    : Array MethodDef := #[]
+  className        : String
+  superClass       : String := "java/lang/Object"
+  cp               : ConstantPool := ConstantPool.empty
+  fields           : Array FieldDef := #[]
+  methods          : Array MethodDef := #[]
+  bootstrapMethods : Array BootstrapMethod := #[]
   deriving Inhabited
 
 namespace ClassFile
@@ -192,6 +228,26 @@ def addInteger (cf : ClassFile) (v : UInt32) : UInt16 × ClassFile :=
 def addLong (cf : ClassFile) (v : UInt64) : UInt16 × ClassFile :=
   let (idx, cp) := cf.cp.addLong v
   (idx, { cf with cp := cp })
+
+def addMethodHandle (cf : ClassFile) (refKind : UInt8) (refIdx : UInt16) : UInt16 × ClassFile :=
+  let (idx, cp) := cf.cp.addMethodHandle refKind refIdx
+  (idx, { cf with cp := cp })
+
+def addMethodType (cf : ClassFile) (desc : String) : UInt16 × ClassFile :=
+  let (idx, cp) := cf.cp.addMethodType desc
+  (idx, { cf with cp := cp })
+
+def addInvokeDynamic (cf : ClassFile) (bmAttrIdx : UInt16) (name : String) (desc : String) : UInt16 × ClassFile :=
+  let (ntIdx, cp) := cf.cp.addNameAndType name desc
+  let (idx, cp) := cp.addInvokeDynamic bmAttrIdx ntIdx
+  (idx, { cf with cp := cp })
+
+def addBootstrapMethod (cf : ClassFile) (bmRef : UInt16) (args : Array UInt16) : UInt16 × ClassFile :=
+  match cf.bootstrapMethods.findIdx? (fun bm => bm.bootstrapMethodRef == bmRef && bm.arguments == args) with
+  | some idx => (idx.toUInt16, cf)
+  | none =>
+    let idx := cf.bootstrapMethods.size.toUInt16
+    (idx, { cf with bootstrapMethods := cf.bootstrapMethods.push { bootstrapMethodRef := bmRef, arguments := args } })
 
 open Opcode (writeU8 writeU16 writeU32)
 
@@ -234,6 +290,17 @@ def encodeConstantPool (ba : ByteArray) (cp : ConstantPool) : ByteArray :=
         ba := writeU8 ba 12 -- Tag 12: CONSTANT_NameAndType
         ba := writeU16 ba nameIdx
         ba := writeU16 ba descIdx
+      | .methodHandle refKind refIdx =>
+        ba := writeU8 ba 15 -- Tag 15: CONSTANT_MethodHandle
+        ba := writeU8 ba refKind
+        ba := writeU16 ba refIdx
+      | .methodType descIdx =>
+        ba := writeU8 ba 16 -- Tag 16: CONSTANT_MethodType
+        ba := writeU16 ba descIdx
+      | .invokeDynamic bmAttrIdx ntIdx =>
+        ba := writeU8 ba 18 -- Tag 18: CONSTANT_InvokeDynamic
+        ba := writeU16 ba bmAttrIdx
+        ba := writeU16 ba ntIdx
     return ba
 
 inductive VerificationType where
@@ -662,6 +729,10 @@ def toByteArray (cf : ClassFile) : ByteArray :=
     -- Register attribute names
     let (codeAttrIdx, cp') := cp.addUtf8 "Code"
     let (stackMapAttrIdx, cp') := cp'.addUtf8 "StackMapTable"
+    let (bsAttrIdx, cp') := if !cf.bootstrapMethods.isEmpty then
+      cp'.addUtf8 "BootstrapMethods"
+    else
+      (0, cp')
     cp := cp'
 
     -- Register fields
@@ -743,8 +814,22 @@ def toByteArray (cf : ClassFile) : ByteArray :=
         ba := writeU16 ba 0 -- exception_table_length
         ba := writeU16 ba 0 -- code attributes_count = 0
 
-    -- Class attributes_count = 0
-    ba := writeU16 ba 0
+    -- Class attributes
+    if cf.bootstrapMethods.isEmpty then
+      ba := writeU16 ba 0 -- Class attributes_count = 0
+    else
+      ba := writeU16 ba 1 -- Class attributes_count = 1
+      ba := writeU16 ba bsAttrIdx
+      let mut attrLen : UInt32 := 2
+      for bm in cf.bootstrapMethods do
+        attrLen := attrLen + 4 + (2 * bm.arguments.size).toUInt32
+      ba := writeU32 ba attrLen
+      ba := writeU16 ba cf.bootstrapMethods.size.toUInt16
+      for bm in cf.bootstrapMethods do
+        ba := writeU16 ba bm.bootstrapMethodRef
+        ba := writeU16 ba bm.arguments.size.toUInt16
+        for arg in bm.arguments do
+          ba := writeU16 ba arg
 
     return ba
 

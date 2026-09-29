@@ -113,6 +113,7 @@ inductive Opcode where
   | arraylength
   | checkcast (cpIdx : UInt16)
   | instanceof (cpIdx : UInt16)
+  | invokedynamic (cpIdx : UInt16)
   deriving Inhabited
 
 namespace Opcode
@@ -290,6 +291,7 @@ def emit (ba : ByteArray) (op : Opcode) : ByteArray :=
   | .arraylength => writeU8 ba 0xbe
   | .checkcast idx => writeU16 (writeU8 ba 0xc0) idx
   | .instanceof idx => writeU16 (writeU8 ba 0xc1) idx
+  | .invokedynamic idx => writeU8 (writeU8 (writeU16 (writeU8 ba 0xba) idx) 0) 0
 
 end Opcode
 
