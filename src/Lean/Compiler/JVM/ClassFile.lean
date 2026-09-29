@@ -333,6 +333,21 @@ def trimTop (locals : Array VerificationType) : Array VerificationType :=
       arr := arr.pop
     return arr
 
+def mergeLocals (l1 l2 : Array VerificationType) : Array VerificationType :=
+  Id.run do
+    let sz := min l1.size l2.size
+    let mut res : Array VerificationType := #[]
+    let mut i := 0
+    while i < sz do
+      let v1 := l1[i]!
+      let v2 := l2[i]!
+      if v1 == v2 then
+        res := res.push v1
+      else
+        res := res.push .top
+      i := i + 1
+    return trimTop res
+
 def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantPool) : Option ByteArray × ConstantPool :=
   Id.run do
     let code := m.bytecodes
@@ -493,9 +508,11 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
             let tNat := target.toNat
             if !targets.contains tNat then
               targets := targets.push tNat
-            if !targetLocalsMap.contains tNat then
-              let locs := if tNat == 0 then initialLocals else trimTop currentLocals
-              targetLocalsMap := targetLocalsMap.insert tNat locs
+            let incomingLocs := if tNat == 0 then initialLocals else trimTop currentLocals
+            if let some existingLocs := targetLocalsMap[tNat]? then
+              targetLocalsMap := targetLocalsMap.insert tNat (mergeLocals existingLocs incomingLocs)
+            else
+              targetLocalsMap := targetLocalsMap.insert tNat incomingLocs
             if op == 0xa7 && u16Val == 4 && tNat > 0 && pc >= 1 && code.get! (pc - 1) == 0x03 then
               targetStackMap := targetStackMap.insert tNat #[.integer]
 
@@ -520,9 +537,11 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
         if defTarget >= 0 then
           let tNat := defTarget.toNat
           if !targets.contains tNat then targets := targets.push tNat
-          if !targetLocalsMap.contains tNat then
-            let locs := if tNat == 0 then initialLocals else trimTop currentLocals
-            targetLocalsMap := targetLocalsMap.insert tNat locs
+          let incomingLocs := if tNat == 0 then initialLocals else trimTop currentLocals
+          if let some existingLocs := targetLocalsMap[tNat]? then
+            targetLocalsMap := targetLocalsMap.insert tNat (mergeLocals existingLocs incomingLocs)
+          else
+            targetLocalsMap := targetLocalsMap.insert tNat incomingLocs
         let mut i := 0
         while i < count do
           let off := readI32 (base + 12 + i * 4)
@@ -530,9 +549,11 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
           if target >= 0 then
             let tNat := target.toNat
             if !targets.contains tNat then targets := targets.push tNat
-            if !targetLocalsMap.contains tNat then
-              let locs := if tNat == 0 then initialLocals else trimTop currentLocals
-              targetLocalsMap := targetLocalsMap.insert tNat locs
+            let incomingLocs := if tNat == 0 then initialLocals else trimTop currentLocals
+            if let some existingLocs := targetLocalsMap[tNat]? then
+              targetLocalsMap := targetLocalsMap.insert tNat (mergeLocals existingLocs incomingLocs)
+            else
+              targetLocalsMap := targetLocalsMap.insert tNat incomingLocs
           i := i + 1
 
       if (op >= 0xac && op <= 0xb1) || op == 0xa7 || op == 0xaa then
