@@ -7,6 +7,7 @@ module
 
 prelude
 public import Lean.Compiler.BorrowedAnnotation
+public import Lean.Compiler.ExternAttr
 public import Lean.Meta.InferType
 import Init.Omega
 import Lean.OriginalConstKind
@@ -170,6 +171,10 @@ where
   go type := do
     if ← isProp type then
       return erasedExpr
+    if let .const declName us := type then
+      if let some desc := getExternNameFor (← getEnv) `jvm declName then
+        if desc.startsWith "L" || desc.startsWith "[" || desc == "V" then
+          return .const declName us
     let type ← whnfEta type
     match type with
     | .sort u     => return .sort u
@@ -221,6 +226,9 @@ where
           -- This branch can happen under `backward.privateInPublic`; restore original behavior of
           -- failing here, which is caught and ignored above by `observing`.
           throwError "internal compiler error: private in public"
+        if let some desc := getExternNameFor (← getEnv) `jvm declName then
+          if desc.startsWith "L" || desc.startsWith "[" || desc == "V" then
+            return .const declName us
         let .inductInfo _ ← getConstInfo declName | return anyExpr
         pure <| .const declName us
       | .fvar .. => pure f
@@ -447,6 +455,16 @@ to be passed around etc. at this point in the pipeline.
 def void : Expr := .const ``lcVoid []
 
 /--
+Represents a foreign JVM reference or array type descriptor (e.g. `Ljava/lang/Object;`, `[J`).
+-/
+@[inline, expose]
+def jvmType (desc : String) : Expr := .app (.const `jvmType []) (.lit (.strVal desc))
+
+def getJvmTypeDesc? : Expr → Option String
+  | .app (.const `jvmType _) (.lit (.strVal desc)) => some desc
+  | _ => none
+
+/--
 Whether the type is a scalar as opposed to a pointer (or a value disguised as a pointer).
 -/
 def Lean.Expr.isScalar : Expr → Bool
@@ -467,6 +485,7 @@ def Lean.Expr.isObj : Expr → Bool
   | ImpureType.tagged  => true
   | ImpureType.tobject => true
   | ImpureType.void    => true
+  | .app (.const `jvmType _) _ => true
   | _       => false
 
 /--
@@ -490,6 +509,7 @@ def Lean.Expr.boxed : Expr → Expr
   | ImpureType.object | ImpureType.float | ImpureType.float32 | ImpureType.uint64 =>
     ImpureType.object
   | ImpureType.void | ImpureType.tagged | ImpureType.uint8 | ImpureType.uint16 => ImpureType.tagged
+  | t@(.app (.const `jvmType _) _) => t
   | _ => ImpureType.tobject
 
 end ImpureType

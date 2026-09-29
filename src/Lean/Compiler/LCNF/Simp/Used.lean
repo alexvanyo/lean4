@@ -7,6 +7,7 @@ module
 
 prelude
 public import Lean.Compiler.LCNF.Simp.SimpM
+public import Lean.Compiler.NeverExtractAttr
 import Init.Omega
 
 public section
@@ -74,6 +75,14 @@ def isUsed (fvarId : FVarId) : SimpM Bool :=
   return (← get).used.contains fvarId
 
 /--
+Return `true` if `letDecl` is an application of a constant tagged with `[never_extract]`.
+-/
+def isNeverExtractLetDecl (letDecl : LetDecl .pure) : SimpM Bool := do
+  match letDecl.value with
+  | .const declName _ _ => return hasNeverExtractAttribute (← getEnv) declName
+  | _ => return false
+
+/--
 Attach the given `decls` to `code`. For example, assume `decls` is `#[.let _x.1 := 10, .let _x.2 := true]`,
 then the result is
 ```
@@ -88,7 +97,10 @@ where
   go (i : Nat) (code : Code .pure) : SimpM (Code .pure) := do
     if i > 0 then
       let decl := decls[i-1]!
-      if (← isUsed decl.fvarId) then
+      let keep ← match decl with
+        | .let letDecl => isUsed decl.fvarId <||> isNeverExtractLetDecl letDecl
+        | _ => isUsed decl.fvarId
+      if keep then
         match decl with
         | .let decl => markUsedLetDecl decl; go (i-1) (.let decl code)
         | .fun decl => markUsedFunDecl decl; go (i-1) (.fun decl code)

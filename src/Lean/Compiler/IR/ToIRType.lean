@@ -46,6 +46,7 @@ def toIRType (type : Lean.Expr) : IRType :=
   | LCNF.ImpureType.tobject => .tobject
   | LCNF.ImpureType.tagged => .tagged
   | LCNF.ImpureType.void => .void
+  | .app (.const `jvmType _) _ => .tobject
   | _ => unreachable!
 
 end IR

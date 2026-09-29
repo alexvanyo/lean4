@@ -29,6 +29,8 @@ open ImpureType
 
 def requiresBoxedVersion (sig : Signature .impure) : CompilerM Bool := do
   let ps := sig.params
+  if (getJvmTypeDesc? sig.type).isSome || ps.any (fun p => (getJvmTypeDesc? p.type).isSome) then
+    return false
   let env ← getEnv
   return (ps.size > 0
     && (sig.type.isScalar
