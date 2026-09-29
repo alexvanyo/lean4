@@ -149,22 +149,25 @@ def addClass (className : String) : EmitJVMM UInt16 := do
   set { s with cf := cf' }
   return idx
 
-def captureCode (act : EmitJVMM Unit) : EmitJVMM (ByteArray × Array (Nat × Name)) := do
+def captureCode (act : EmitJVMM Unit) : EmitJVMM (ByteArray × Array (Nat × Name) × Array (Name × Nat)) := do
   let savedCode := (← get).code
   let savedFixups := (← get).fixups
-  modify fun s => { s with code := ByteArray.empty, fixups := #[] }
+  let savedLabels := (← get).labelOffsets
+  modify fun s => { s with code := ByteArray.empty, fixups := #[], labelOffsets := {} }
   act
   let capturedCode := (← get).code
   let capturedFixups := (← get).fixups
-  modify fun s => { s with code := savedCode, fixups := savedFixups }
-  return (capturedCode, capturedFixups)
+  let capturedLabels := (← get).labelOffsets
+  modify fun s => { s with code := savedCode, fixups := savedFixups, labelOffsets := savedLabels }
+  return (capturedCode, capturedFixups, capturedLabels.toArray)
 
-def appendCode (code : ByteArray) (fixups : Array (Nat × Name) := #[]) : EmitJVMM Unit := do
+def appendCode (code : ByteArray) (fixups : Array (Nat × Name) := #[]) (labels : Array (Name × Nat) := #[]) : EmitJVMM Unit := do
   let base := (← get).code.size
   modify fun s => {
     s with
     code := s.code ++ code
     fixups := s.fixups ++ fixups.map (fun (fpc, name) => (base + fpc, name))
+    labelOffsets := labels.foldl (fun m (name, off) => m.insert name (base + off)) s.labelOffsets
   }
 
 /--
@@ -1098,6 +1101,42 @@ def overwriteParam (ps : Array (Param .impure)) (args : Array (Arg .impure)) : B
         return true
   return false
 
+def emitArgAs (arg : Arg .impure) (ty : Expr) : EmitJVMM Unit := do
+  match arg with
+  | .fvar id => emitLoadAs id ty
+  | .erased =>
+    if toJVMTypeDesc ty == "I" then emitOp .iconst_0
+    else if toJVMTypeDesc ty == "J" then emitOp .lconst_0
+    else emitOp .aconst_null
+
+partial def collectJoinPoints (code : Code .impure) : Array (FunDecl .impure) :=
+  go code #[]
+where
+  go (code : Code .impure) (acc : Array (FunDecl .impure)) : Array (FunDecl .impure) :=
+    match code with
+    | .let _ k => go k acc
+    | .jp decl k =>
+      let acc := acc.push decl
+      let acc := go decl.value acc
+      go k acc
+    | .cases cs =>
+      cs.alts.foldl (fun a alt => go alt.getCode a) acc
+    | .inc _ _ _ _ k | .dec _ _ _ _ _ k | .del _ k | .setTag _ _ k
+    | .oset _ _ _ k | .uset _ _ _ k | .sset _ _ _ _ _ k => go k acc
+    | .return _ | .jmp _ _ | .unreach _ => acc
+
+def isTerminalBytecode (code : ByteArray) : Bool :=
+  if code.size == 0 then
+    false
+  else
+    let lastByte := code.get! (code.size - 1)
+    if (lastByte >= 0xac && lastByte <= 0xb1) || lastByte == 0xbf then
+      true
+    else if code.size >= 3 && code.get! (code.size - 3) == 0xa7 then
+      true
+    else
+      false
+
 /--
 Emits a self-tail call by assigning new arguments into parameter slots and jumping back to offset 0.
 -/
@@ -1105,13 +1144,6 @@ def emitTailCall (decl : LetDecl .impure) : EmitJVMM Unit := do
   let .fap _ args := decl.value | unreachable!
   let ctx ← read
   let ps := ctx.currParams
-  let emitArgAs (arg : Arg .impure) (ty : Expr) : EmitJVMM Unit := do
-    match arg with
-    | .fvar id => emitLoadAs id ty
-    | .erased =>
-      if toJVMTypeDesc ty == "I" then emitOp .iconst_0
-      else if toJVMTypeDesc ty == "J" then emitOp .lconst_0
-      else emitOp .aconst_null
 
   if overwriteParam ps args then
     let mut tmpSlots : Array (Option UInt8) := #[]
@@ -1234,29 +1266,29 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
           if toJVMTypeDesc discrTy == "J" then
             emitOp .l2i
 
-        let mut branchCodes : Array (ByteArray × Array (Nat × Name)) := #[]
+        let mut branchCodes : Array (ByteArray × Array (Nat × Name) × Array (Name × Nat)) := #[]
         for alt in sortedAlts do
           match alt with
           | .ctorAlt _ k =>
-            let pair ← captureCode (emitCode k)
-            branchCodes := branchCodes.push pair
+            let triple ← captureCode (emitCode k)
+            branchCodes := branchCodes.push triple
           | _ => unreachable!
         let retType := (← read).currReturnType
-        let (defaultCode, defaultFixups) ← captureCode (emitDefaultReturn retType)
+        let (defaultCode, defaultFixups, defaultLabels) ← captureCode (emitDefaultReturn retType)
 
         let switchPc := (← get).code.size
         let pad := (4 - ((switchPc + 1) % 4)) % 4
         let tableswitchLen := 1 + pad + 4 + 4 + 4 + sortedAlts.size * 4
         let mut curOffset := tableswitchLen
         let mut offsets : Array UInt32 := #[]
-        for (bCode, _) in branchCodes do
+        for (bCode, _, _) in branchCodes do
           offsets := offsets.push curOffset.toUInt32
           curOffset := curOffset + bCode.size
         let defOffset := curOffset.toUInt32
         emitOp (.tableswitch 0 (sortedAlts.size - 1).toUInt32 defOffset offsets)
-        for (bCode, bFixups) in branchCodes do
-          appendCode bCode bFixups
-        appendCode defaultCode defaultFixups
+        for (bCode, bFixups, bLabels) in branchCodes do
+          appendCode bCode bFixups bLabels
+        appendCode defaultCode defaultFixups defaultLabels
       else
         let tagSlot := ctx.nextSlot
         let branchCtx := { ctx with nextSlot := ctx.nextSlot + 1 }
@@ -1277,12 +1309,12 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
           for alt in cs.alts do
             match alt with
             | .ctorAlt info k =>
-              let (altCode, altFixups) ← captureCode (emitCode k)
+              let (altCode, altFixups, altLabels) ← captureCode (emitCode k)
               emitOp (.iload tagSlot)
               emitPushInt info.cidx
               let jumpOffset := (3 + altCode.size).toUInt16
               emitOp (.if_icmpne jumpOffset)
-              appendCode altCode altFixups
+              appendCode altCode altFixups altLabels
             | .default k =>
               emitCode k
           if !hasDefault then
@@ -1292,40 +1324,61 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     let ctx ← read
     match ctx.joinPoints[fvarId]? with
     | some decl =>
-      let mut nextSlot := ctx.nextSlot
-      let mut newVarSlotMap := ctx.varSlotMap
-      let mut newVarTypeMap := ctx.varTypeMap
-      let mut paramSlots : Array (Param .impure × UInt8) := #[]
-      for p in decl.params do
-        paramSlots := paramSlots.push (p, nextSlot)
-        newVarSlotMap := newVarSlotMap.insert p.fvarId nextSlot
-        newVarTypeMap := newVarTypeMap.insert p.fvarId p.type
-        nextSlot := nextSlot + getSlotSize p.type
-
-      for h : i in 0...args.size do
-        let arg := args[i]
-        if h2 : i < paramSlots.size then
-          let (p, slot) := paramSlots[i]
-          match arg with
-          | .fvar id => emitLoadAs id p.type
-          | .erased =>
-            if toJVMTypeDesc p.type == "I" then
-              emitOp .iconst_0
-            else if toJVMTypeDesc p.type == "J" then
-              emitOp .lconst_0
-            else
-              emitOp .aconst_null
-          emitStoreTyped slot p.type
-      let newCtx := { ctx with varSlotMap := newVarSlotMap, varTypeMap := newVarTypeMap, nextSlot := nextSlot }
-      withReader (fun _ => newCtx) do
-        emitCode decl.value
+      let ps := decl.params
+      if overwriteParam ps args then
+        let mut curSlot := ctx.nextSlot
+        let mut tmpSlots : Array (Option UInt8) := #[]
+        for h : i in 0...ps.size do
+          let p := ps[i]
+          let arg := if h2 : i < args.size then args[i] else .erased
+          if !paramEqArg p arg then
+            let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
+            tmpSlots := tmpSlots.push (some curSlot)
+            curSlot := curSlot + getSlotSize pTy
+          else
+            tmpSlots := tmpSlots.push none
+        for h : i in 0...ps.size do
+          if let some tmpSlot := tmpSlots[i]! then
+            let p := ps[i]
+            let arg := if h2 : i < args.size then args[i] else .erased
+            let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
+            emitArgAs arg pTy
+            emitStoreTyped tmpSlot pTy
+        for h : i in 0...ps.size do
+          if let some tmpSlot := tmpSlots[i]! then
+            let p := ps[i]
+            let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
+            let pSlot := ctx.varSlotMap[p.fvarId]?.getD 0
+            match toJVMTypeDesc pTy with
+            | "I" => emitOp (.iload tmpSlot); emitOp (.istore pSlot)
+            | "J" => emitOp (.lload tmpSlot); emitOp (.lstore pSlot)
+            | "F" => emitOp (.fload tmpSlot); emitOp (.fstore pSlot)
+            | "D" => emitOp (.dload tmpSlot); emitOp (.dstore pSlot)
+            | _   => emitOp (.aload tmpSlot); emitOp (.astore pSlot)
+      else
+        for h : i in 0...ps.size do
+          let p := ps[i]
+          let arg := if h2 : i < args.size then args[i] else .erased
+          unless paramEqArg p arg do
+            let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
+            let pSlot := ctx.varSlotMap[p.fvarId]?.getD 0
+            emitArgAs arg pTy
+            emitStoreTyped pSlot pTy
+      let fpc := (← get).code.size
+      emitOp (.goto 0)
+      modify fun s => { s with fixups := s.fixups.push (fpc, fvarId.name) }
     | none =>
       let retType := ctx.currReturnType
       emitDefaultReturn retType
   | .jp decl k =>
-    let newCtx := { (← read) with joinPoints := (← read).joinPoints.insert decl.fvarId decl }
-    withReader (fun _ => newCtx) do
-      emitCode k
+    emitCode k
+    if (← get).fixups.any (·.2 == decl.fvarId.name) then
+      let offset := (← get).code.size
+      modify fun s => { s with labelOffsets := s.labelOffsets.insert decl.fvarId.name offset }
+      emitCode decl.value
+      let retType := (← read).currReturnType
+      if !isTerminalBytecode (← get).code then
+        emitDefaultReturn retType
   | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
     -- Tracing GC: Reference counting instructions are no-ops!
     emitCode k
@@ -1438,8 +1491,18 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     let retDesc := toJVMTypeDesc retType
     let descriptor := s!"({paramDescs}){retDesc}"
 
-    -- Reset code and fixups buffer for this method
-    modify fun s => { s with code := ByteArray.empty, fixups := #[] }
+    -- Pre-allocate slots and types for all join point parameters
+    let joinPoints := collectJoinPoints code
+    let mut joinPointMap : Std.HashMap FVarId (FunDecl .impure) := {}
+    for jp in joinPoints do
+      joinPointMap := joinPointMap.insert jp.fvarId jp
+      for p in jp.params do
+        slotMap := slotMap.insert p.fvarId slot
+        typeMap := typeMap.insert p.fvarId p.type
+        slot := slot + getSlotSize p.type
+
+    -- Reset code, fixups, and labelOffsets buffer for this method
+    modify fun s => { s with code := ByteArray.empty, fixups := #[], labelOffsets := {} }
 
     let ctx ← read
     let methodCtx := { ctx with
@@ -1449,6 +1512,7 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
       varSlotMap := slotMap
       varTypeMap := typeMap
       nextSlot := slot
+      joinPoints := joinPointMap
     }
 
     withReader (fun _ => methodCtx) do
@@ -1458,6 +1522,12 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     for (fpc, targetName) in (← get).fixups do
       if targetName == `_start then
         let target := (0x10000 - fpc).toUInt16
+        bytecodes := bytecodes.set! (fpc + 1) (target >>> 8).toUInt8
+        bytecodes := bytecodes.set! (fpc + 2) target.toUInt8
+      else if let some targetOffset := (← get).labelOffsets[targetName]? then
+        let targetDiff : Int := (targetOffset : Int) - (fpc : Int)
+        let targetNat := if targetDiff < 0 then (0x10000 + targetDiff).toNat else targetDiff.toNat
+        let target := targetNat.toUInt16
         bytecodes := bytecodes.set! (fpc + 1) (target >>> 8).toUInt8
         bytecodes := bytecodes.set! (fpc + 2) target.toUInt8
 

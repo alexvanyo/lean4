@@ -384,6 +384,16 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  join_point_test)
+    if [[ -f "lean/mod_l_lean_test_JoinPointModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'101\n201\n301\n24\n46\n68\n90\n55'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_JoinPointModule)
+      rm -f lean/mod_l_lean_test_JoinPointModule*.class lean/test/JoinPointModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "JoinPointTest failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true
