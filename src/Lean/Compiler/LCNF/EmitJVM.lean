@@ -418,6 +418,30 @@ def addFieldRef (className : String) (fieldName : String) (desc : String) : Emit
   set { s with cf := cf' }
   return idx
 
+def addMethodHandle (refKind : UInt8) (refIdx : UInt16) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addMethodHandle refKind refIdx
+  set { s with cf := cf' }
+  return idx
+
+def addMethodType (desc : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addMethodType desc
+  set { s with cf := cf' }
+  return idx
+
+def addInvokeDynamic (bmAttrIdx : UInt16) (name : String) (desc : String) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addInvokeDynamic bmAttrIdx name desc
+  set { s with cf := cf' }
+  return idx
+
+def addBootstrapMethod (bmRef : UInt16) (args : Array UInt16) : EmitJVMM UInt16 := do
+  let s ← get
+  let (idx, cf') := s.cf.addBootstrapMethod bmRef args
+  set { s with cf := cf' }
+  return idx
+
 def emitBoxValue (type : Expr) : EmitJVMM Unit := do
   match toJVMTypeDesc type with
   | "J" =>
@@ -952,61 +976,78 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     let targetClass ← getDeclClassName fn
     let methodName := toJVMMethodName fn
     let sig? ← getImpureSignature? fn
-    let totalArity? := match (← read).localDecls.find? (·.name == fn) with
+    let isBoxed := isBoxedName fn
+    let localDecl? := (← read).localDecls.find? (·.name == fn)
+    let totalArity? := match localDecl? with
       | some decl => some decl.params.size
-      | none => sig?.map (·.params.size)
-    -- Fall back to dynamic dispatch (LeanClosure.alloc) when we cannot determine the
-    -- total arity statically or when all args are already captured (remainingArity = 0).
-    match totalArity? with
-    | some totalArity =>
-      if totalArity > args.size then
-        discard <| emitSyntheticClosure targetClass methodName totalArity args
-      else
-        -- All args already captured (remainingArity = 0); dynamic fallback.
-        let classStrRef ← addString targetClass
-        if classStrRef <= 255 then emitOp (.ldc classStrRef.toUInt8)
-        else emitOp (.ldc_w classStrRef)
-        let methodStrRef ← addString methodName
-        if methodStrRef <= 255 then emitOp (.ldc methodStrRef.toUInt8)
-        else emitOp (.ldc_w methodStrRef)
-        emitPushInt totalArity
-        emitPushInt args.size
-        let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
-        emitOp (.anewarray leanObjClassIdx)
-        for h : i in 0...args.size do
-          emitOp .dup
-          emitPushInt i
-          let arg := args[i]
-          match arg with
-          | .fvar argId => emitLoadAs argId ImpureType.object
-          | .erased => emitOp .aconst_null
-          emitOp .aastore
-        let allocRef ← addMethodRef "lean/runtime/LeanClosure" "alloc"
-          "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
-        emitOp (.invokestatic allocRef)
-    | none =>
-      -- Arity unknown; dynamic fallback using captured count as best estimate.
-      let classStrRef ← addString targetClass
-      if classStrRef <= 255 then emitOp (.ldc classStrRef.toUInt8)
-      else emitOp (.ldc_w classStrRef)
-      let methodStrRef ← addString methodName
-      if methodStrRef <= 255 then emitOp (.ldc methodStrRef.toUInt8)
-      else emitOp (.ldc_w methodStrRef)
-      emitPushInt args.size
-      emitPushInt args.size
-      let leanObjClassIdx ← addClass "lean/runtime/LeanObject"
-      emitOp (.anewarray leanObjClassIdx)
-      for h : i in 0...args.size do
-        emitOp .dup
-        emitPushInt i
-        let arg := args[i]
-        match arg with
-        | .fvar argId => emitLoadAs argId ImpureType.object
-        | .erased => emitOp .aconst_null
-        emitOp .aastore
-      let allocRef ← addMethodRef "lean/runtime/LeanClosure" "alloc"
-        "(Ljava/lang/String;Ljava/lang/String;I[Llean/runtime/LeanObject;)Llean/runtime/LeanClosure;"
-      emitOp (.invokestatic allocRef)
+      | none => sig?.map fun (sig : Signature .impure) => sig.params.size
+    let totalArity := totalArity?.getD args.size
+
+    let (paramTypes, retDesc) := match localDecl? with
+      | some decl =>
+        if isBoxed then
+          (decl.params.map fun _ => ImpureType.object, leanObjTypeDesc)
+        else
+          (decl.params.map fun (p : Param .impure) => p.type, toJVMTypeDesc decl.type)
+      | none => match sig? with
+        | some sig =>
+          if isBoxed then
+            (sig.params.map fun _ => ImpureType.object, leanObjTypeDesc)
+          else
+            (sig.params.map fun (p : Param .impure) => p.type, toJVMTypeDesc sig.type)
+        | none =>
+          ((List.replicate totalArity ImpureType.object).toArray, leanObjTypeDesc)
+    let mut pDescs := ""
+    for p in paramTypes do
+      pDescs := pDescs ++ toJVMTypeDesc p
+    if paramTypes.size < totalArity then
+      for _ in List.range (totalArity - paramTypes.size) do
+        pDescs := pDescs ++ leanObjTypeDesc
+    let targetDesc := s!"({pDescs}){retDesc}"
+
+    let rem := if totalArity > args.size then totalArity - args.size else 0
+
+    -- 1. Push captured arguments onto the operand stack
+    for arg in args do
+      match arg with
+      | .fvar argId => emitLoadAs argId ImpureType.object
+      | .erased => emitOp .aconst_null
+
+    -- 2. Register target implementation method reference & MethodHandle (REF_invokeStatic = 6)
+    let targetMethodRef ← addMethodRef targetClass methodName targetDesc
+    let targetHandleIdx ← addMethodHandle 6 targetMethodRef
+
+    -- 3. Register standard java.lang.invoke.LambdaMetafactory.metafactory bootstrap method
+    let bsMethodDesc := "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;"
+    let bsMethodRef ← addMethodRef "java/lang/invoke/LambdaMetafactory" "metafactory" bsMethodDesc
+    let bsHandleIdx ← addMethodHandle 6 bsMethodRef
+
+    -- 4. SAM interface method descriptor: (rem LeanObjects) -> LeanObject
+    let mut samParamDescs := ""
+    for _ in List.range rem do
+      samParamDescs := samParamDescs ++ leanObjTypeDesc
+    let samDesc := s!"({samParamDescs}){leanObjTypeDesc}"
+    let samMethodTypeIdx ← addMethodType samDesc
+
+    -- 5. Register BootstrapMethod attribute entry: [samMethodType, implMethod, instantiatedMethodType]
+    let bmAttrIdx ← addBootstrapMethod bsHandleIdx #[samMethodTypeIdx, targetHandleIdx, samMethodTypeIdx]
+
+    -- 6. Construct callsite descriptor: (captured...) -> LeanFn{rem}
+    let fnInterface := s!"lean/runtime/LeanFn{rem}"
+    let mut callsiteParamDescs := ""
+    for _ in List.range args.size do
+      callsiteParamDescs := callsiteParamDescs ++ leanObjTypeDesc
+    let callsiteDesc := s!"({callsiteParamDescs})L{fnInterface};"
+
+    -- 7. Register CONSTANT_InvokeDynamic and emit opcode
+    let indyIdx ← addInvokeDynamic bmAttrIdx "invoke" callsiteDesc
+    emitOp (.invokedynamic indyIdx)
+
+    -- 8. Wrap into LeanClosure via LeanClosure.ofFn{rem}
+    let ofFnMethodName := s!"ofFn{rem}"
+    let ofFnDesc := s!"(L{fnInterface};){leanClosureTypeDesc}"
+    let ofFnRef ← addMethodRef "lean/runtime/LeanClosure" ofFnMethodName ofFnDesc
+    emitOp (.invokestatic ofFnRef)
   | .ctor info args =>
     emitCtor info args
   | .oproj i fvarId =>
