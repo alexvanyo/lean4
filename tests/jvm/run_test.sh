@@ -374,6 +374,16 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  tailrec_stress)
+    if [[ -f "lean/mod_l_lean_test_TailRecStressModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'30\n1000000\n500000500000'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_TailRecStressModule)
+      rm -f lean/mod_l_lean_test_TailRecStressModule*.class lean/test/TailRecStressModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "TailRecStress failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true

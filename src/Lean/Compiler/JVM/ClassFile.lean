@@ -353,6 +353,7 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
 
     let mut targets : Array Nat := #[]
     let mut targetLocalsMap : Std.HashMap Nat (Array VerificationType) := {}
+    let mut targetStackMap : Std.HashMap Nat (Array VerificationType) := {}
     let mut currentLocals := initialLocals
     let mut pc : Nat := 0
 
@@ -493,9 +494,48 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
             if !targets.contains tNat then
               targets := targets.push tNat
             if !targetLocalsMap.contains tNat then
-              targetLocalsMap := targetLocalsMap.insert tNat (trimTop currentLocals)
+              let locs := if tNat == 0 then initialLocals else trimTop currentLocals
+              targetLocalsMap := targetLocalsMap.insert tNat locs
+            if op == 0xa7 && u16Val == 4 && tNat > 0 && pc >= 1 && code.get! (pc - 1) == 0x03 then
+              targetStackMap := targetStackMap.insert tNat #[.integer]
 
-      if (op >= 0xac && op <= 0xb1) || op == 0xa7 then
+      if op == 0xaa then
+        let pad := (4 - ((pc + 1) % 4)) % 4
+        let base := pc + 1 + pad
+        let readI32 (idx : Nat) : Int :=
+          let b0 := (code.get! idx).toUInt32
+          let b1 := (code.get! (idx + 1)).toUInt32
+          let b2 := (code.get! (idx + 2)).toUInt32
+          let b3 := (code.get! (idx + 3)).toUInt32
+          let u := (b0 <<< 24) ||| (b1 <<< 16) ||| (b2 <<< 8) ||| b3
+          if u >= 0x80000000 then
+            -((0x100000000 - u.toNat) : Int)
+          else
+            (u.toNat : Int)
+        let defOff := readI32 base
+        let low := readI32 (base + 4)
+        let high := readI32 (base + 8)
+        let count := if high >= low then (high - low + 1).toNat else 0
+        let defTarget := (pc : Int) + defOff
+        if defTarget >= 0 then
+          let tNat := defTarget.toNat
+          if !targets.contains tNat then targets := targets.push tNat
+          if !targetLocalsMap.contains tNat then
+            let locs := if tNat == 0 then initialLocals else trimTop currentLocals
+            targetLocalsMap := targetLocalsMap.insert tNat locs
+        let mut i := 0
+        while i < count do
+          let off := readI32 (base + 12 + i * 4)
+          let target := (pc : Int) + off
+          if target >= 0 then
+            let tNat := target.toNat
+            if !targets.contains tNat then targets := targets.push tNat
+            if !targetLocalsMap.contains tNat then
+              let locs := if tNat == 0 then initialLocals else trimTop currentLocals
+              targetLocalsMap := targetLocalsMap.insert tNat locs
+          i := i + 1
+
+      if (op >= 0xac && op <= 0xb1) || op == 0xa7 || op == 0xaa then
         match Nat.decLt nextPc code.size with
         | .isTrue _ =>
           if !targets.contains nextPc then
@@ -525,13 +565,42 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
       let localsAtT := match targetLocalsMap[t]? with
         | some locs => locs
         | none => initialLocals
+      let stackAtT := targetStackMap[t]?.getD #[]
 
       if localsAtT == prevLocals then
-        if delta < 64 then
-          sm := writeU8 sm delta.toUInt8
+        if stackAtT.isEmpty then
+          if delta < 64 then
+            sm := writeU8 sm delta.toUInt8
+          else
+            sm := writeU8 sm 251
+            sm := writeU16 sm delta.toUInt16
+        else if stackAtT.size == 1 then
+          let vt := stackAtT[0]!
+          if delta < 64 then
+            sm := writeU8 sm (64 + delta.toUInt8)
+            sm := encodeVerificationType sm vt
+          else
+            sm := writeU8 sm 247
+            sm := writeU16 sm delta.toUInt16
+            sm := encodeVerificationType sm vt
         else
-          sm := writeU8 sm 251
+          sm := writeU8 sm 255
           sm := writeU16 sm delta.toUInt16
+          let mut encodedLocals : Array VerificationType := #[]
+          let mut idx := 0
+          while idx < localsAtT.size do
+            let vt := localsAtT[idx]!
+            encodedLocals := encodedLocals.push vt
+            if (vt == .long || vt == .double) && idx + 1 < localsAtT.size && localsAtT[idx + 1]! == .top then
+              idx := idx + 2
+            else
+              idx := idx + 1
+          sm := writeU16 sm encodedLocals.size.toUInt16
+          for vt in encodedLocals do
+            sm := encodeVerificationType sm vt
+          sm := writeU16 sm stackAtT.size.toUInt16
+          for vt in stackAtT do
+            sm := encodeVerificationType sm vt
       else
         sm := writeU8 sm 255
         sm := writeU16 sm delta.toUInt16
@@ -547,7 +616,9 @@ def computeStackMapTable (m : MethodDef) (thisClassIdx : UInt16) (cp : ConstantP
         sm := writeU16 sm encodedLocals.size.toUInt16
         for vt in encodedLocals do
           sm := encodeVerificationType sm vt
-        sm := writeU16 sm 0
+        sm := writeU16 sm stackAtT.size.toUInt16
+        for vt in stackAtT do
+          sm := encodeVerificationType sm vt
 
       prevTarget := t
       prevLocals := localsAtT
