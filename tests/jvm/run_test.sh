@@ -404,6 +404,35 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  option_null_sound)
+    if [[ -f "lean/mod_l_lean_test_OptionModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'100\n42\nhello\nnone\n777\n888\n999\n99\n123'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_OptionModule)
+      rm -f lean/mod_l_lean_test_OptionModule*.class lean/test/OptionModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "OptionModule failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
+  struct_specialization)
+    if [[ -f "lean/mod_l_lean_test_StructSpecModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'Alice\n30\n1.750000\n123456789\ntrue\n31\n[Alice, Alice]'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_StructSpecModule)
+      
+      # verify getfield/putfield in both the generated struct class and the module class
+      javap -c -p lean/ctor_l_Person_mk.class > javap_out.txt
+      if ! grep -q "getfield" javap_out.txt; then fail "No getfield in ctor_l_Person_mk"; fi
+      javap -c -p lean/mod_l_lean_test_StructSpecModule.class > javap_mod_out.txt
+      if ! grep -q "getfield.*lean/ctor_l_Person_mk" javap_mod_out.txt; then fail "No direct getfield on ctor_l_Person_mk in StructSpecModule"; fi
+      if ! grep -q "putfield.*lean/ctor_l_Person_mk" javap_mod_out.txt; then fail "No direct putfield on ctor_l_Person_mk in StructSpecModule"; fi
+      rm -f javap_out.txt javap_mod_out.txt
+
+      rm -f lean/mod_l_lean_test_StructSpecModule*.class lean/ctor_l_Person_mk.class lean/test/StructSpecModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "StructSpec failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true
