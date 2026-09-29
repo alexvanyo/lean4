@@ -547,23 +547,56 @@ def getDeclClassName (fn : Name) : EmitJVMM String := do
   | none =>
     return ctx.className
 
+def emitCtorArg (arg : Arg .impure) : EmitJVMM Unit := do
+  match arg with
+  | .fvar fvarId => emitLoadAs fvarId ImpureType.object
+  | .erased => emitOp .aconst_null
+
 def emitCtor (info : CtorInfo) (args : Array (Arg .impure)) : EmitJVMM Unit := do
-  emitPushInt info.cidx
-  emitPushInt info.size
   let numScalars := info.usize + (info.ssize + 7) / 8
-  emitPushInt numScalars
-  let allocIdx ← addMethodRef "lean/runtime/LeanCtor" "alloc" "(III)Llean/runtime/LeanCtor;"
-  emitOp (.invokestatic allocIdx)
-  if args.size > 0 then
-    let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
-    for h : i in 0...args.size do
-      let arg := args[i]
-      emitOp .dup
-      emitPushInt i
-      match arg with
-      | .fvar fvarId => emitLoadAs fvarId ImpureType.object
-      | .erased => emitOp .aconst_null
-      emitOp (.invokevirtual setObjIdx)
+  if info.size == 0 && numScalars == 0 then
+    emitPushInt info.cidx
+    let alloc0Idx ← addMethodRef "lean/runtime/LeanCtor" "alloc0" "(I)Llean/runtime/LeanCtor;"
+    emitOp (.invokestatic alloc0Idx)
+  else if info.size == 1 && numScalars == 0 then
+    emitPushInt info.cidx
+    if h : 0 < args.size then
+      emitCtorArg args[0]
+    else
+      emitOp .aconst_null
+    let alloc1Idx ← addMethodRef "lean/runtime/LeanCtor" "alloc1" "(ILlean/runtime/LeanObject;)Llean/runtime/LeanCtor;"
+    emitOp (.invokestatic alloc1Idx)
+  else if info.size == 2 && numScalars == 0 then
+    emitPushInt info.cidx
+    if h0 : 0 < args.size then
+      emitCtorArg args[0]
+    else
+      emitOp .aconst_null
+    if h1 : 1 < args.size then
+      emitCtorArg args[1]
+    else
+      emitOp .aconst_null
+    let alloc2Idx ← addMethodRef "lean/runtime/LeanCtor" "alloc2" "(ILlean/runtime/LeanObject;Llean/runtime/LeanObject;)Llean/runtime/LeanCtor;"
+    emitOp (.invokestatic alloc2Idx)
+  else if info.size == 0 && numScalars == 1 then
+    emitPushInt info.cidx
+    emitOp .lconst_0
+    let allocScalar1Idx ← addMethodRef "lean/runtime/LeanCtor" "allocScalar1" "(IJ)Llean/runtime/LeanCtor;"
+    emitOp (.invokestatic allocScalar1Idx)
+  else
+    emitPushInt info.cidx
+    emitPushInt info.size
+    emitPushInt numScalars
+    let allocIdx ← addMethodRef "lean/runtime/LeanCtor" "alloc" "(III)Llean/runtime/LeanCtor;"
+    emitOp (.invokestatic allocIdx)
+    if args.size > 0 then
+      let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
+      for h : i in 0...args.size do
+        let arg := args[i]
+        emitOp .dup
+        emitPushInt i
+        emitCtorArg arg
+        emitOp (.invokevirtual setObjIdx)
 
 def emitPushNatLiteral (n : Nat) : EmitJVMM Unit := do
   if n <= 127 then
@@ -1054,16 +1087,27 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt i
-    let getObjIdx ← addMethodRef "lean/runtime/LeanCtor" "getObj" "(I)Llean/runtime/LeanObject;"
-    emitOp (.invokevirtual getObjIdx)
+    if i == 0 then
+      let getObj0Idx ← addMethodRef "lean/runtime/LeanCtor" "getObj0" "()Llean/runtime/LeanObject;"
+      emitOp (.invokevirtual getObj0Idx)
+    else if i == 1 then
+      let getObj1Idx ← addMethodRef "lean/runtime/LeanCtor" "getObj1" "()Llean/runtime/LeanObject;"
+      emitOp (.invokevirtual getObj1Idx)
+    else
+      emitPushInt i
+      let getObjIdx ← addMethodRef "lean/runtime/LeanCtor" "getObj" "(I)Llean/runtime/LeanObject;"
+      emitOp (.invokevirtual getObjIdx)
   | .uproj i fvarId =>
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt i
-    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getScalar" "(I)J"
-    emitOp (.invokevirtual getScalarIdx)
+    if i == 0 then
+      let getScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "getScalar0" "()J"
+      emitOp (.invokevirtual getScalar0Idx)
+    else
+      emitPushInt i
+      let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getScalar" "(I)J"
+      emitOp (.invokevirtual getScalarIdx)
     if isScalarType decl.type then
       if toJVMTypeDesc decl.type == "I" then
         emitOp .l2i
@@ -1074,12 +1118,21 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt n
-    emitPushInt offset
     let numBytes := getScalarNumBytes decl.type
-    emitPushInt numBytes
-    let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getByteScalar" "(III)J"
-    emitOp (.invokevirtual getScalarIdx)
+    if offset == 0 && numBytes == 8 then
+      let getScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "getScalar0" "()J"
+      emitOp (.invokevirtual getScalar0Idx)
+    else if offset < 8 then
+      emitPushInt offset
+      emitPushInt numBytes
+      let getByteScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "getByteScalar0" "(II)J"
+      emitOp (.invokevirtual getByteScalar0Idx)
+    else
+      emitPushInt n
+      emitPushInt offset
+      emitPushInt numBytes
+      let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getByteScalar" "(III)J"
+      emitOp (.invokevirtual getScalarIdx)
     if isScalarType decl.type then
       if decl.type == ImpureType.uint8 || decl.type == ImpureType.uint16 || decl.type == ImpureType.uint32 then
         emitOp .l2i
@@ -1427,52 +1480,104 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt i
-    match y with
-    | .fvar yId => emitLoadAs yId ImpureType.object
-    | .erased => emitOp .aconst_null
-    let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
-    emitOp (.invokevirtual setObjIdx)
+    if i == 0 then
+      match y with
+      | .fvar yId => emitLoadAs yId ImpureType.object
+      | .erased => emitOp .aconst_null
+      let setObj0Idx ← addMethodRef "lean/runtime/LeanCtor" "setObj0" "(Llean/runtime/LeanObject;)V"
+      emitOp (.invokevirtual setObj0Idx)
+    else if i == 1 then
+      match y with
+      | .fvar yId => emitLoadAs yId ImpureType.object
+      | .erased => emitOp .aconst_null
+      let setObj1Idx ← addMethodRef "lean/runtime/LeanCtor" "setObj1" "(Llean/runtime/LeanObject;)V"
+      emitOp (.invokevirtual setObj1Idx)
+    else
+      emitPushInt i
+      match y with
+      | .fvar yId => emitLoadAs yId ImpureType.object
+      | .erased => emitOp .aconst_null
+      let setObjIdx ← addMethodRef "lean/runtime/LeanCtor" "setObj" "(ILlean/runtime/LeanObject;)V"
+      emitOp (.invokevirtual setObjIdx)
     emitCode k
   | .uset fvarId i y k =>
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt i
     let ctx ← read
     let yType := ctx.varTypeMap[y]?.getD ImpureType.object
-    emitLoad y
-    if toJVMTypeDesc yType == "J" then
-      pure ()
-    else if toJVMTypeDesc yType == "I" then
-      emitOp .i2l
+    if i == 0 then
+      emitLoad y
+      if toJVMTypeDesc yType == "J" then
+        pure ()
+      else if toJVMTypeDesc yType == "I" then
+        emitOp .i2l
+      else
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let setScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "setScalar0" "(J)V"
+      emitOp (.invokevirtual setScalar0Idx)
     else
-      let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
-      emitOp (.invokestatic getScalar64Idx)
-    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
-    emitOp (.invokevirtual setScalarIdx)
+      emitPushInt i
+      emitLoad y
+      if toJVMTypeDesc yType == "J" then
+        pure ()
+      else if toJVMTypeDesc yType == "I" then
+        emitOp .i2l
+      else
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setScalar" "(IJ)V"
+      emitOp (.invokevirtual setScalarIdx)
     emitCode k
   | .sset fvarId i offset y ty k =>
     emitLoad fvarId
     let ctorClassIdx ← addClass "lean/runtime/LeanCtor"
     emitOp (.checkcast ctorClassIdx)
-    emitPushInt i
-    emitPushInt offset
     let numBytes := getScalarNumBytes ty
-    emitPushInt numBytes
     let ctx ← read
     let yType := ctx.varTypeMap[y]?.getD ty
-    emitLoad y
-    if toJVMTypeDesc yType == "I" then
-      emitOp .i2l
-    else if toJVMTypeDesc yType == "D" then
-      let toRawBitsIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
-      emitOp (.invokestatic toRawBitsIdx)
-    else if toJVMTypeDesc yType != "J" then
-      let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
-      emitOp (.invokestatic getScalar64Idx)
-    let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setByteScalar" "(IIIJ)V"
-    emitOp (.invokevirtual setScalarIdx)
+    if offset == 0 && numBytes == 8 then
+      emitLoad y
+      if toJVMTypeDesc yType == "I" then
+        emitOp .i2l
+      else if toJVMTypeDesc yType == "D" then
+        let toRawBitsIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+        emitOp (.invokestatic toRawBitsIdx)
+      else if toJVMTypeDesc yType != "J" then
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let setScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "setScalar0" "(J)V"
+      emitOp (.invokevirtual setScalar0Idx)
+    else if offset < 8 then
+      emitPushInt offset
+      emitPushInt numBytes
+      emitLoad y
+      if toJVMTypeDesc yType == "I" then
+        emitOp .i2l
+      else if toJVMTypeDesc yType == "D" then
+        let toRawBitsIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+        emitOp (.invokestatic toRawBitsIdx)
+      else if toJVMTypeDesc yType != "J" then
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let setByteScalar0Idx ← addMethodRef "lean/runtime/LeanCtor" "setByteScalar0" "(IIJ)V"
+      emitOp (.invokevirtual setByteScalar0Idx)
+    else
+      emitPushInt i
+      emitPushInt offset
+      emitPushInt numBytes
+      emitLoad y
+      if toJVMTypeDesc yType == "I" then
+        emitOp .i2l
+      else if toJVMTypeDesc yType == "D" then
+        let toRawBitsIdx ← addMethodRef "java/lang/Double" "doubleToRawLongBits" "(D)J"
+        emitOp (.invokestatic toRawBitsIdx)
+      else if toJVMTypeDesc yType != "J" then
+        let getScalar64Idx ← addMethodRef "lean/runtime/LeanRuntimeJVM" "getScalar64" "(Llean/runtime/LeanObject;)J"
+        emitOp (.invokestatic getScalar64Idx)
+      let setScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "setByteScalar" "(IIIJ)V"
+      emitOp (.invokevirtual setScalarIdx)
     emitCode k
   | .setTag _ _ k =>
     emitCode k

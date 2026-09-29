@@ -45,8 +45,8 @@ public final class LeanFloat(
             if (obj is LeanNat) {
                 return Double.fromBits(obj.smallVal.toLong())
             }
-            if (obj is LeanCtor && obj.scalars.isNotEmpty()) {
-                return Double.fromBits(obj.scalars[0])
+            if (obj is LeanCtor && obj.hasScalars()) {
+                return Double.fromBits(obj.getScalar0())
             }
             return 0.0
         }
