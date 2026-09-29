@@ -18,7 +18,7 @@ public object LeanRuntimeJVM {
     public fun getScalar64(obj: LeanObject?): Long {
         if (obj is LeanFloat) return obj.value.toRawBits()
         if (obj is LeanNat) return obj.smallVal.toLong()
-        if (obj is LeanCtor && obj.scalars.isNotEmpty()) return obj.scalars[0]
+        if (obj is LeanCtor && obj.hasScalars()) return obj.getScalar0()
         return obj?.tag?.toLong() ?: 0L
     }
 

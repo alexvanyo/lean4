@@ -394,6 +394,16 @@ case "$TEST_BASE" in
       fi
     fi
     ;;
+  specialized_ctor)
+    if [[ -f "lean/mod_l_lean_test_SpecializedCtorModule.class" ]] && command -v java &>/dev/null; then
+      EXPECTED=$'42\n200 100\n9876543210\n0\n999'
+      OUTPUT=$(java -XX:-UsePerfData -cp .:"$RUNTIME_JAR" lean.mod_l_lean_test_SpecializedCtorModule)
+      rm -f lean/mod_l_lean_test_SpecializedCtorModule*.class lean/test/SpecializedCtorModule.lean
+      if [[ "$OUTPUT" != "$EXPECTED" ]]; then
+        fail "SpecializedCtor failed: expected '$EXPECTED', got '$OUTPUT'"
+      fi
+    fi
+    ;;
 esac
 
 rmdir lean/test lean 2>/dev/null || true
