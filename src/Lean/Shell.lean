@@ -12,6 +12,7 @@ import Lean.Server.Watchdog
 import Lean.Server.FileWorker
 import Lean.Compiler.LCNF.EmitC
 import Lean.Compiler.LCNF.EmitJVM
+import Lean.Compiler.LCNF.EmitKotlin
 import Init.System.Platform
 import Lean.Compiler.Options
 import Std.Async.Process
@@ -152,6 +153,7 @@ def displayHelp (useStderr : Bool) : IO Unit := do
   out.putStrLn    "  -i, --i=iname          create ilean file"
   out.putStrLn    "  -c, --c=fname          name of the C output file"
   out.putStrLn    "  -b, --bc=fname         name of the LLVM bitcode file"
+  out.putStrLn    "  -K, --kotlin=fname     name of the Kotlin output file"
   out.putStrLn    "      --stdin            take input from stdin"
   out.putStrLn    "  -R, --root=dir         set package root directory from which the module name\n"
   out.putStrLn    "                         of the input file is calculated\n"
@@ -244,6 +246,7 @@ structure ShellOptions where
   cFileName? : Option System.FilePath := none
   bcFileName? : Option System.FilePath := none
   jvmFileName? : Option System.FilePath := none
+  kotlinFileName? : Option System.FilePath := none
   jsonOutput : Bool := false
   errorOnKinds : Array Name := #[]
   printStats : Bool := false
@@ -331,6 +334,8 @@ def ShellOptions.process (opts : ShellOptions)
     return {opts with bcFileName? := ← checkOptArg "b" optArg?}
   | 'k' => -- `--jvm=fname`
     return {opts with jvmFileName? := ← checkOptArg "jvm" optArg?}
+  | 'K' => -- `-K, --kotlin=fname`
+    return {opts with kotlinFileName? := ← checkOptArg "kotlin" optArg?}
   | 's' => -- `-s, --tstack=num`
     let arg ← checkOptArg "s" optArg?
     let some stackSize := arg.toNat?
@@ -595,6 +600,13 @@ def shellMain (args : List String) (opts : ShellOptions) : IO UInt32 := do
             let baseName := (className : System.FilePath).fileName.getD className
             let outPath := parent / (baseName ++ ".class")
             writeFileAtomically outPath fun out => out.write bytes
+    if let some kt := opts.kotlinFileName? then
+      if let some parent := kt.parent then
+        IO.FS.createDirAll parent
+      profileitIO "Kotlin code generation" opts.leanOpts do
+        let data ← Compiler.LCNF.emitKotlin mainModuleName
+          |>.toIO' { fileName, fileMap := default, options := opts.leanOpts } { env }
+        writeFileAtomically kt fun out => out.write data.toUTF8
   displayCumulativeProfilingTimes
   if Internal.hasAddressSanitizer () then
     return if env?.isSome then 0 else 1
