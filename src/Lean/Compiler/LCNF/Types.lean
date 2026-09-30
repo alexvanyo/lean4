@@ -173,7 +173,7 @@ where
       return erasedExpr
     if let .const declName us := type then
       if let some desc := getExternNameFor (← getEnv) `jvm declName then
-        if desc.startsWith "L" || desc.startsWith "[" || desc == "V" then
+        if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
           return .const declName us
     let type ← whnfEta type
     match type with
@@ -227,7 +227,7 @@ where
           -- failing here, which is caught and ignored above by `observing`.
           throwError "internal compiler error: private in public"
         if let some desc := getExternNameFor (← getEnv) `jvm declName then
-          if desc.startsWith "L" || desc.startsWith "[" || desc == "V" then
+          if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
             return .const declName us
         let .inductInfo _ ← getConstInfo declName | return anyExpr
         pure <| .const declName us
