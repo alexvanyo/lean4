@@ -18,6 +18,7 @@ public import Lean.Compiler.LCNF.ToImpureType
 public import Lean.Compiler.JVM.ClassFile
 public import Lean.Compiler.JVM.Opcode
 public import Init.Data.ByteArray
+import Std.Data.HashSet
 
 namespace Lean.Compiler.LCNF
 
@@ -1038,8 +1039,9 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitJVMM Bool :=
     | `UInt32.toUInt64 | `UInt32.toUSize =>
       if !isIntArg ctx args[0]! then return false
       emitArg args[0]!
-      let ref ← addMethodRef "java/lang/Integer" "toUnsignedLong" "(I)J"
-      emitOp (.invokestatic ref)
+      emitOp .i2l
+      emitPushLong 0xffffffff
+      emitOp .land
       return true
     | `UInt64.toUInt32 | `USize.toUInt32 =>
       if !isLongArg ctx args[0]! then return false
@@ -1255,20 +1257,26 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitJVMM Bool :=
     return true
   | ``UInt32.decLt =>
     if !isIntArg ctx args[0]! || !isIntArg ctx args[1]! then return false
-    emitBinaryArgs args
-    let ref ← addMethodRef "java/lang/Integer" "compareUnsigned" "(II)I"
-    emitOp (.invokestatic ref)
-    emitOp (.iflt 7)
+    emitArg args[0]!
+    emitPushInt 0x80000000
+    emitOp .ixor
+    emitArg args[1]!
+    emitPushInt 0x80000000
+    emitOp .ixor
+    emitOp (.if_icmplt 7)
     emitOp .iconst_0
     emitOp (.goto 4)
     emitOp .iconst_1
     return true
   | ``UInt32.decLe =>
     if !isIntArg ctx args[0]! || !isIntArg ctx args[1]! then return false
-    emitBinaryArgs args
-    let ref ← addMethodRef "java/lang/Integer" "compareUnsigned" "(II)I"
-    emitOp (.invokestatic ref)
-    emitOp (.ifle 7)
+    emitArg args[0]!
+    emitPushInt 0x80000000
+    emitOp .ixor
+    emitArg args[1]!
+    emitPushInt 0x80000000
+    emitOp .ixor
+    emitOp (.if_icmple 7)
     emitOp .iconst_0
     emitOp (.goto 4)
     emitOp .iconst_1
@@ -1368,8 +1376,9 @@ def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (retType : Expr) : 
     | "u32_to_u64" =>
       if args.size < 1 then return false
       emitExternCallArg paramTypes? args 0
-      let ref ← addMethodRef "java/lang/Integer" "toUnsignedLong" "(I)J"
-      emitOp (.invokestatic ref)
+      emitOp .i2l
+      emitPushLong 0xffffffff
+      emitOp .land
       return true
     | "u64_to_u32" | "l2i" =>
       if args.size < 1 then return false
@@ -1893,30 +1902,65 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
     else
       emitOp .aconst_null
 
+partial def checkReturn (target : FVarId) (k : Code .impure) (jps : Std.HashMap FVarId (FunDecl .impure)) (visited : Std.HashSet FVarId := {}) : Bool :=
+  match k with
+  | .return fvarId' => target == fvarId'
+  | .inc (k := k') .. | .dec (k := k') .. | .del (k := k') .. =>
+    checkReturn target k' jps visited
+  | .jp decl k' =>
+    let jps' := jps.insert decl.fvarId decl
+    checkReturn target k' jps' visited
+  | .jmp jpId args =>
+    if visited.contains jpId then
+      false
+    else
+      match jps[jpId]? with
+      | some jpDecl =>
+        let visited' := visited.insert jpId
+        let rec checkArgs (i : Nat) : Bool :=
+          if h : i < args.size then
+            match args[i] with
+            | .fvar argId =>
+              if argId == target && i < jpDecl.params.size then
+                let paramId := jpDecl.params[i]!.fvarId
+                if checkReturn paramId jpDecl.value jps visited' then
+                  true
+                else
+                  checkArgs (i + 1)
+              else
+                checkArgs (i + 1)
+            | .erased => checkArgs (i + 1)
+          else
+            false
+        checkArgs 0
+      | none => false
+  | _ => false
+
 /--
 Detects if code is a self-tail call returning its result.
 -/
 def isTailCall (code : Code .impure) : EmitJVMM Bool := do
   match code with
   | .let { fvarId := fvarId, value := .fap declName _, .. } k =>
-    let rec checkReturn (k : Code .impure) : Bool :=
-      match k with
-      | .return fvarId' => fvarId == fvarId'
-      | .inc (k := k') .. | .dec (k := k') .. | .del (k := k') .. => checkReturn k'
-      | _ => false
-    return checkReturn k && (← read).currFn == declName
+    let ctx ← read
+    if declName != ctx.currFn then return false
+    return checkReturn fvarId k ctx.joinPoints
   | _ => return false
 
-def paramEqArg (p : Param .impure) (arg : Arg .impure) : Bool :=
+def paramEqArg (ctx : JVMContext) (p : Param .impure) (arg : Arg .impure) : Bool :=
   match arg with
-  | .fvar fvarId => p.fvarId == fvarId
+  | .fvar fvarId =>
+    if p.fvarId == fvarId then true
+    else match ctx.varSlotMap[fvarId]?, ctx.varSlotMap[p.fvarId]? with
+      | some s1, some s2 => s1 == s2
+      | _, _ => false
   | .erased => false
 
-def overwriteParam (ps : Array (Param .impure)) (args : Array (Arg .impure)) : Bool := Id.run do
+def overwriteParam (ctx : JVMContext) (ps : Array (Param .impure)) (args : Array (Arg .impure)) : Bool := Id.run do
   for h1 : i in 0...ps.size do
     let p := ps[i]
     for h2 : j in (i+1)...args.size do
-      if paramEqArg p args[j] then
+      if paramEqArg ctx p args[j] then
         return true
   return false
 
@@ -1964,13 +2008,13 @@ def emitTailCall (decl : LetDecl .impure) : EmitJVMM Unit := do
   let ctx ← read
   let ps := ctx.currParams
 
-  if overwriteParam ps args then
+  if overwriteParam ctx ps args then
     let mut tmpSlots : Array (Option UInt8) := #[]
     let mut curSlot := (← get).maxSlot
     for h : i in 0...ps.size do
       let p := ps[i]
       let arg := if h2 : i < args.size then args[i] else .erased
-      if !paramEqArg p arg then
+      if !paramEqArg ctx p arg then
         let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
         tmpSlots := tmpSlots.push (some curSlot)
         curSlot := curSlot + getSlotSize pTy
@@ -1998,7 +2042,7 @@ def emitTailCall (decl : LetDecl .impure) : EmitJVMM Unit := do
     for h : i in 0...ps.size do
       let p := ps[i]
       let arg := if h2 : i < args.size then args[i] else .erased
-      unless paramEqArg p arg do
+      unless paramEqArg ctx p arg do
         let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
         let pSlot := ctx.varSlotMap[p.fvarId]?.getD 0
         emitArgAs arg pTy
@@ -2006,6 +2050,199 @@ def emitTailCall (decl : LetDecl .impure) : EmitJVMM Unit := do
   let fpc := (← get).code.size
   emitOp (.goto (0x10000 - fpc).toUInt16)
   modify fun s => { s with fixups := s.fixups.push (fpc, `_start) }
+
+def stripRCOps (code : Code .impure) : Code .impure :=
+  match code with
+  | .inc (k := k') .. | .dec (k := k') .. | .del (k := k') .. => stripRCOps k'
+  | _ => code
+
+def isImmediateReturnOf (var : FVarId) (k : Code .impure) : Bool :=
+  match k with
+  | .return fvarId => fvarId == var
+  | .inc (k := k') .. | .dec (k := k') .. | .del (k := k') .. => isImmediateReturnOf var k'
+  | _ => false
+
+def getBoolAlts? (alts : Array (Alt .impure)) : Option (Code .impure × Code .impure) :=
+  if alts.size == 2 then
+    match alts[0]!, alts[1]! with
+    | .ctorAlt info0 k0, .ctorAlt info1 k1 =>
+      if info0.cidx == 0 && info1.cidx == 1 then some (k0, k1)
+      else if info0.cidx == 1 && info1.cidx == 0 then some (k1, k0)
+      else none
+    | .ctorAlt info0 k0, .default k1 =>
+      if info0.cidx == 0 then some (k0, k1)
+      else if info0.cidx == 1 then some (k1, k0)
+      else none
+    | .default k0, .ctorAlt info1 k1 =>
+      if info1.cidx == 1 then some (k0, k1)
+      else if info1.cidx == 0 then some (k1, k0)
+      else none
+    | _, _ => none
+  else
+    none
+
+def Arg.containsVar (var : FVarId) (arg : Arg .impure) : Bool :=
+  match arg with
+  | .fvar id => id == var
+  | .erased => false
+
+def countVarInLetValue (var : FVarId) (val : LetValue .impure) : Nat :=
+  match val with
+  | .fvar id args => (if id == var then 1 else 0) + args.foldl (fun n a => if Arg.containsVar var a then n + 1 else n) 0
+  | .fap _ args | .pap _ args | .ctor _ args | .reuse _ _ _ args =>
+    args.foldl (fun n a => if Arg.containsVar var a then n + 1 else n) 0
+  | .oproj _ id | .uproj _ id | .sproj _ _ id | .box _ id | .unbox id | .isShared id =>
+    if id == var then 1 else 0
+  | _ => 0
+
+partial def countVarUses (var : FVarId) (code : Code .impure) : Nat :=
+  match code with
+  | .let decl k =>
+    countVarInLetValue var decl.value + countVarUses var k
+  | .jp decl k =>
+    countVarUses var decl.value + countVarUses var k
+  | .jmp _ args =>
+    args.foldl (fun n a => if Arg.containsVar var a then n + 1 else n) 0
+  | .cases cs =>
+    (if cs.discr == var then 1 else 0) +
+    cs.alts.foldl (fun n alt => match alt with
+      | .ctorAlt _ k => n + countVarUses var k
+      | .default k => n + countVarUses var k) 0
+  | .return fvarId =>
+    if fvarId == var then 1 else 0
+  | .unreach .. => 0
+  | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
+    countVarUses var k
+  | .setTag _ _ k => countVarUses var k
+  | .oset id _ y k =>
+    (if id == var then 1 else 0) + (if Arg.containsVar var y then 1 else 0) + countVarUses var k
+  | .uset id _ y k =>
+    (if id == var then 1 else 0) + (if y == var then 1 else 0) + countVarUses var k
+  | .sset id _ _ y _ k =>
+    (if id == var then 1 else 0) + (if y == var then 1 else 0) + countVarUses var k
+
+def getComparisonBranchEmitter? (decl : LetDecl .impure) : EmitJVMM (Option (UInt16 → EmitJVMM Unit)) := do
+  let ctx ← read
+  match decl.value with
+  | .fap fn args =>
+    if fn == ``UInt32.decEq || fn == ``UInt16.decEq || fn == ``UInt8.decEq then
+      if args.size >= 2 && isIntArg ctx args[0]! && isIntArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          emitOp (.if_icmpne jumpOffset)
+      else return none
+    else if fn == ``UInt32.decLt then
+      if args.size >= 2 && isIntArg ctx args[0]! && isIntArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitArg args[0]!
+          emitPushInt 0x80000000
+          emitOp .ixor
+          emitArg args[1]!
+          emitPushInt 0x80000000
+          emitOp .ixor
+          emitOp (.if_icmpge jumpOffset)
+      else return none
+    else if fn == ``UInt32.decLe then
+      if args.size >= 2 && isIntArg ctx args[0]! && isIntArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitArg args[0]!
+          emitPushInt 0x80000000
+          emitOp .ixor
+          emitArg args[1]!
+          emitPushInt 0x80000000
+          emitOp .ixor
+          emitOp (.if_icmpgt jumpOffset)
+      else return none
+    else if fn == ``UInt16.decLt || fn == ``UInt8.decLt then
+      if args.size >= 2 && isIntArg ctx args[0]! && isIntArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          emitOp (.if_icmpge jumpOffset)
+      else return none
+    else if fn == ``UInt16.decLe || fn == ``UInt8.decLe then
+      if args.size >= 2 && isIntArg ctx args[0]! && isIntArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          emitOp (.if_icmpgt jumpOffset)
+      else return none
+    else if fn == ``UInt64.decEq || fn == ``USize.decEq then
+      if args.size >= 2 && isLongArg ctx args[0]! && isLongArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          emitOp .lcmp
+          emitOp (.ifne jumpOffset)
+      else return none
+    else if fn == ``UInt64.decLt || fn == ``USize.decLt then
+      if args.size >= 2 && isLongArg ctx args[0]! && isLongArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          let ref ← addMethodRef "java/lang/Long" "compareUnsigned" "(JJ)I"
+          emitOp (.invokestatic ref)
+          emitOp (.ifge jumpOffset)
+      else return none
+    else if fn == ``UInt64.decLe || fn == ``USize.decLe then
+      if args.size >= 2 && isLongArg ctx args[0]! && isLongArg ctx args[1]! then
+        return some fun jumpOffset => do
+          emitBinaryArgs args
+          let ref ← addMethodRef "java/lang/Long" "compareUnsigned" "(JJ)I"
+          emitOp (.invokestatic ref)
+          emitOp (.ifgt jumpOffset)
+      else return none
+    else
+      let env ← getEnv
+      let some extStr := getExternNameFor env `jvm fn | return none
+      if extStr.startsWith "jvm_op:" then
+        let op := (extStr.drop 7).toString
+        let paramTypes? := match ctx.localDecls.find? (·.name == fn) with
+          | some fdecl => some (fdecl.params.map (·.type))
+          | none => match ctx.otherModuleDecls.find? (·.name == fn) with
+            | some sig => some (sig.params.map (·.type))
+            | none => none
+        match op with
+        | "if_icmplt" =>
+          if args.size >= 2 then
+            return some fun jumpOffset => do
+              emitExternCallArg paramTypes? args 0
+              emitExternCallArg paramTypes? args 1
+              emitOp (.if_icmpge jumpOffset)
+          else return none
+        | "if_icmpge" =>
+          if args.size >= 2 then
+            return some fun jumpOffset => do
+              emitExternCallArg paramTypes? args 0
+              emitExternCallArg paramTypes? args 1
+              emitOp (.if_icmplt jumpOffset)
+          else return none
+        | "if_icmpgt" =>
+          if args.size >= 2 then
+            return some fun jumpOffset => do
+              emitExternCallArg paramTypes? args 0
+              emitExternCallArg paramTypes? args 1
+              emitOp (.if_icmple jumpOffset)
+          else return none
+        | "if_icmple" =>
+          if args.size >= 2 then
+            return some fun jumpOffset => do
+              emitExternCallArg paramTypes? args 0
+              emitExternCallArg paramTypes? args 1
+              emitOp (.if_icmpgt jumpOffset)
+          else return none
+        | "if_acmpeq" =>
+          if args.size >= 2 then
+            return some fun jumpOffset => do
+              emitArg args[0]!
+              emitArg args[1]!
+              emitOp (.if_acmpne jumpOffset)
+          else return none
+        | "ifnull" =>
+          if args.size >= 1 then
+            return some fun jumpOffset => do
+              emitArg args[0]!
+              emitOp (.ifnonnull jumpOffset)
+          else return none
+        | _ => return none
+      else return none
+  | _ => return none
 
 /--
 Emits a basic block of LCNF code to JVM bytecode.
@@ -2015,27 +2252,47 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
   | .let decl k =>
     if ← isTailCall code then
       emitTailCall decl
-    else
+    else if isImmediateReturnOf decl.fvarId k then
       emitLetValue decl
+      let retType := (← read).currReturnType
       let actualType := match decl.value with
         | .ctor .. | .box .. | .lit (.nat ..) => ImpureType.object
         | _ => decl.type
-      let (slot, newCtx') ← allocSlot decl.fvarId actualType
-      let mut newCtx := newCtx'
-      match decl.value with
-      | .ctor info _ | .reuse _ info _ _ =>
-        if ← shouldEmitCtorClass info then
-          let layout? ← try
-              let l ← getCtorLayout info.name
-              pure (some l)
-            catch _ => pure none
-          if let some layout := layout? then
-            newCtx := { newCtx with ctorClassMap := newCtx.ctorClassMap.insert decl.fvarId (info.name, layout) }
+      if toJVMTypeDesc actualType != toJVMTypeDesc retType then
+        if toJVMTypeDesc retType == leanObjTypeDesc then
+          emitBoxValue actualType
+        else
+          emitUnboxValue retType
+      match toJVMTypeDesc retType with
+      | "I" => emitOp .ireturn
+      | "J" => emitOp .lreturn
+      | "F" => emitOp .freturn
+      | "D" => emitOp .dreturn
+      | _   => emitOp .areturn
+    else if let some emitJumpFalse ← getComparisonBranchEmitter? decl then
+      let kRest := stripRCOps k
+      match kRest with
+      | .cases cs =>
+        if cs.discr == decl.fvarId && countVarUses decl.fvarId k == 1 then
+          if let some (kFalse, kTrue) := getBoolAlts? cs.alts then
+            let (trueCode, trueFixups, trueLabels) ← captureCode (emitCode kTrue)
+            let (falseCode, falseFixups, falseLabels) ← captureCode (emitCode kFalse)
+            let trueTerm := isTerminalBytecode trueCode
+            let jumpOffset := if trueTerm then
+              (3 + trueCode.size).toUInt16
+            else
+              (3 + trueCode.size + 3).toUInt16
+            emitJumpFalse jumpOffset
+            appendCode trueCode trueFixups trueLabels
+            if !trueTerm then
+              let falseJumpOffset := (3 + falseCode.size).toUInt16
+              emitOp (.goto falseJumpOffset)
+            appendCode falseCode falseFixups falseLabels
+            return ()
       | _ => pure ()
-      
-      emitStoreTyped slot actualType
-      withReader (fun _ => newCtx) do
-        emitCode k
+      emitDefaultLet decl k
+    else
+      emitDefaultLet decl k
   | .return fvarId =>
     let retType := (← read).currReturnType
     emitLoadAs fvarId retType
@@ -2056,6 +2313,27 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
       match cs.alts[0]! with
       | .ctorAlt _ k => emitCode k
       | .default k => emitCode k
+    else if let some (kFalse, kTrue) := getBoolAlts? cs.alts then
+      let discrTy := (← read).varTypeMap[cs.discr]?.getD ImpureType.object
+      emitLoad cs.discr
+      if toJVMTypeDesc discrTy == leanObjTypeDesc then
+        let getTagIdx ← addMethodRef "lean/runtime/LeanObject" "getTag" "()I"
+        emitOp (.invokevirtual getTagIdx)
+      else if toJVMTypeDesc discrTy == "J" then
+        emitOp .l2i
+      let (trueCode, trueFixups, trueLabels) ← captureCode (emitCode kTrue)
+      let (falseCode, falseFixups, falseLabels) ← captureCode (emitCode kFalse)
+      let trueTerm := isTerminalBytecode trueCode
+      let jumpOffset := if trueTerm then
+        (3 + trueCode.size).toUInt16
+      else
+        (3 + trueCode.size + 3).toUInt16
+      emitOp (.ifeq jumpOffset)
+      appendCode trueCode trueFixups trueLabels
+      if !trueTerm then
+        let falseJumpOffset := (3 + falseCode.size).toUInt16
+        emitOp (.goto falseJumpOffset)
+      appendCode falseCode falseFixups falseLabels
     else
       let ctx ← read
       let canUseTableSwitch :=
@@ -2155,13 +2433,13 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     match ctx.joinPoints[fvarId]? with
     | some decl =>
       let ps := decl.params
-      if overwriteParam ps args then
+      if overwriteParam ctx ps args then
         let mut curSlot := (← get).maxSlot
         let mut tmpSlots : Array (Option UInt8) := #[]
         for h : i in 0...ps.size do
           let p := ps[i]
           let arg := if h2 : i < args.size then args[i] else .erased
-          if !paramEqArg p arg then
+          if !paramEqArg ctx p arg then
             let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
             tmpSlots := tmpSlots.push (some curSlot)
             curSlot := curSlot + getSlotSize pTy
@@ -2189,7 +2467,7 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
         for h : i in 0...ps.size do
           let p := ps[i]
           let arg := if h2 : i < args.size then args[i] else .erased
-          unless paramEqArg p arg do
+          unless paramEqArg ctx p arg do
             let pTy := ctx.varTypeMap[p.fvarId]?.getD p.type
             let pSlot := ctx.varSlotMap[p.fvarId]?.getD 0
             emitArgAs arg pTy
@@ -2416,6 +2694,43 @@ partial def emitCode (code : Code .impure) : EmitJVMM Unit := do
     emitCode k
   | .setTag _ _ k =>
     emitCode k
+where
+  emitDefaultLet (decl : LetDecl .impure) (k : Code .impure) : EmitJVMM Unit := do
+    let ctx ← read
+    match decl.value with
+    | .fvar origId #[] =>
+      if let some origSlot := ctx.varSlotMap[origId]? then
+        let origTy := ctx.varTypeMap[origId]?.getD decl.type
+        if toJVMTypeDesc origTy == toJVMTypeDesc decl.type then
+          let newCtx := { ctx with
+            varSlotMap := ctx.varSlotMap.insert decl.fvarId origSlot
+            varTypeMap := ctx.varTypeMap.insert decl.fvarId origTy
+          }
+          withReader (fun _ => newCtx) do
+            emitCode k
+          return ()
+    | _ => pure ()
+
+    emitLetValue decl
+    let actualType := match decl.value with
+      | .ctor .. | .box .. | .lit (.nat ..) => ImpureType.object
+      | _ => decl.type
+    let (slot, newCtx') ← allocSlot decl.fvarId actualType
+    let mut newCtx := newCtx'
+    match decl.value with
+    | .ctor info _ | .reuse _ info _ _ =>
+      if ← shouldEmitCtorClass info then
+        let layout? ← try
+            let l ← getCtorLayout info.name
+            pure (some l)
+          catch _ => pure none
+        if let some layout := layout? then
+          newCtx := { newCtx with ctorClassMap := newCtx.ctorClassMap.insert decl.fvarId (info.name, layout) }
+    | _ => pure ()
+
+    emitStoreTyped slot actualType
+    withReader (fun _ => newCtx) do
+      emitCode k
 
 /--
 Emits a function declaration as a static method in the classfile.
@@ -2469,6 +2784,211 @@ def populateCtorClassMap (decl : Decl .impure) : EmitJVMM (Std.HashMap FVarId (N
         acc := acc.insert p.fvarId entry
     acc ← match monoDecl.value with | .code c => collectStructTypes c acc | _ => pure acc
   return acc
+
+def getInstructionLength (code : ByteArray) (pc : Nat) : Nat :=
+  if pc >= code.size then 1
+  else
+    let op := code.get! pc
+    match op with
+    | 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07 | 0x08 | 0x09 | 0x0a => 1
+    | 0x10 => 2
+    | 0x11 => 3
+    | 0x12 => 2
+    | 0x13 | 0x14 => 3
+    | 0x15 | 0x16 | 0x17 | 0x18 | 0x19 => 2
+    | 0x1a | 0x1b | 0x1c | 0x1d | 0x1e | 0x1f | 0x20 | 0x21
+    | 0x22 | 0x23 | 0x24 | 0x25 | 0x26 | 0x27 | 0x28 | 0x29
+    | 0x2a | 0x2b | 0x2c | 0x2d | 0x2e | 0x2f | 0x30 | 0x31
+    | 0x32 | 0x33 | 0x34 | 0x35 => 1
+    | 0x36 | 0x37 | 0x38 | 0x39 | 0x3a => 2
+    | 0x3b | 0x3c | 0x3d | 0x3e | 0x3f | 0x40 | 0x41 | 0x42
+    | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 | 0x4a
+    | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f | 0x50 | 0x51 | 0x52
+    | 0x53 | 0x54 | 0x55 | 0x56 => 1
+    | 0x57 | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f => 1
+    | 0x60 | 0x61 | 0x62 | 0x63 | 0x64 | 0x65 | 0x66 | 0x67
+    | 0x68 | 0x69 | 0x6a | 0x6b | 0x6c | 0x6d | 0x6e | 0x6f
+    | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77
+    | 0x78 | 0x79 | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f
+    | 0x80 | 0x81 | 0x82 | 0x83 => 1
+    | 0x84 => 3
+    | 0x85 | 0x86 | 0x87 | 0x88 | 0x89 | 0x8a | 0x8b | 0x8c
+    | 0x8d | 0x8e | 0x8f | 0x90 | 0x91 | 0x92 | 0x93 => 1
+    | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 => 1
+    | 0x99 | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e
+    | 0x9f | 0xa0 | 0xa1 | 0xa2 | 0xa3 | 0xa4
+    | 0xa5 | 0xa6 | 0xa7 | 0xa8 => 3
+    | 0xa9 => 2
+    | 0xaa =>
+      let pad := (4 - ((pc + 1) % 4)) % 4
+      if pc + 1 + pad + 11 < code.size then
+        let low := ((code.get! (pc + 1 + pad + 4)).toUInt32 <<< 24) |||
+                   ((code.get! (pc + 1 + pad + 5)).toUInt32 <<< 16) |||
+                   ((code.get! (pc + 1 + pad + 6)).toUInt32 <<< 8) |||
+                   (code.get! (pc + 1 + pad + 7)).toUInt32
+        let high := ((code.get! (pc + 1 + pad + 8)).toUInt32 <<< 24) |||
+                    ((code.get! (pc + 1 + pad + 9)).toUInt32 <<< 16) |||
+                    ((code.get! (pc + 1 + pad + 10)).toUInt32 <<< 8) |||
+                    (code.get! (pc + 1 + pad + 11)).toUInt32
+        let count := if high >= low then high.toNat - low.toNat + 1 else 0
+        1 + pad + 12 + count * 4
+      else 1
+    | 0xac | 0xad | 0xae | 0xaf | 0xb0 | 0xb1 => 1
+    | 0xb2 | 0xb3 | 0xb4 | 0xb5 => 3
+    | 0xb6 | 0xb7 | 0xb8 => 3
+    | 0xb9 | 0xba => 5
+    | 0xbb => 3
+    | 0xbc => 2
+    | 0xbd => 3
+    | 0xbe | 0xbf => 1
+    | 0xc0 | 0xc1 => 3
+    | 0xc2 | 0xc3 => 1
+    | 0xc5 => 4
+    | 0xc6 | 0xc7 => 3
+    | 0xc8 => 5
+    | _ => 1
+
+def countLoads (code : ByteArray) (isTwoSlot : Bool) (targetSlot : UInt8) : Nat := Id.run do
+  let mut count : Nat := 0
+  let mut pc : Nat := 0
+  while pc < code.size do
+    let op := code.get! pc
+    if !isTwoSlot then
+      if targetSlot < 4 then
+        if op == 0x1a + targetSlot || op == 0x22 + targetSlot || op == 0x2a + targetSlot then
+          count := count + 1
+      else
+        if (op == 0x15 || op == 0x17 || op == 0x19) && pc + 1 < code.size && code.get! (pc + 1) == targetSlot then
+          count := count + 1
+    else
+      if targetSlot < 4 then
+        if op == 0x1e + targetSlot || op == 0x26 + targetSlot then
+          count := count + 1
+      else
+        if (op == 0x16 || op == 0x18) && pc + 1 < code.size && code.get! (pc + 1) == targetSlot then
+          count := count + 1
+    pc := pc + getInstructionLength code pc
+  return count
+
+def peepholeOptimizeBytecodes (code : ByteArray) (fixups : Array (Nat × Name)) (labelOffsets : Std.HashMap Name Nat) (paramSlots : Nat) : ByteArray := Id.run do
+  let mut targets : Std.HashSet Nat := {}
+  for (_, off) in labelOffsets do
+    targets := targets.insert off
+  for (fpc, _) in fixups do
+    targets := targets.insert fpc
+  let mut pc : Nat := 0
+  while pc < code.size do
+    let op := code.get! pc
+    if (op >= 0x99 && op <= 0xa8) || op == 0xc6 || op == 0xc7 then
+      if pc + 2 < code.size then
+        let hi := (code.get! (pc + 1)).toUInt16
+        let lo := (code.get! (pc + 2)).toUInt16
+        let u16Val := (hi <<< 8) ||| lo
+        let target := if u16Val >= 0x8000 then
+          (pc : Int) - (0x10000 - u16Val.toNat : Int)
+        else
+          (pc : Int) + (u16Val.toNat : Int)
+        if target >= 0 then
+          targets := targets.insert target.toNat
+    else if op == 0xaa then
+      let pad := (4 - ((pc + 1) % 4)) % 4
+      let base := pc + 1 + pad
+      let readI32 (idx : Nat) : Int :=
+        if idx + 3 < code.size then
+          let b0 := (code.get! idx).toUInt32
+          let b1 := (code.get! (idx + 1)).toUInt32
+          let b2 := (code.get! (idx + 2)).toUInt32
+          let b3 := (code.get! (idx + 3)).toUInt32
+          let u := (b0 <<< 24) ||| (b1 <<< 16) ||| (b2 <<< 8) ||| b3
+          if u >= 0x80000000 then -((0x100000000 - u.toNat) : Int) else u.toNat
+        else 0
+      let defTarget := (pc : Int) + readI32 base
+      if defTarget >= 0 then targets := targets.insert defTarget.toNat
+      let low := readI32 (base + 4)
+      let high := readI32 (base + 8)
+      let count := if high >= low then (high - low + 1).toNat else 0
+      for i in [0:count] do
+        let offTarget := (pc : Int) + readI32 (base + 12 + i * 4)
+        if offTarget >= 0 then targets := targets.insert offTarget.toNat
+    pc := pc + getInstructionLength code pc
+
+  let mut curCode := code
+  for _ in [0:3] do
+    let mut modified := false
+    let mut i : Nat := 0
+    while i < curCode.size do
+      let op := curCode.get! i
+      if (op >= 0x3b && op <= 0x3e) || (op >= 0x4b && op <= 0x4e) || (op >= 0x43 && op <= 0x46) then
+        let slot := if op >= 0x4b then op - 0x4b
+                    else if op >= 0x43 then op - 0x43
+                    else op - 0x3b
+        let expectedLoad := if op >= 0x4b then 0x2a + slot
+                            else if op >= 0x43 then 0x22 + slot
+                            else 0x1a + slot
+        let nextI := i + 1
+        if nextI < curCode.size && !targets.contains nextI && curCode.get! nextI == expectedLoad then
+          let loads := countLoads curCode false slot
+          if loads == 1 && slot.toNat >= paramSlots then
+            curCode := curCode.set! i 0x00 |>.set! nextI 0x00
+            modified := true
+            i := nextI + 1
+            continue
+          else
+            curCode := curCode.set! i 0x59 |>.set! nextI op
+            modified := true
+            i := nextI + 1
+            continue
+      else if (op == 0x36 || op == 0x3a || op == 0x38) && i + 3 < curCode.size then
+        let slot := curCode.get! (i + 1)
+        let expectedLoadOp := if op == 0x3a then 0x19 else if op == 0x38 then 0x17 else 0x15
+        let nextI := i + 2
+        if !targets.contains nextI && curCode.get! nextI == expectedLoadOp && curCode.get! (nextI + 1) == slot then
+          let loads := countLoads curCode false slot
+          if loads == 1 && slot.toNat >= paramSlots then
+            curCode := curCode.set! i 0x00 |>.set! (i + 1) 0x00 |>.set! nextI 0x00 |>.set! (nextI + 1) 0x00
+            modified := true
+            i := nextI + 2
+            continue
+          else
+            curCode := curCode.set! i 0x59 |>.set! (i + 1) op |>.set! (i + 2) slot |>.set! (i + 3) 0x00
+            modified := true
+            i := nextI + 2
+            continue
+      else if (op >= 0x3f && op <= 0x42) || (op >= 0x47 && op <= 0x4a) then
+        let slot := if op >= 0x47 then op - 0x47 else op - 0x3f
+        let expectedLoad := if op >= 0x47 then 0x26 + slot else 0x1e + slot
+        let nextI := i + 1
+        if nextI < curCode.size && !targets.contains nextI && curCode.get! nextI == expectedLoad then
+          let loads := countLoads curCode true slot
+          if loads == 1 && slot.toNat >= paramSlots then
+            curCode := curCode.set! i 0x00 |>.set! nextI 0x00
+            modified := true
+            i := nextI + 1
+            continue
+          else
+            curCode := curCode.set! i 0x5c |>.set! nextI op
+            modified := true
+            i := nextI + 1
+            continue
+      else if (op == 0x37 || op == 0x39) && i + 3 < curCode.size then
+        let slot := curCode.get! (i + 1)
+        let expectedLoadOp := if op == 0x39 then 0x18 else 0x16
+        let nextI := i + 2
+        if !targets.contains nextI && curCode.get! nextI == expectedLoadOp && curCode.get! (nextI + 1) == slot then
+          let loads := countLoads curCode true slot
+          if loads == 1 && slot.toNat >= paramSlots then
+            curCode := curCode.set! i 0x00 |>.set! (i + 1) 0x00 |>.set! nextI 0x00 |>.set! (nextI + 1) 0x00
+            modified := true
+            i := nextI + 2
+            continue
+          else
+            curCode := curCode.set! i 0x5c |>.set! (i + 1) op |>.set! (i + 2) slot |>.set! (i + 3) 0x00
+            modified := true
+            i := nextI + 2
+            continue
+      i := i + getInstructionLength curCode i
+    if !modified then break
+  return curCode
 
 def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
   match decl.value with
@@ -2562,7 +3082,13 @@ def emitFnDecl (decl : Decl .impure) : EmitJVMM Unit := do
     withReader (fun _ => methodCtx) do
       emitCode code
 
+    let mut paramSlots : UInt8 := 0
+    for p in decl.params do
+      let pTy := if isBoxed then ImpureType.object else p.type
+      paramSlots := paramSlots + getSlotSize pTy
+
     let mut bytecodes := (← get).code
+    bytecodes := peepholeOptimizeBytecodes bytecodes (← get).fixups (← get).labelOffsets paramSlots.toNat
     for (fpc, targetName) in (← get).fixups do
       if targetName == `_start then
         let target := (0x10000 - fpc).toUInt16
