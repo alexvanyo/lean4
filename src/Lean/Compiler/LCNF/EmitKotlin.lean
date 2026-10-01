@@ -1502,6 +1502,14 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
   | .fap fn args =>
     let p := fn.getPrefix
     let s := match fn with | .str _ str => str | _ => ""
+    if s == "toInt64" then return "Long"
+    if s == "toUInt64" then return "ULong"
+    if s == "toInt32" then return "Int"
+    if s == "toUInt32" then return "UInt"
+    if s == "toInt16" then return "Short"
+    if s == "toUInt16" then return "UShort"
+    if s == "toInt8" then return "Byte"
+    if s == "toUInt8" then return "UByte"
     if p == ``Int64 || s == "shl64" || s == "ushr64" || s == "ashr64" then
       if s.startsWith "dec" then return "Boolean" else return "Long"
     if p == ``Int32 || s == "ushr32" then
