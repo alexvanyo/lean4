@@ -2080,22 +2080,28 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
       let aliases := (← get).aliases
       let mut isAliased : Array Bool := #[]
       let useLbl := needsJpLabel decl.fvarId k
-      for p in params do
-        if let some r := aliases[p.fvarId]? then
-          setParamVarName p.fvarId (← getVarName r)
-          isAliased := isAliased.push true
-        else
-          let pName ← getVarName p.fvarId
-          let pType := toKotlinType p.type
-          recordVarType pName pType
-          emitLn s!"val {pName}: {pType}"
-          isAliased := isAliased.push false
       let lbl? ← if useLbl then
         let c := (← get).loopCounter + 1
         modify fun st => { st with loopCounter := c }
         pure (some s!"jp_{c}")
       else
         pure none
+      for p in params do
+        let st ← get
+        let rName? := match aliases[p.fvarId]? with
+          | some r => st.varNames[r]?
+          | none => none
+        if let some rName := rName? then
+          setParamVarName p.fvarId rName
+          isAliased := isAliased.push true
+        else
+          let pName ← getVarName p.fvarId
+          let pType := toKotlinType p.type
+          recordVarType pName pType
+          let defVal := defaultKotlinVal pType
+          let mutDecl := if lbl?.isSome then s!"var {pName}: {pType} = {defVal}" else s!"val {pName}: {pType}"
+          emitLn mutDecl
+          isAliased := isAliased.push false
       modify fun st => { st with blockJps := st.blockJps.insert decl.fvarId (decl, lbl?, isAliased) }
       match lbl? with
       | some lbl =>
