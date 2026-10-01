@@ -324,6 +324,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | ``Bool.toInt16 =>
       return some s!"(if ({a0}) (1).toShort() else (0).toShort())"
     -- Conversions to Int32 / ISize / USize / Nat (Int)
+    | ``Int.toNat | ``Int8.toInt | ``Int16.toInt | ``Int32.toInt | ``Int64.toInt
+    | ``Int.toInt32 | ``Int.toInt64
     | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt | ``USize.ofNat
     | ``UInt32.toInt32 | ``Int8.toInt32 | ``Int16.toInt32 | ``Int64.toInt32 | ``ISize.toInt32
     | ``Int32.toISize | ``Int64.toISize | ``UInt32.toUSize | ``UInt64.toUSize
@@ -803,6 +805,8 @@ Calls to `@[extern]` declarations with a Kotlin rendering:
   argument (unqualified on `this` unless shadowed by a parameter).
 -/
 def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : EmitM (Option String) := do
+  if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited") then
+    return some (defaultKotlinVal (toKotlinType resTy))
   let env ← getEnv
   let some extStr := getExternNameFor env `kotlin fn | return none
   if extStr.startsWith "kotlin_expr:" then
@@ -860,14 +864,20 @@ def unsupportedProj (x : FVarId) : EmitM String := do
   throwError "Kotlin backend: in `{(← read).currFn}`: projection of `{← getVarName x}`, which is \
     not a `@[kotlin_class]` structure, is not supported"
 
-/-- Returns the underlying literal `LetDecl` if `d` is a 0-argument constant wrapping a literal. -/
+def isInlinedConstLet? (d0 : LetDecl .impure) : Bool :=
+  match d0.value with
+  | .lit _ | .erased => true
+  | .fap fn _ => fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited")
+  | _ => false
+
+/-- Returns the underlying literal `LetDecl` if `d` is a 0-argument constant wrapping a literal or inhabited default. -/
 def isInlinedConstDecl? (d : Decl .impure) : Option (LetDecl .impure) :=
   if !d.params.isEmpty then none
   else match d.value with
   | .code (.let d0 (.return r)) =>
-    if r == d0.fvarId && d0.value matches .lit _ then some d0 else none
+    if r == d0.fvarId && isInlinedConstLet? d0 then some d0 else none
   | .code (.let d0 (.let d1 (.return r))) =>
-    if r == d1.fvarId && d0.value matches .lit _ && d1.value matches .box _ _ then some d0 else none
+    if r == d1.fvarId && isInlinedConstLet? d0 && d1.value matches .box _ _ then some d0 else none
   | _ => none
 
 partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
@@ -926,7 +936,12 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
   | .box _ fvarId =>
     getVarName fvarId
   | .unbox fvarId =>
-    castIfNeeded (← getVarName fvarId) (toKotlinType decl.type)
+    let src ← getVarName fvarId
+    let srcTy := (← get).varTypes[src]?.getD "Any?"
+    if isKotlinIntType srcTy then
+      pure src
+    else
+      castIfNeeded src (toKotlinType decl.type)
   | .oproj i x =>
     if (← classStructOf? x).isSome then classField x (·.objs[i]?) else unsupportedProj x
   | .sproj _ off x =>
@@ -1475,8 +1490,29 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
   | .lit v => return litKotlinType v decl.type
   | .box _ fvarId =>
     return (← get).varTypes[← getVarName fvarId]?.getD baseTy
-  | .unbox _ => return baseTy
+  | .unbox fvarId =>
+    return (← get).varTypes[← getVarName fvarId]?.getD baseTy
   | .fap fn args =>
+    let p := fn.getPrefix
+    let s := match fn with | .str _ str => str | _ => ""
+    if p == ``Int64 || s == "shl64" || s == "ushr64" || s == "ashr64" then
+      if s.startsWith "dec" then return "Boolean" else return "Long"
+    if p == ``Int32 || s == "ushr32" then
+      if s.startsWith "dec" then return "Boolean" else return "Int"
+    if p == ``Int16 then
+      if s.startsWith "dec" then return "Boolean" else return "Short"
+    if p == ``Int8 then
+      if s.startsWith "dec" then return "Boolean" else return "Byte"
+    if p == ``UInt64 then
+      if s.startsWith "dec" then return "Boolean" else return "ULong"
+    if p == ``UInt32 then
+      if s.startsWith "dec" then return "Boolean" else return "UInt"
+    if p == ``UInt16 then
+      if s.startsWith "dec" then return "Boolean" else return "UShort"
+    if p == ``UInt8 then
+      if s.startsWith "dec" then return "Boolean" else return "UByte"
+    if p == ``Bool then
+      return "Boolean"
     if args.isEmpty then
       if let some d := (← read).declMap[fn]? then
         if let some d0 := isInlinedConstDecl? d then
@@ -1551,6 +1587,8 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
         match fn with
         | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat
         | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt
+        | ``Int.toNat | ``Int8.toInt | ``Int16.toInt | ``Int32.toInt
+        | ``Int.toInt32 | ``Int.toInt64
         | ``Int32.toNatClampNeg | ``Int32.toISize | ``ISize.toInt32 =>
           setParamVarName x a0
           return true
@@ -1671,8 +1709,8 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
       s == "shiftLeft" || s == "shiftRight" ||
       s == "decEq" || s == "decLt" || s == "decLe"
     else false
-  else if p == ``Nat then
-    if numArgs == 1 then s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
+  else if p == ``Nat || p == ``Int then
+    if numArgs == 1 then s.startsWith "to" || s.startsWith "of" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
     else if numArgs == 2 then
       s == "decEq" || s == "decLt" || s == "decLe" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
     else false
@@ -1686,6 +1724,7 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
 
 def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
   let .fap fn args := decl.value | return false
+  if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited" || fn.getString!.contains "boxed_const") then return true
   if (← loopExpandable? decl.value).isSome then return false
   if Ownership.isArraySet fn then return false
   if (Ownership.inplaceArg? (← getEnv) fn args).isSome then return false
@@ -1904,16 +1943,22 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         else
           let rhs ← emitLetValue decl
           let ty ← inferLetKotlinType decl
-          if !(← isUsed x) && ty == "Unit" then
-            emitLn rhs
+          if !(← isUsed x) then
+            if ← isPureLet decl then
+              pure ()
+            else
+              emitLn rhs
           else
             let n ← getVarName x
             recordVarType n ty
             emitLn s!"val {n} = {rhs}"
     | _ =>
-      let n ← getVarName x
-      recordVarType n (← inferLetKotlinType decl)
-      emitLn s!"val {n} = {← emitLetValue decl}"
+      if !(← isUsed x) then
+        pure ()
+      else
+        let n ← getVarName x
+        recordVarType n (← inferLetKotlinType decl)
+        emitLn s!"val {n} = {← emitLetValue decl}"
   emitCode k
 
 partial def emitCode (code : Code .impure) : EmitM Unit := do
@@ -2317,7 +2362,10 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let isInline := !codeJP && !hasSelfCall decl.name code && Compiler.hasInlineAttribute env decl.name
   let (mods, fnName) := match member? with
     | some info => (info.modifiers, memberKotlinName decl.name info)
-    | none => (compiler.kotlin.topLevelModifiers.get opts, toKotlinFnName decl.name)
+    | none =>
+      let topMods := compiler.kotlin.topLevelModifiers.get opts
+      let topMods := if topMods == "internal" then "@PublishedApi internal" else topMods
+      (topMods, toKotlinFnName decl.name)
   let explicitInline := (identTokens mods).contains "inline"
   let auto :=
     if isTailRec then "tailrec "
