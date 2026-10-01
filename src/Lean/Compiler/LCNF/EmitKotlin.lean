@@ -263,16 +263,23 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
   return s!"({s} as {targetTy})"
 
 def getVarName (fvarId : FVarId) : EmitM String := do
-  if let some name := (← get).varNames[fvarId]? then
+  let mut f := fvarId
+  for _ in [:8] do
+    if let some r := (← get).aliases[f]? then
+      if r != f then
+        f := r
+        continue
+    break
+  if let some name := (← get).varNames[f]? then
     return name
-  let rawName := (← getBinderName fvarId).toString
+  let rawName := (← getBinderName f).toString
   let cleanName := rawName.replace "." "_"
   let cleanName := if cleanName.startsWith "_" then "v" ++ cleanName else cleanName
   let count := (← get).nameCounter + 1
   let uniqueName := s!"{cleanName}_{count}"
   modify fun st => {
     st with
-    varNames := st.varNames.insert fvarId uniqueName
+    varNames := st.varNames.insert f uniqueName
     nameCounter := count
   }
   return uniqueName
@@ -2087,12 +2094,7 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
       else
         pure none
       for p in params do
-        let st ← get
-        let rName? := match aliases[p.fvarId]? with
-          | some r => st.varNames[r]?
-          | none => none
-        if let some rName := rName? then
-          setParamVarName p.fvarId rName
+        if aliases.contains p.fvarId then
           isAliased := isAliased.push true
         else
           let pName ← getVarName p.fvarId
