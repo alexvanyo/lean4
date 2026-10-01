@@ -76,6 +76,13 @@ inductive LoopExit where
   | assignAndBreak (varName : String) (varTy : String) (loopLbl : String)
   | breakOnly (loopLbl : String)
   | returnLbl (lbl : String) (varTy? : Option String)
+  | threaded (successExit : LoopExit) (failureLbl : String)
+
+/-- Destination of an inlined loop expansion (`emitLoopExpansion`). -/
+inductive LoopDest where
+  | tail
+  | assign (fv : FVarId) (ty : Expr)
+  | threaded (outerExit : LoopExit)
 
 /-- State of a self-tail-recursive function whose body is being emitted as a `while (true)` loop. -/
 structure LoopCtx where
@@ -1196,6 +1203,39 @@ def emitReturn (valStr : String) (valTy? : Option String := none) : EmitM Unit :
       | some t => castIfNeeded valStr t valTy?
       | none => pure valStr
     emitLn s!"return@{lbl} {rhs}"
+  | .threaded successExit failureLbl =>
+    if valStr == "(-1)" || valStr == "-1" || valStr == "4294967295L" || valStr == "4294967295" then
+      emitLn s!"break@{failureLbl}"
+    else
+      match successExit with
+      | .funcReturn =>
+        if (← read).retUnit then
+          unless valStr == "null" || valStr.all (fun c => c.isAlphanum || c == '_') do
+            emitLn valStr
+          emitLn "return"
+        else
+          match (← read).retCast? with
+          | some t => emitLn s!"return {← castIfNeeded valStr t valTy?}"
+          | none => emitLn s!"return {valStr}"
+      | .assignAndBreak x xTy loopLbl =>
+        let rhs ← castIfNeeded valStr xTy valTy?
+        modify fun st => { st with loopExits := st.loopExits.insert loopLbl ((st.loopExits.getD loopLbl #[]).push rhs) }
+        emitLn s!"{x} = {rhs}"
+        emitLn s!"break@{loopLbl}"
+      | .assignOnly x xTy =>
+        emitLn s!"{x} = {← castIfNeeded valStr xTy valTy?}"
+      | .breakOnly loopLbl =>
+        emitLn s!"break@{loopLbl}"
+      | .inlineAlias fv =>
+        if let some t := valTy? then recordVarType valStr t
+        setParamVarName fv valStr
+      | .returnLbl lbl retTy? =>
+        let rhs ← match retTy? with
+          | some t => castIfNeeded valStr t valTy?
+          | none => pure valStr
+        emitLn s!"return@{lbl} {rhs}"
+      | .threaded .. =>
+        emitLn s!"return {valStr}"
 
 /-- Returns from the current `return` target without a value. -/
 def emitReturnUnit : EmitM Unit := do
@@ -1206,6 +1246,7 @@ def emitReturnUnit : EmitM Unit := do
   | .assignAndBreak _ _ loopLbl => emitLn s!"break@{loopLbl}"
   | .breakOnly loopLbl => emitLn s!"break@{loopLbl}"
   | .returnLbl lbl _ => emitLn s!"return@{lbl} Unit"
+  | .threaded _ failureLbl => emitLn s!"break@{failureLbl}"
 
 /-- `return x`, dropping the components of the result that are identical to parameters. -/
 def emitReturnVar (x : FVarId) : EmitM Unit := do
@@ -1909,10 +1950,47 @@ def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM B
   setParamVarName decl.fvarId rhs
   return true
 
+/--
+Detects if `code` tests `fv >= 0` and returns `fv` on success:
+`let _x := decLe 0 fv; cases _x | false => contCode | true => return fv`
+Returns `some contCode` if matched, where `contCode` does not use `fv`.
+-/
+partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure) : Option (Code .impure) :=
+  match code with
+  | .let _ k =>
+    if countUsesCode fv k > 0 then
+      isNonNegEarlyExit? fv k
+    else none
+  | .cases cs =>
+    if cs.alts.size == 2 then
+      let alt0 := cs.alts[0]!
+      let alt1 := cs.alts[1]!
+      let checkAlt (retAlt contAlt : Alt .impure) : Option (Code .impure) := do
+        match skipRC retAlt.getCode with
+        | .return r =>
+          if r == fv && countUsesCode fv contAlt.getCode == 0 then
+            some contAlt.getCode
+          else none
+        | _ => none
+      checkAlt alt1 alt0 <|> checkAlt alt0 alt1
+    else none
+  | _ => none
+
 mutual
 
 partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : EmitM Unit := do
   if let some (callee, args) ← loopExpandable? decl.value then
+    let curExit ← currentExit
+    if let .return r := skipRC k then
+      if (r == decl.fvarId || ((← read).retUnit && (curExit matches .funcReturn))) &&
+         !(curExit matches .inlineAlias _ | .assignOnly ..) then
+        emitLoopExpansion callee args .tail
+        return
+    if let some contCode := isNonNegEarlyExit? decl.fvarId k then
+      if !(curExit matches .inlineAlias _ | .assignOnly ..) then
+        emitLoopExpansion callee args (.threaded curExit)
+        emitCode contCode
+        return
     if let .let d2 k2 := skipRC k then
       if let .unbox f := d2.value then
         if f == decl.fvarId then
@@ -1920,14 +1998,25 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           if let .return r := skipRC k2 then
             if (r == d2.fvarId || ((← read).retUnit && (curExit matches .funcReturn))) &&
                !(curExit matches .inlineAlias _ | .assignOnly ..) then
-              emitLoopExpansion callee args none
+              emitLoopExpansion callee args .tail
               return
-          emitLoopExpansion callee args (some (d2.fvarId, d2.type))
+          emitLoopExpansion callee args (.assign d2.fvarId d2.type)
           setParamVarName decl.fvarId (← getVarName d2.fvarId)
           emitCode k2
           return
-    emitLoopExpansion callee args (some (decl.fvarId, decl.type))
+    emitLoopExpansion callee args (.assign decl.fvarId decl.type)
   else if let some (lam, args) ← papBeta? decl.value then
+    let curExit ← currentExit
+    if let .return r := skipRC k then
+      if (r == decl.fvarId || ((← read).retUnit && (curExit matches .funcReturn))) &&
+         !(curExit matches .inlineAlias _ | .assignOnly ..) then
+        emitLoopExpansion lam args .tail
+        return
+    if let some contCode := isNonNegEarlyExit? decl.fvarId k then
+      if !(curExit matches .inlineAlias _ | .assignOnly ..) then
+        emitLoopExpansion lam args (.threaded curExit)
+        emitCode contCode
+        return
     -- Closures return boxed values; fuse `let y := unbox x` so the inlined body yields `y` directly.
     if let .let d2 k2 := skipRC k then
       if let .unbox f := d2.value then
@@ -1936,13 +2025,13 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           if let .return r := skipRC k2 then
             if (r == d2.fvarId || ((← read).retUnit && (curExit matches .funcReturn))) &&
                !(curExit matches .inlineAlias _ | .assignOnly ..) then
-              emitLoopExpansion lam args none
+              emitLoopExpansion lam args .tail
               return
-          emitLoopExpansion lam args (some (d2.fvarId, d2.type))
+          emitLoopExpansion lam args (.assign d2.fvarId d2.type)
           setParamVarName decl.fvarId (← getVarName d2.fvarId)
           emitCode k2
           return
-    emitLoopExpansion lam args (some (decl.fvarId, decl.type))
+    emitLoopExpansion lam args (.assign decl.fvarId decl.type)
   else if ← recordPap? decl then
     pure ()
   else if ← tryAliasLet? decl then
@@ -2066,10 +2155,10 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
               emitLoopContinue l args
               return
         if let some (callee, args) ← loopExpandable? decl.value then
-          emitLoopExpansion callee args none
+          emitLoopExpansion callee args .tail
           return
         if let some (lam, args) ← papBeta? decl.value then
-          emitLoopExpansion lam args none
+          emitLoopExpansion lam args .tail
           return
         if fvarId == decl.fvarId then
           -- Self tail call whose dropped results are passed through unchanged: keep it a tail call.
@@ -2256,7 +2345,7 @@ Emits the body of the loop-expandable `callee` applied to `args` as a `while (tr
 `dest? = some (x, ty)`: assigns result to `x`.
 -/
 partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure))
-    (dest? : Option (FVarId × Expr)) : EmitM Unit := do
+    (dest : LoopDest) : EmitM Unit := do
   let callee ← callee.internalize (uniqueIdents := true)
   let .code body := callee.value | return
   markUsed body
@@ -2301,8 +2390,8 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
           setParamVarName p.fvarId nm
           names := names.push nm
     return names
-  match dest? with
-  | none =>
+  match dest with
+  | .tail =>
     let outerExit ← currentExit
     let names ← emitParams
     let lc : LoopCtx := { fnName := callee.name, varNames := names, variant, loopLbl, exit := outerExit }
@@ -2313,7 +2402,18 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
       emitLn "}"
     else
       withReader (fun ctx => { ctx with loop? := some lc }) (emitCode body)
-  | some (fv, ty) =>
+  | .threaded outerExit =>
+    let names ← emitParams
+    let lc : LoopCtx := { fnName := callee.name, varNames := names, variant, loopLbl, exit := .threaded outerExit loopLbl }
+    if isLoop then
+      forgetFieldVals
+      emitIndent; emit s!"{loopLbl}@ while (true) "; emitLn "{"
+      withIndent (withReader (fun ctx => { ctx with loop? := some lc }) (emitCode body))
+      emitLn "}"
+    else
+      withReader (fun ctx => { ctx with loop? := some lc }) (emitCode body)
+    forgetFieldVals
+  | .assign fv ty =>
     let shape? ← dropShape? callee.name
     let unitShape := shape?.any isUnitShape
     if unitShape then
