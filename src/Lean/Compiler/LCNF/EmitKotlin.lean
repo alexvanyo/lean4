@@ -148,6 +148,8 @@ structure State where
   writeBacks : Std.HashSet (FVarId × FVarId) := {}
   /-- Static Kotlin types of emitted variables and literals (by Kotlin expression/name). -/
   varTypes : Std.HashMap String String := {}
+  /-- Kotlin expressions of Int origin that were converted to Long (by Kotlin variable name). -/
+  intSources : Std.HashMap String String := {}
   /-- Precomputed variable aliases for the current function or loop body. -/
   aliases : Std.HashMap FVarId FVarId := {}
   /-- Recorded exit expressions for each loop label. -/
@@ -315,6 +317,36 @@ def formatInt64 (n : UInt64) : String :=
 def formatUInt64 (n : UInt64) : String :=
   s!"{n.toNat}uL"
 
+partial def stripOuterParens (s : String) : String := Id.run do
+  let s := s.trimAscii.toString
+  if s.startsWith "(" && s.endsWith ")" && s.length >= 2 then
+    let mut depth := 0
+    let mut matched := true
+    let chars := s.toList
+    for h : i in [:chars.length] do
+      let c := chars[i]
+      if c == '(' then depth := depth + 1
+      else if c == ')' then
+        depth := depth - 1
+        if depth == 0 && i < chars.length - 1 then
+          matched := false
+          break
+    if matched && depth == 0 then
+      stripOuterParens ((s.drop 1).take (s.length - 2)).toString
+    else
+      s
+  else
+    s
+
+def stripToLong? (s : String) : Option String :=
+  let sClean := stripOuterParens s
+  if sClean.endsWith ".toLong()" && sClean.length >= 9 then
+    some (sClean.take (sClean.length - 9)).toString
+  else if sClean.endsWith ".toULong()" && sClean.length >= 10 then
+    some (sClean.take (sClean.length - 10)).toString
+  else
+    none
+
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
@@ -400,11 +432,19 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
   if args.size == 2 then
     let a0 ← toKotlinArg args[0]!
     let a1 ← toKotlinArg args[1]!
-    let a1Int :=
-      if (← get).varTypes[a1]? == some "Int" then a1
-      else if a1.endsWith "uL" && a1.length > 2 && (a1.take (a1.length - 2)).all Char.isDigit then (a1.take (a1.length - 2)).toString
-      else if (a1.endsWith "L" || a1.endsWith "u") && a1.length > 1 && (a1.take (a1.length - 1)).all Char.isDigit then (a1.take (a1.length - 1)).toString
-      else s!"({a1}).toInt()"
+    let a1Int ← do
+      if (← get).varTypes[a1]? == some "Int" then
+        pure a1
+      else if let some src := (← get).intSources[a1]? then
+        pure src
+      else if let some intExpr := stripToLong? a1 then
+        pure intExpr
+      else if a1.endsWith "uL" && a1.length > 2 && (a1.take (a1.length - 2)).all Char.isDigit then
+        pure (a1.take (a1.length - 2)).toString
+      else if (a1.endsWith "L" || a1.endsWith "u") && a1.length > 1 && (a1.take (a1.length - 1)).all Char.isDigit then
+        pure (a1.take (a1.length - 1)).toString
+      else
+        pure s!"({a1}).toInt()"
     match fn with
     -- Signed Int32 / ISize / USize (Int)
     | ``Int32.add | ``ISize.add | ``USize.add =>
@@ -1547,6 +1587,19 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     fnRetKotlinType fn decl.type
   | _ => return baseTy
 
+def isPureConstantLet (decl : LetDecl .impure) : EmitM Bool := do
+  match decl.value with
+  | .lit _ | .erased => return true
+  | .fap fn args =>
+    if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited") then
+      return true
+    if args.isEmpty then
+      if let some d := (← read).declMap[fn]? then
+        if let some _ := isInlinedConstDecl? d then
+          return true
+    return false
+  | _ => return false
+
 def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
   let x := decl.fvarId
   match decl.value with
@@ -1794,7 +1847,10 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
   | .sset y _ _ z _ _ _ | .uset y _ z _ _ =>
     return z == x && y != x
   | .let d2 k2 =>
-    if (← loopExpandable? d2.value).isSome || (← papBeta? d2.value).isSome || (d2.value matches .pap ..) then
+    if (← loopExpandable? d2.value).isSome || (← papBeta? d2.value).isSome then
+      let u := countUsesLetValue x d2.value
+      return u == 1 && countUsesCode x k2 == 0
+    if d2.value matches .pap .. then
       return false
     let u := countUsesLetValue x d2.value
     if u > 0 then
@@ -1832,6 +1888,16 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
       | _ => return false
   | _ => return false
 
+def recordIntSource (n : String) (rhs : String) (decl : LetDecl .impure) : EmitM Unit := do
+  if let some intExpr := stripToLong? rhs then
+    modify fun st => { st with intSources := st.intSources.insert n intExpr }
+  else if let .fap fn args := decl.value then
+    if args.size == 1 && (fn == ``Int32.toInt64 || fn == ``ISize.toInt64 || fn == ``UInt32.toUInt64 ||
+                          fn == ``Int64.ofInt || fn == ``Int64.ofNat) then
+      let a0 ← toKotlinArg args[0]!
+      if (← get).varTypes[a0]? == some "Int" then
+        modify fun st => { st with intSources := st.intSources.insert n a0 }
+
 def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
   unless ← isInlineableLet decl do return false
   unless countUsesCode decl.fvarId k == 1 do return false
@@ -1839,6 +1905,7 @@ def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM B
   let rhs ← emitLetValue decl
   let ty ← inferLetKotlinType decl
   recordVarType rhs ty
+  recordIntSource rhs rhs decl
   setParamVarName decl.fvarId rhs
   return true
 
@@ -1958,16 +2025,31 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         else
           let rhs ← emitLetValue decl
           let ty ← inferLetKotlinType decl
-          if !(← isUsed x) && ty == "Unit" then
-            emitLn rhs
+          if !(← isUsed x) then
+            if ty == "Unit" then
+              emitLn rhs
+            else if ← isPureConstantLet decl then
+              pure ()
+            else
+              let n ← getVarName x
+              recordVarType n ty
+              recordIntSource n rhs decl
+              emitLn s!"val {n} = {rhs}"
           else
             let n ← getVarName x
             recordVarType n ty
+            recordIntSource n rhs decl
             emitLn s!"val {n} = {rhs}"
     | _ =>
-      let n ← getVarName x
-      recordVarType n (← inferLetKotlinType decl)
-      emitLn s!"val {n} = {← emitLetValue decl}"
+      if !(← isUsed x) && (← isPureConstantLet decl) then
+        pure ()
+      else
+        let n ← getVarName x
+        let rhs ← emitLetValue decl
+        let ty ← inferLetKotlinType decl
+        recordVarType n ty
+        recordIntSource n rhs decl
+        emitLn s!"val {n} = {rhs}"
   emitCode k
 
 partial def emitCode (code : Code .impure) : EmitM Unit := do
@@ -2108,9 +2190,7 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
           let pName ← getVarName p.fvarId
           let pType := toKotlinType p.type
           recordVarType pName pType
-          let defVal := defaultKotlinVal pType
-          let mutDecl := if lbl?.isSome then s!"var {pName}: {pType} = {defVal}" else s!"val {pName}: {pType}"
-          emitLn mutDecl
+          emitLn s!"val {pName}: {pType}"
           isAliased := isAliased.push false
       modify fun st => { st with blockJps := st.blockJps.insert decl.fvarId (decl, lbl?, isAliased) }
       match lbl? with
@@ -2206,11 +2286,20 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
         emitLn s!"var {nm}: {pTy} = {aCast}"
         names := names.push nm
       else
-        -- Loop-invariant parameter: alias the argument, no copy and no per-iteration update.
-        setParamVarName p.fvarId a
-        if ((← get).varTypes[a]?.getD "Any?") == "Any?" && pTy != "Any?" then
-          recordVarType a pTy
-        names := names.push a
+        let isSimple := a.all (fun c => c.isAlphanum || c == '_') || a == "true" || a == "false" || a == "null"
+        if isSimple then
+          -- Loop-invariant parameter: alias the argument, no copy and no per-iteration update.
+          setParamVarName p.fvarId a
+          if ((← get).varTypes[a]?.getD "Any?") == "Any?" && pTy != "Any?" then
+            recordVarType a pTy
+          names := names.push a
+        else
+          let nm ← getVarName p.fvarId
+          recordVarType nm pTy
+          let aCast ← castIfNeeded a pTy
+          emitLn s!"val {nm}: {pTy} = {aCast}"
+          setParamVarName p.fvarId nm
+          names := names.push nm
     return names
   match dest? with
   | none =>
