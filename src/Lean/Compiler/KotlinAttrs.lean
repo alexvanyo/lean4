@@ -8,6 +8,7 @@ module
 prelude
 public import Lean.Attributes
 public import Lean.Parser.Attr
+public import Lean.Structure
 
 public section
 
@@ -85,5 +86,44 @@ builtin_initialize kotlinTypesAttr : ParametricAttribute (Array String) ←
 
 def getKotlinTypes? (env : Environment) (n : Name) : Option (Array String) :=
   kotlinTypesAttr.getParam? env n
+
+/--
+`@[kotlin_file]` marks a constant of type `Lean.Compiler.Kotlin.FileSpec` describing the layout
+of the Kotlin file the Kotlin backend emits for this module (classes, fields, verbatim code).
+-/
+builtin_initialize kotlinFileAttr : TagAttribute ←
+  registerTagAttribute `kotlin_file "Kotlin file layout for this module (Kotlin backend)"
+
+end Lean.Compiler
+
+namespace Lean.Parser.Attr
+
+/-- `@[kotlin_class "Type"]`: see `Lean.Compiler.kotlinClassAttr`. -/
+@[builtin_attr_parser] def kotlin_class := leading_parser
+  nonReservedSymbol "kotlin_class" >> ppSpace >> strLit
+
+end Lean.Parser.Attr
+
+namespace Lean.Compiler
+
+/--
+`@[kotlin_class "Type"]` on a structure makes the Kotlin backend represent values of the structure
+as instances of the Kotlin class `Type` (e.g. `"Foo<*, *>"`), whose properties have the names of the
+structure fields. Values are mutated in place: the backend verifies statically that every value
+it updates is exclusively owned, and rejects the program otherwise.
+-/
+builtin_initialize kotlinClassAttr : ParametricAttribute String ←
+  registerParametricAttribute {
+    name := `kotlin_class
+    descr := "represent this structure as a Kotlin class (Kotlin backend)"
+    getParam := fun declName stx => do
+      let some s := stx[1].isStrLit? | throwError "`kotlin_class` expects a string argument"
+      unless isStructure (← getEnv) declName do
+        throwError "`kotlin_class` can only be used on structures"
+      return s
+  }
+
+def getKotlinClass? (env : Environment) (n : Name) : Option String :=
+  kotlinClassAttr.getParam? env n
 
 end Lean.Compiler

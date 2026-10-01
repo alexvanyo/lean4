@@ -301,6 +301,10 @@ where
     match value with
     | .fap f .. =>
       let some sig ← getImpureSignature? f | unreachable!
+      -- A more precise reference type (e.g. a typed Kotlin array produced by a generic function
+      -- whose signature only says `obj`) is kept: both are references.
+      if (getJvmTypeDesc? currentType).isSome && !sig.type.isScalar then
+        return currentType
       return sig.type
     | .pap .. => return object
     | .uproj .. => return usize

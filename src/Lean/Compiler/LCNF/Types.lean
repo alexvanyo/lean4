@@ -493,6 +493,9 @@ Whether the type might be an actual pointer (crucially this excludes `tagged`).
 -/
 def Lean.Expr.isPossibleRef : Expr → Bool
   | ImpureType.object | ImpureType.tobject => true
+  -- Foreign (Kotlin) references take part in reference counting so that ownership can be analyzed;
+  -- the Kotlin backend itself ignores reference-counting instructions.
+  | .app (.const `jvmType _) _ => true
   | _ => false
 
 /--
@@ -500,6 +503,7 @@ Whether the type is a pointer for sure.
 -/
 def Lean.Expr.isDefiniteRef : Expr → Bool
   | ImpureType.object => true
+  | .app (.const `jvmType _) _ => true
   | _ => false
 
 /--

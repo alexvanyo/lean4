@@ -9,8 +9,25 @@ prelude
 public import Lean.Compiler.LCNF.Irrelevant
 import Lean.Compiler.LCNF.MonoTypes
 import Init.Data.Format.Macro
+import Lean.Compiler.KotlinAttrs
 
 namespace Lean.Compiler.LCNF
+
+register_builtin_option compiler.kotlin.typedArrays : Bool := {
+  defValue := false
+  descr := "(Kotlin backend) represent `Array α` as a Kotlin array: `LongArray` for `UInt64`, \
+    `IntArray` for `UInt32`, `DoubleArray` for `Float`, `FloatArray` for `Float32` and \
+    `Array<Any?>` otherwise"
+}
+
+/-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/
+def kotlinArrayType (elemType : Lean.Expr) : String :=
+  match elemType with
+  | .const ``UInt64 _ => "LongArray"
+  | .const ``UInt32 _ => "IntArray"
+  | .const ``Float _ => "DoubleArray"
+  | .const ``Float32 _ => "FloatArray"
+  | _ => "Array<Any?>"
 
 def impureTypeForEnum (numCtors : Nat) : Expr :=
   if numCtors == 1 then
@@ -120,6 +137,8 @@ inductive type `name`.
 public def nameToImpureType (name : Name) : CoreM Expr := do
   if let some type := builtinImpureType? name then return type
   let env ← getEnv
+  if let some cls := Compiler.getKotlinClass? env name then
+    return ImpureType.jvmType s!"kotlin:{cls}"
   let some (.inductInfo _) := env.find? name | do
     if let some desc := getExternNameFor env `jvm name then
       if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
@@ -155,6 +174,8 @@ public partial def toImpureType (type : Expr) : CoreM Expr := do
   | _ => unreachable!
 where
   visitApp (declName : Name) (args : Array Lean.Expr) : CoreM Expr := do
+    if declName == ``Array && args.size == 1 && compiler.kotlin.typedArrays.get (← getOptions) then
+      return ImpureType.jvmType s!"kotlin:{kotlinArrayType args[0]!}"
     if let some info ← hasTrivialImpureStructure? declName then
       let ctorType ← getOtherDeclBaseType info.ctorName []
       let monoType ← toMonoType (getParamTypes (← instantiateForall ctorType args[*...info.numParams]))[info.fieldIdx]!
