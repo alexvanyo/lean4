@@ -190,15 +190,21 @@ def splitLines (s : String) : List String :=
 
 def toKotlinType (ty : Expr) : String :=
   match ty with
-  | ImpureType.uint8 => "Boolean"
-  | ImpureType.uint16 => "Short"
-  | ImpureType.uint32 => "Int"
-  | ImpureType.uint64 => "Long"
+  | ImpureType.bool => "Boolean"
+  | ImpureType.uint8 => "UByte"
+  | ImpureType.uint16 => "UShort"
+  | ImpureType.uint32 => "UInt"
+  | ImpureType.uint64 => "ULong"
   | ImpureType.usize => "Int"
+  | ImpureType.int8 => "Byte"
+  | ImpureType.int16 => "Short"
+  | ImpureType.int32 => "Int"
+  | ImpureType.int64 => "Long"
+  | ImpureType.isize => "Int"
   | ImpureType.float => "Double"
   | ImpureType.float32 => "Float"
   | ImpureType.void => "Unit"
-  | .const ``Bool _ => "Boolean"
+  | .const ``Bool _ | .const ``Decidable _ => "Boolean"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
   | .app (.const `jvmType _) (.lit (.strVal desc)) =>
     -- Types declared with `@[extern "kotlin:<Kotlin type>"]`.
@@ -208,9 +214,14 @@ def toKotlinType (ty : Expr) : String :=
 def defaultKotlinVal (ty : String) : String :=
   match ty with
   | "Boolean" => "false"
+  | "Byte" => "(0).toByte()"
   | "Short" => "(0).toShort()"
   | "Int" => "0"
   | "Long" => "0L"
+  | "UByte" => "(0u).toUByte()"
+  | "UShort" => "(0u).toUShort()"
+  | "UInt" => "0u"
+  | "ULong" => "0uL"
   | "Double" => "0.0"
   | "Float" => "0.0f"
   | "Unit" => "Unit"
@@ -219,6 +230,22 @@ def defaultKotlinVal (ty : String) : String :=
 def recordVarType (name : String) (ty : String) : EmitM Unit := do
   if ty != "Any?" && ty != "_" then
     modify fun st => { st with varTypes := st.varTypes.insert name ty }
+
+def isKotlinIntType (ty : String) : Bool :=
+  ty == "Byte" || ty == "Short" || ty == "Int" || ty == "Long" ||
+  ty == "UByte" || ty == "UShort" || ty == "UInt" || ty == "ULong"
+
+def kotlinIntConversionMethod (targetTy : String) : Option String :=
+  match targetTy with
+  | "Byte" => some "toByte()"
+  | "Short" => some "toShort()"
+  | "Int" => some "toInt()"
+  | "Long" => some "toLong()"
+  | "UByte" => some "toUByte()"
+  | "UShort" => some "toUShort()"
+  | "UInt" => some "toUInt()"
+  | "ULong" => some "toULong()"
+  | _ => none
 
 def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := none) : EmitM String := do
   if targetTy == "Any?" || targetTy == "_" then
@@ -229,6 +256,10 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
     | none => vt[s]?
   if actualTy? == some targetTy || (actualTy?.map (s!"{·}?") == some targetTy) then
     return s
+  if let some actualTy := actualTy? then
+    if isKotlinIntType actualTy then
+      if let some conv := kotlinIntConversionMethod targetTy then
+        return s!"({s}).{conv}"
   return s!"({s} as {targetTy})"
 
 def getVarName (fvarId : FVarId) : EmitM String := do
@@ -261,47 +292,93 @@ def toKotlinArg (arg : Arg .impure) : EmitM String := do
     return n
   | .erased => return "null"
 
-def formatUInt32 (n : UInt32) : String :=
+def formatInt32 (n : UInt32) : String :=
   let signedVal : Int := if n.toNat > 2147483647 then (n.toNat : Int) - 4294967296 else (n.toNat : Int)
-  if signedVal < 0 then s!"({signedVal})" else s!"{signedVal}"
+  if signedVal == -2147483648 then "Int.MIN_VALUE"
+  else if signedVal < 0 then s!"({signedVal})" else s!"{signedVal}"
+
+def formatUInt32 (n : UInt32) : String :=
+  s!"{n.toNat}u"
+
+def formatInt64 (n : UInt64) : String :=
+  let signedVal : Int := if n.toNat > 9223372036854775807 then (n.toNat : Int) - 18446744073709551616 else (n.toNat : Int)
+  if signedVal == -9223372036854775808 then "Long.MIN_VALUE"
+  else if signedVal < 0 then s!"({signedVal}L)" else s!"{signedVal}L"
 
 def formatUInt64 (n : UInt64) : String :=
-  let signedVal : Int := if n.toNat > 9223372036854775807 then (n.toNat : Int) - 18446744073709551616 else (n.toNat : Int)
-  if signedVal < 0 then s!"({signedVal}L)" else s!"{signedVal}L"
+  s!"{n.toNat}uL"
 
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
     match fn with
-    | `UInt32.toUInt64 | `UInt32.toUSize =>
-      return some s!"({a0}.toLong() and 0xffffffffL)"
-    | `UInt64.toUInt32 | `USize.toUInt32 =>
-      return some (if a0Ty? == some "Int" then a0 else s!"{a0}.toInt()")
-    | `UInt8.toUInt32 | `UInt16.toUInt32 =>
-      return some (if a0Ty? == some "Int" then a0 else s!"{a0}.toInt()")
-    | `UInt32.toUInt8 =>
-      return some s!"{a0}.toByte()"
-    | `UInt32.toUInt16 =>
-      return some s!"{a0}.toShort()"
-    | `UInt8.toUInt64 | `UInt16.toUInt64 =>
-      return some s!"{a0}.toLong()"
-    | `UInt64.toUInt8 =>
-      return some s!"{a0}.toByte()"
-    | `UInt64.toUInt16 =>
-      return some s!"{a0}.toShort()"
-    -- `Nat` is represented by (boxed) `Int`: conversions from fixed-width types assume that the
-    -- value fits, which holds for array indices and sizes.
-    | ``UInt32.toNat | ``USize.toNat | ``UInt8.toNat | ``UInt16.toNat =>
-      return some (if a0Ty? == some "Int" then a0 else s!"{a0}.toInt()")
-    | ``UInt64.toNat =>
-      return some (if a0Ty? == some "Int" then a0 else s!"{a0}.toInt()")
-    | ``UInt32.ofNat | ``USize.ofNat =>
-      return some (← castIfNeeded a0 "Int")
-    | ``UInt64.ofNat =>
-      return some s!"{← castIfNeeded a0 "Int"}.toLong()"
+    -- Conversions to Int8 (Byte)
+    | ``Int8.ofNat | ``Int8.ofInt | ``UInt8.toInt8 | ``Int16.toInt8 | ``Int32.toInt8 | ``Int64.toInt8 | ``ISize.toInt8 =>
+      return some (if a0Ty? == some "Byte" then a0 else s!"({a0}).toByte()")
+    | ``Bool.toInt8 =>
+      return some s!"(if ({a0}) (1).toByte() else (0).toByte())"
+    -- Conversions to Int16 (Short)
+    | ``Int16.ofNat | ``Int16.ofInt | ``UInt16.toInt16 | ``Int8.toInt16 | ``Int32.toInt16 | ``Int64.toInt16 | ``ISize.toInt16 =>
+      return some (if a0Ty? == some "Short" then a0 else s!"({a0}).toShort()")
+    | ``Bool.toInt16 =>
+      return some s!"(if ({a0}) (1).toShort() else (0).toShort())"
+    -- Conversions to Int32 / ISize / USize / Nat (Int)
+    | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt | ``USize.ofNat
+    | ``UInt32.toInt32 | ``Int8.toInt32 | ``Int16.toInt32 | ``Int64.toInt32 | ``ISize.toInt32
+    | ``Int32.toISize | ``Int64.toISize | ``UInt32.toUSize | ``UInt64.toUSize
+    | ``UInt8.toNat | ``UInt16.toNat | ``UInt32.toNat | ``UInt64.toNat | ``USize.toNat
+    | ``Int8.toNatClampNeg | ``Int16.toNatClampNeg | ``Int32.toNatClampNeg | ``Int64.toNatClampNeg =>
+      return some (if a0Ty? == some "Int" then a0 else s!"({a0}).toInt()")
+    | ``Bool.toInt32 | ``Bool.toISize | ``Bool.toNat | ``Bool.toUSize =>
+      return some s!"(if ({a0}) 1 else 0)"
+    -- Conversions to Int64 (Long)
+    | ``Int64.ofNat | ``Int64.ofInt | ``UInt64.toInt64 | ``Int8.toInt64 | ``Int16.toInt64 | ``Int32.toInt64 | ``ISize.toInt64 =>
+      return some (if a0Ty? == some "Long" then a0 else s!"({a0}).toLong()")
+    | ``Bool.toInt64 =>
+      return some s!"(if ({a0}) 1L else 0L)"
+    -- Conversions to UInt8 (UByte)
+    | ``UInt8.ofNat | ``Int8.toUInt8 | ``UInt16.toUInt8 | ``UInt32.toUInt8 | ``UInt64.toUInt8 | ``USize.toUInt8 =>
+      return some (if a0Ty? == some "UByte" then a0 else s!"({a0}).toUByte()")
+    | ``Bool.toUInt8 =>
+      return some s!"(if ({a0}) (1u).toUByte() else (0u).toUByte())"
+    -- Conversions to UInt16 (UShort)
+    | ``UInt16.ofNat | ``Int16.toUInt16 | ``UInt8.toUInt16 | ``UInt32.toUInt16 | ``UInt64.toUInt16 | ``USize.toUInt16 =>
+      return some (if a0Ty? == some "UShort" then a0 else s!"({a0}).toUShort()")
+    | ``Bool.toUInt16 =>
+      return some s!"(if ({a0}) (1u).toUShort() else (0u).toUShort())"
+    -- Conversions to UInt32 (UInt)
+    | ``UInt32.ofNat | ``Int32.toUInt32 | ``UInt8.toUInt32 | ``UInt16.toUInt32 | ``UInt64.toUInt32 | ``USize.toUInt32 =>
+      return some (if a0Ty? == some "UInt" then a0 else s!"({a0}).toUInt()")
+    | ``Bool.toUInt32 =>
+      return some s!"(if ({a0}) 1u else 0u)"
+    -- Conversions to UInt64 (ULong)
+    | ``UInt64.ofNat | ``Int64.toUInt64 | ``UInt8.toUInt64 | ``UInt16.toUInt64 | ``UInt32.toUInt64 | ``USize.toUInt64 =>
+      return some (if a0Ty? == some "ULong" then a0 else s!"({a0}).toULong()")
+    | ``Bool.toUInt64 =>
+      return some s!"(if ({a0}) 1uL else 0uL)"
+    -- Unary negation
+    | ``Int32.neg | ``Int64.neg | ``ISize.neg =>
+      return some s!"(-{a0})"
+    | ``Int8.neg =>
+      return some s!"(-({a0}).toInt()).toByte()"
+    | ``Int16.neg =>
+      return some s!"(-({a0}).toInt()).toShort()"
+    | ``UInt32.neg =>
+      return some s!"(0u - {a0})"
+    | ``UInt64.neg =>
+      return some s!"(0uL - {a0})"
+    | ``UInt8.neg =>
+      return some s!"(0u - ({a0}).toUInt()).toUByte()"
+    | ``UInt16.neg =>
+      return some s!"(0u - ({a0}).toUInt()).toUShort()"
+    | ``USize.neg =>
+      return some s!"(-{a0})"
+    -- Bitwise complement
+    | ``Int8.complement | ``Int16.complement | ``Int32.complement | ``Int64.complement | ``ISize.complement
+    | ``UInt8.complement | ``UInt16.complement | ``UInt32.complement | ``UInt64.complement | ``USize.complement =>
+      return some s!"{a0}.inv()"
     | _ =>
-      -- Remaining conversions from `Nat` (boxed in Kotlin).
       if fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64") then
         if a0Ty? == some "Long" then return some a0
         if a0Ty? == some "Int" then return some s!"{a0}.toLong()"
@@ -316,35 +393,144 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     let a1 ← toKotlinArg args[1]!
     let a1Int :=
       if (← get).varTypes[a1]? == some "Int" then a1
-      else if a1.endsWith "L" && a1.all (fun c => c.isDigit || c == 'L') then String.ofList (a1.toList.dropLast)
+      else if a1.endsWith "uL" && a1.length > 2 && (a1.take (a1.length - 2)).all Char.isDigit then (a1.take (a1.length - 2)).toString
+      else if (a1.endsWith "L" || a1.endsWith "u") && a1.length > 1 && (a1.take (a1.length - 1)).all Char.isDigit then (a1.take (a1.length - 1)).toString
       else s!"({a1}).toInt()"
     match fn with
-    | ``UInt32.add | ``UInt64.add | ``USize.add =>
-      return some s!"({a0} + {a1})"
-    | ``UInt32.sub | ``UInt64.sub | ``USize.sub =>
-      return some s!"({a0} - {a1})"
-    | ``UInt32.mul | ``UInt64.mul | ``USize.mul =>
-      return some s!"({a0} * {a1})"
-    | ``UInt32.div | ``UInt64.div | ``USize.div =>
-      return some s!"({a0} / {a1})"
-    | ``UInt32.mod | ``UInt64.mod | ``USize.mod =>
-      return some s!"({a0} % {a1})"
-    | ``UInt32.land | ``UInt64.land | ``USize.land =>
-      return some s!"({a0} and {a1})"
-    | ``UInt32.lor | ``UInt64.lor | ``USize.lor =>
-      return some s!"({a0} or {a1})"
-    | ``UInt32.xor | `UInt32.lxor | ``UInt64.xor | `UInt64.lxor | ``USize.xor | `USize.lxor =>
-      return some s!"({a0} xor {a1})"
-    | ``UInt32.shiftLeft | ``UInt64.shiftLeft | ``USize.shiftLeft =>
-      return some s!"({a0} shl {a1Int})"
-    | ``UInt32.shiftRight | ``UInt64.shiftRight | ``USize.shiftRight =>
-      return some s!"({a0} ushr {a1Int})"
-    | ``UInt32.decEq | ``UInt64.decEq =>
-      return some s!"({a0} == {a1})"
-    | ``UInt32.decLt | ``UInt64.decLt =>
-      return some s!"({a0} < {a1})"
-    | ``UInt32.decLe | ``UInt64.decLe =>
-      return some s!"({a0} <= {a1})"
+    -- Signed Int32 / ISize / USize (Int)
+    | ``Int32.add | ``ISize.add | ``USize.add =>
+      return some s!"({← castIfNeeded a0 "Int"} + {← castIfNeeded a1 "Int"})"
+    | ``Int32.sub | ``ISize.sub | ``USize.sub =>
+      return some s!"({← castIfNeeded a0 "Int"} - {← castIfNeeded a1 "Int"})"
+    | ``Int32.mul | ``ISize.mul | ``USize.mul =>
+      return some s!"({← castIfNeeded a0 "Int"} * {← castIfNeeded a1 "Int"})"
+    | ``Int32.div | ``ISize.div | ``USize.div =>
+      return some s!"({← castIfNeeded a0 "Int"} / {← castIfNeeded a1 "Int"})"
+    | ``Int32.mod | ``ISize.mod | ``USize.mod =>
+      return some s!"({← castIfNeeded a0 "Int"} % {← castIfNeeded a1 "Int"})"
+    | ``Int32.land | ``ISize.land | ``USize.land =>
+      return some s!"({← castIfNeeded a0 "Int"} and {← castIfNeeded a1 "Int"})"
+    | ``Int32.lor | ``ISize.lor | ``USize.lor =>
+      return some s!"({← castIfNeeded a0 "Int"} or {← castIfNeeded a1 "Int"})"
+    | ``Int32.xor | ``ISize.xor | ``USize.xor =>
+      return some s!"({← castIfNeeded a0 "Int"} xor {← castIfNeeded a1 "Int"})"
+    | ``Int32.shiftLeft | ``ISize.shiftLeft | ``USize.shiftLeft =>
+      return some s!"({← castIfNeeded a0 "Int"} shl {a1Int})"
+    | ``Int32.shiftRight | ``ISize.shiftRight =>
+      return some s!"({← castIfNeeded a0 "Int"} shr {a1Int})"
+    | ``USize.shiftRight =>
+      return some s!"({← castIfNeeded a0 "Int"} ushr {a1Int})"
+    | ``Int32.decEq | ``ISize.decEq | ``USize.decEq =>
+      return some s!"({← castIfNeeded a0 "Int"} == {← castIfNeeded a1 "Int"})"
+    | ``Int32.decLt | ``ISize.decLt | ``USize.decLt =>
+      return some s!"({← castIfNeeded a0 "Int"} < {← castIfNeeded a1 "Int"})"
+    | ``Int32.decLe | ``ISize.decLe | ``USize.decLe =>
+      return some s!"({← castIfNeeded a0 "Int"} <= {← castIfNeeded a1 "Int"})"
+
+    -- Signed Int64 (Long)
+    | ``Int64.add => return some s!"({← castIfNeeded a0 "Long"} + {← castIfNeeded a1 "Long"})"
+    | ``Int64.sub => return some s!"({← castIfNeeded a0 "Long"} - {← castIfNeeded a1 "Long"})"
+    | ``Int64.mul => return some s!"({← castIfNeeded a0 "Long"} * {← castIfNeeded a1 "Long"})"
+    | ``Int64.div => return some s!"({← castIfNeeded a0 "Long"} / {← castIfNeeded a1 "Long"})"
+    | ``Int64.mod => return some s!"({← castIfNeeded a0 "Long"} % {← castIfNeeded a1 "Long"})"
+    | ``Int64.land => return some s!"({← castIfNeeded a0 "Long"} and {← castIfNeeded a1 "Long"})"
+    | ``Int64.lor => return some s!"({← castIfNeeded a0 "Long"} or {← castIfNeeded a1 "Long"})"
+    | ``Int64.xor => return some s!"({← castIfNeeded a0 "Long"} xor {← castIfNeeded a1 "Long"})"
+    | ``Int64.shiftLeft => return some s!"({← castIfNeeded a0 "Long"} shl {a1Int})"
+    | ``Int64.shiftRight => return some s!"({← castIfNeeded a0 "Long"} shr {a1Int})"
+    | ``Int64.decEq => return some s!"({← castIfNeeded a0 "Long"} == {← castIfNeeded a1 "Long"})"
+    | ``Int64.decLt => return some s!"({← castIfNeeded a0 "Long"} < {← castIfNeeded a1 "Long"})"
+    | ``Int64.decLe => return some s!"({← castIfNeeded a0 "Long"} <= {← castIfNeeded a1 "Long"})"
+
+    -- Unsigned UInt32 (UInt)
+    | ``UInt32.add => return some s!"({← castIfNeeded a0 "UInt"} + {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.sub => return some s!"({← castIfNeeded a0 "UInt"} - {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.mul => return some s!"({← castIfNeeded a0 "UInt"} * {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.div => return some s!"({← castIfNeeded a0 "UInt"} / {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.mod => return some s!"({← castIfNeeded a0 "UInt"} % {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.land => return some s!"({← castIfNeeded a0 "UInt"} and {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.lor => return some s!"({← castIfNeeded a0 "UInt"} or {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.xor | `UInt32.lxor => return some s!"({← castIfNeeded a0 "UInt"} xor {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.shiftLeft => return some s!"({← castIfNeeded a0 "UInt"} shl {a1Int})"
+    | ``UInt32.shiftRight => return some s!"({← castIfNeeded a0 "UInt"} shr {a1Int})"
+    | ``UInt32.decEq => return some s!"({← castIfNeeded a0 "UInt"} == {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.decLt => return some s!"({← castIfNeeded a0 "UInt"} < {← castIfNeeded a1 "UInt"})"
+    | ``UInt32.decLe => return some s!"({← castIfNeeded a0 "UInt"} <= {← castIfNeeded a1 "UInt"})"
+
+    -- Unsigned UInt64 (ULong)
+    | ``UInt64.add => return some s!"({← castIfNeeded a0 "ULong"} + {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.sub => return some s!"({← castIfNeeded a0 "ULong"} - {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.mul => return some s!"({← castIfNeeded a0 "ULong"} * {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.div => return some s!"({← castIfNeeded a0 "ULong"} / {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.mod => return some s!"({← castIfNeeded a0 "ULong"} % {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.land => return some s!"({← castIfNeeded a0 "ULong"} and {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.lor => return some s!"({← castIfNeeded a0 "ULong"} or {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.xor | `UInt64.lxor => return some s!"({← castIfNeeded a0 "ULong"} xor {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.shiftLeft => return some s!"({← castIfNeeded a0 "ULong"} shl {a1Int})"
+    | ``UInt64.shiftRight => return some s!"({← castIfNeeded a0 "ULong"} shr {a1Int})"
+    | ``UInt64.decEq => return some s!"({← castIfNeeded a0 "ULong"} == {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.decLt => return some s!"({← castIfNeeded a0 "ULong"} < {← castIfNeeded a1 "ULong"})"
+    | ``UInt64.decLe => return some s!"({← castIfNeeded a0 "ULong"} <= {← castIfNeeded a1 "ULong"})"
+
+    -- Signed Int8 (Byte) & Int16 (Short)
+    | ``Int8.add => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() + {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.sub => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() - {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.mul => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() * {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.div => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() / {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.mod => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() % {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.land => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() and {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.lor => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() or {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.xor => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() xor {← castIfNeeded a1 "Byte"}.toInt()).toByte())"
+    | ``Int8.shiftLeft => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() shl {a1Int}).toByte())"
+    | ``Int8.shiftRight => return some s!"(({← castIfNeeded a0 "Byte"}.toInt() shr {a1Int}).toByte())"
+    | ``Int8.decEq => return some s!"({← castIfNeeded a0 "Byte"} == {← castIfNeeded a1 "Byte"})"
+    | ``Int8.decLt => return some s!"({← castIfNeeded a0 "Byte"} < {← castIfNeeded a1 "Byte"})"
+    | ``Int8.decLe => return some s!"({← castIfNeeded a0 "Byte"} <= {← castIfNeeded a1 "Byte"})"
+
+    | ``Int16.add => return some s!"(({← castIfNeeded a0 "Short"}.toInt() + {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.sub => return some s!"(({← castIfNeeded a0 "Short"}.toInt() - {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.mul => return some s!"(({← castIfNeeded a0 "Short"}.toInt() * {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.div => return some s!"(({← castIfNeeded a0 "Short"}.toInt() / {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.mod => return some s!"(({← castIfNeeded a0 "Short"}.toInt() % {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.land => return some s!"(({← castIfNeeded a0 "Short"}.toInt() and {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.lor => return some s!"(({← castIfNeeded a0 "Short"}.toInt() or {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.xor => return some s!"(({← castIfNeeded a0 "Short"}.toInt() xor {← castIfNeeded a1 "Short"}.toInt()).toShort())"
+    | ``Int16.shiftLeft => return some s!"(({← castIfNeeded a0 "Short"}.toInt() shl {a1Int}).toShort())"
+    | ``Int16.shiftRight => return some s!"(({← castIfNeeded a0 "Short"}.toInt() shr {a1Int}).toShort())"
+    | ``Int16.decEq => return some s!"({← castIfNeeded a0 "Short"} == {← castIfNeeded a1 "Short"})"
+    | ``Int16.decLt => return some s!"({← castIfNeeded a0 "Short"} < {← castIfNeeded a1 "Short"})"
+    | ``Int16.decLe => return some s!"({← castIfNeeded a0 "Short"} <= {← castIfNeeded a1 "Short"})"
+
+    -- Unsigned UInt8 (UByte) & UInt16 (UShort)
+    | ``UInt8.add => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() + {← castIfNeeded a1 "UByte"}.toUInt()).toUByte())"
+    | ``UInt8.sub => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() - {← castIfNeeded a1 "UByte"}.toUInt()).toUByte())"
+    | ``UInt8.mul => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() * {← castIfNeeded a1 "UByte"}.toUInt()).toUByte())"
+    | ``UInt8.div => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() / {← castIfNeeded a1 "UByte"}.toUInt()).toUByte())"
+    | ``UInt8.mod => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() % {← castIfNeeded a1 "UByte"}.toUInt()).toUByte())"
+    | ``UInt8.land => return some s!"({← castIfNeeded a0 "UByte"} and {← castIfNeeded a1 "UByte"})"
+    | ``UInt8.lor => return some s!"({← castIfNeeded a0 "UByte"} or {← castIfNeeded a1 "UByte"})"
+    | ``UInt8.xor => return some s!"({← castIfNeeded a0 "UByte"} xor {← castIfNeeded a1 "UByte"})"
+    | ``UInt8.shiftLeft => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() shl {a1Int}).toUByte())"
+    | ``UInt8.shiftRight => return some s!"(({← castIfNeeded a0 "UByte"}.toUInt() shr {a1Int}).toUByte())"
+    | ``UInt8.decEq => return some s!"({← castIfNeeded a0 "UByte"} == {← castIfNeeded a1 "UByte"})"
+    | ``UInt8.decLt => return some s!"({← castIfNeeded a0 "UByte"} < {← castIfNeeded a1 "UByte"})"
+    | ``UInt8.decLe => return some s!"({← castIfNeeded a0 "UByte"} <= {← castIfNeeded a1 "UByte"})"
+
+    | ``UInt16.add => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() + {← castIfNeeded a1 "UShort"}.toUInt()).toUShort())"
+    | ``UInt16.sub => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() - {← castIfNeeded a1 "UShort"}.toUInt()).toUShort())"
+    | ``UInt16.mul => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() * {← castIfNeeded a1 "UShort"}.toUInt()).toUShort())"
+    | ``UInt16.div => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() / {← castIfNeeded a1 "UShort"}.toUInt()).toUShort())"
+    | ``UInt16.mod => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() % {← castIfNeeded a1 "UShort"}.toUInt()).toUShort())"
+    | ``UInt16.land => return some s!"({← castIfNeeded a0 "UShort"} and {← castIfNeeded a1 "UShort"})"
+    | ``UInt16.lor => return some s!"({← castIfNeeded a0 "UShort"} or {← castIfNeeded a1 "UShort"})"
+    | ``UInt16.xor => return some s!"({← castIfNeeded a0 "UShort"} xor {← castIfNeeded a1 "UShort"})"
+    | ``UInt16.shiftLeft => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() shl {a1Int}).toUShort())"
+    | ``UInt16.shiftRight => return some s!"(({← castIfNeeded a0 "UShort"}.toUInt() shr {a1Int}).toUShort())"
+    | ``UInt16.decEq => return some s!"({← castIfNeeded a0 "UShort"} == {← castIfNeeded a1 "UShort"})"
+    | ``UInt16.decLt => return some s!"({← castIfNeeded a0 "UShort"} < {← castIfNeeded a1 "UShort"})"
+    | ``UInt16.decLe => return some s!"({← castIfNeeded a0 "UShort"} <= {← castIfNeeded a1 "UShort"})"
+
+    | ``Bool.decEq => return some s!"({a0} == {a1})"
     | ``Nat.decEq =>
       return some s!"({← castIfNeeded a0 "Int"} == {← castIfNeeded a1 "Int"})"
     | ``Nat.decLt =>
@@ -380,6 +566,13 @@ def kotlinArrayElem? (arrTy : String) : Option String :=
   match arrTy with
   | "LongArray" => some "Long"
   | "IntArray" => some "Int"
+  | "ShortArray" => some "Short"
+  | "ByteArray" => some "Byte"
+  | "ULongArray" => some "ULong"
+  | "UIntArray" => some "UInt"
+  | "UShortArray" => some "UShort"
+  | "UByteArray" => some "UByte"
+  | "BooleanArray" => some "Boolean"
   | "DoubleArray" => some "Double"
   | "FloatArray" => some "Float"
   | _ => none
@@ -396,12 +589,27 @@ def arrayType (a : Arg .impure) : EmitM String := do
     | throwError "Kotlin backend: in `{(← read).currFn}`: `Array` operations require `set_option compiler.kotlin.typedArrays true`"
   return t
 
+def isZeroElem (elemTy vc : String) : Bool :=
+  match elemTy with
+  | "Long" => vc == "0L" || vc == "0"
+  | "Int" => vc == "0"
+  | "Short" => vc == "(0).toShort()" || vc == "0.toShort()"
+  | "Byte" => vc == "(0).toByte()" || vc == "0.toByte()"
+  | "ULong" => vc == "0uL"
+  | "UInt" => vc == "0u"
+  | "UShort" => vc == "(0u).toUShort()" || vc == "0u.toUShort()"
+  | "UByte" => vc == "(0u).toUByte()" || vc == "0u.toUByte()"
+  | "Boolean" => vc == "false"
+  | "Double" => vc == "0.0"
+  | "Float" => vc == "0.0f"
+  | _ => false
+
 /-- Kotlin allocation of an array of type `arrTy` with `n` elements equal to `v`. -/
 def kotlinArrayAlloc (arrTy n v : String) : EmitM String := do
   match kotlinArrayElem? arrTy with
   | some e =>
     let vc ← castIfNeeded v e
-    if (e == "Long" && (vc == "0L" || vc == "0")) || (e == "Int" && vc == "0") then
+    if isZeroElem e vc then
       return s!"{arrTy}({n})"
     else
       return s!"{arrTy}({n}).apply \{ fill({vc}) }"
@@ -497,6 +705,8 @@ The result shape of `fn` if results identical to parameters are dropped: the res
 parameter, or some components of a `Prod.mk` result are.
 -/
 def dropShape? (fn : Name) : EmitM (Option Ownership.RetShape) := do
+  if let some d := (← read).declMap[fn]? then
+    if d.type.isScalar then return none
   let some s := (← read).summaries[fn]? | return none
   if s.ret.identities.isEmpty then return none
   return some s.ret
@@ -664,11 +874,24 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
   match decl.value with
   | .lit v =>
     match v with
-    | .uint8 n => return if n == 0 then "false" else "true"
-    | .uint16 n => return s!"{n}.toShort()"
-    | .uint32 n => return formatUInt32 n
-    | .usize n => return formatUInt32 n.toUInt32
-    | .uint64 n => return formatUInt64 n
+    | .uint8 n =>
+      if decl.type == ImpureType.bool then return if n == 0 then "false" else "true"
+      else if decl.type == ImpureType.int8 then
+        let s : Int := if n.toNat > 127 then (n.toNat : Int) - 256 else (n.toNat : Int)
+        return s!"({s}).toByte()"
+      else return s!"({n}u).toUByte()"
+    | .uint16 n =>
+      if decl.type == ImpureType.int16 then
+        let s : Int := if n.toNat > 32767 then (n.toNat : Int) - 65536 else (n.toNat : Int)
+        return s!"({s}).toShort()"
+      else return s!"({n}u).toUShort()"
+    | .uint32 n =>
+      if decl.type == ImpureType.int32 then return formatInt32 n
+      else return formatUInt32 n
+    | .usize n => return formatInt32 n.toUInt32
+    | .uint64 n =>
+      if decl.type == ImpureType.int64 then return formatInt64 n
+      else return formatUInt64 n
     | .nat n =>
       if n > 2147483647 then
         let signedVal : Int := (n : Int) - 4294967296
@@ -1228,17 +1451,28 @@ partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVa
 def isUsed (x : FVarId) : EmitM Bool :=
   return (← get).used.contains x
 
-def litKotlinType : LitValue → String
-  | .uint8 _ => "Boolean"
-  | .uint16 _ => "Short"
-  | .uint32 _ | .usize _ | .nat _ => "Int"
-  | .uint64 _ => "Long"
+def litKotlinType (v : LitValue) (ty : Expr) : String :=
+  match v with
+  | .uint8 _ =>
+    if ty == ImpureType.bool then "Boolean"
+    else if ty == ImpureType.int8 then "Byte"
+    else "UByte"
+  | .uint16 _ =>
+    if ty == ImpureType.int16 then "Short"
+    else "UShort"
+  | .uint32 _ =>
+    if ty == ImpureType.int32 then "Int"
+    else "UInt"
+  | .usize _ | .nat _ => "Int"
+  | .uint64 _ =>
+    if ty == ImpureType.int64 then "Long"
+    else "ULong"
   | .str _ => "String"
 
 def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
   let baseTy := toKotlinType decl.type
   match decl.value with
-  | .lit v => return litKotlinType v
+  | .lit v => return litKotlinType v decl.type
   | .box _ fvarId =>
     return (← get).varTypes[← getVarName fvarId]?.getD baseTy
   | .unbox _ => return baseTy
@@ -1247,7 +1481,8 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       if let some d := (← read).declMap[fn]? then
         if let some d0 := isInlinedConstDecl? d then
           if let .lit v := d0.value then
-            return litKotlinType v
+            let effTy := if decl.type.isScalar then decl.type else d0.type
+            return litKotlinType v effTy
     if fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" then
       let arrTy ← arrayType (args[2]?.getD .erased)
       return (kotlinArrayElem? arrTy).getD baseTy
@@ -1257,19 +1492,8 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       return (kotlinArrayElem? arrTy).getD baseTy
     if fn == arrOp "size" || fn == arrOp "usize" then
       return "Int"
-    match fn with
-    | ``UInt32.toNat | ``USize.toNat | ``UInt8.toNat | ``UInt16.toNat | ``UInt64.toNat
-    | ``UInt32.ofNat | ``USize.ofNat | `Nat.shiftLeft | `Nat.add | `Nat.sub | `Nat.mul | `Nat.div | `Nat.mod =>
-      return "Int"
-    | ``UInt64.ofNat | `UInt32.toUInt64 | `UInt32.toUSize | `UInt8.toUInt64 | `UInt16.toUInt64 =>
-      return "Long"
-    | `UInt64.toUInt32 | `USize.toUInt32 | `UInt8.toUInt32 | `UInt16.toUInt32 =>
-      return "Int"
-    | _ =>
-      if fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64") then return "Long"
-      if fn.isStr && fn.getString! == "toUInt32" then return "Int"
-      if baseTy != "Any?" then return baseTy
-      fnRetKotlinType fn decl.type
+    if baseTy != "Any?" then return baseTy
+    fnRetKotlinType fn decl.type
   | _ => return baseTy
 
 def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
@@ -1280,7 +1504,7 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
     | .str _ => return false
     | _ =>
       let s ← emitLetValue decl
-      recordVarType s (litKotlinType v)
+      recordVarType s (litKotlinType v decl.type)
       setParamVarName x s
       return true
   | .erased =>
@@ -1302,8 +1526,9 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
         if let some d0 := isInlinedConstDecl? d then
           if let .lit v := d0.value then
             if !(v matches .str _) then
-              let s ← emitLetValue d0
-              recordVarType s (litKotlinType v)
+              let effTy := if decl.type.isScalar then decl.type else d0.type
+              let s ← emitLetValue { d0 with type := effTy }
+              recordVarType s (litKotlinType v effTy)
               setParamVarName x s
               return true
     let env ← getEnv
@@ -1324,7 +1549,27 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       let a0 ← toKotlinArg args[0]!
       if (← get).varTypes[a0]? == some "Int" then
         match fn with
-        | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat =>
+        | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat
+        | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt
+        | ``Int32.toNatClampNeg | ``Int32.toISize | ``ISize.toInt32 =>
+          setParamVarName x a0
+          return true
+        | _ => pure ()
+      if (← get).varTypes[a0]? == some "UInt" then
+        match fn with
+        | ``UInt32.ofNat =>
+          setParamVarName x a0
+          return true
+        | _ => pure ()
+      if (← get).varTypes[a0]? == some "Long" then
+        match fn with
+        | ``Int64.ofNat | ``Int64.ofInt =>
+          setParamVarName x a0
+          return true
+        | _ => pure ()
+      if (← get).varTypes[a0]? == some "ULong" then
+        match fn with
+        | ``UInt64.ofNat =>
           setParamVarName x a0
           return true
         | _ => pure ()
@@ -1414,37 +1659,30 @@ partial def countUsesCode (x : FVarId) (code : Code .impure) : Nat :=
   | .setTag y _ k _ => (if y == x then 1 else 0) + countUsesCode x k
 
 def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
-  if numArgs == 1 then
-    match fn with
-    | `UInt32.toUInt64 | `UInt32.toUSize
-    | `UInt64.toUInt32 | `USize.toUInt32
-    | `UInt8.toUInt32 | `UInt16.toUInt32
-    | `UInt32.toUInt8 | `UInt32.toUInt16
-    | `UInt8.toUInt64 | `UInt16.toUInt64
-    | `UInt64.toUInt8 | `UInt64.toUInt16
-    | ``UInt32.toNat | ``USize.toNat | ``UInt8.toNat | ``UInt16.toNat | ``UInt64.toNat
-    | ``UInt32.ofNat | ``USize.ofNat | ``UInt64.ofNat => true
-    | _ =>
-      fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64" || fn.getString! == "toUInt32")
-  else if numArgs == 2 then
-    match fn with
-    | ``UInt32.add | ``UInt64.add | ``USize.add
-    | ``UInt32.sub | ``UInt64.sub | ``USize.sub
-    | ``UInt32.mul | ``UInt64.mul | ``USize.mul
-    | ``UInt32.div | ``UInt64.div | ``USize.div
-    | ``UInt32.mod | ``UInt64.mod | ``USize.mod
-    | ``UInt32.land | ``UInt64.land | ``USize.land
-    | ``UInt32.lor | ``UInt64.lor | ``USize.lor
-    | ``UInt32.xor | `UInt32.lxor | ``UInt64.xor | `UInt64.lxor | ``USize.xor | `USize.lxor
-    | ``UInt32.shiftLeft | ``UInt64.shiftLeft | ``USize.shiftLeft
-    | ``UInt32.shiftRight | ``UInt64.shiftRight | ``USize.shiftRight
-    | ``UInt32.decEq | ``UInt64.decEq
-    | ``UInt32.decLt | ``UInt64.decLt
-    | ``UInt32.decLe | ``UInt64.decLe
-    | ``Nat.decEq | ``Nat.decLt | ``Nat.decLe
-    | `Nat.shiftLeft | `Nat.add | `Nat.sub | `Nat.mul | `Nat.div | `Nat.mod => true
-    | _ => false
-  else false
+  let p := fn.getPrefix
+  let s := match fn with | .str _ str => str | _ => ""
+  if p == ``Int8 || p == ``Int16 || p == ``Int32 || p == ``Int64 || p == ``ISize ||
+     p == ``UInt8 || p == ``UInt16 || p == ``UInt32 || p == ``UInt64 || p == ``USize then
+    if numArgs == 1 then
+      s.startsWith "to" || s.startsWith "of" || s == "neg" || s == "complement"
+    else if numArgs == 2 then
+      s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" ||
+      s == "land" || s == "lor" || s == "xor" || s == "lxor" ||
+      s == "shiftLeft" || s == "shiftRight" ||
+      s == "decEq" || s == "decLt" || s == "decLe"
+    else false
+  else if p == ``Nat then
+    if numArgs == 1 then s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
+    else if numArgs == 2 then
+      s == "decEq" || s == "decLt" || s == "decLe" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
+    else false
+  else if p == ``Bool then
+    if numArgs == 1 then s.startsWith "to"
+    else if numArgs == 2 then s == "decEq"
+    else false
+  else
+    if numArgs == 1 && fn.isStr && (s == "ofNat" || s == "toUInt64" || s == "toUInt32") then true
+    else false
 
 def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
   let .fap fn args := decl.value | return false
@@ -2040,7 +2278,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | some ci => resultType ci.type == mkConst ``Unit
     | none => false
   -- Results identical to parameters are dropped (see `dropShape?`).
-  let shape? ← dropShape? decl.name
+  let shape? ← if decl.type.isScalar then pure none else dropShape? decl.name
   let (retUnit, retCast?) ← match shape? with
     | some shape =>
       if isUnitShape shape then pure (true, none)
@@ -2090,7 +2328,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     for l in kdocLines doc do emitLn l
   emitIndent; emit s!"{modsStr}{auto}fun {fnName}({paramStr}): {retType} "; emitLn "{"
   withIndent do
-    withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast?, retUnit, retShape? := shape? }) do
+    withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape? }) do
       for p in params do discard <| classStructOf? p.fvarId
       emitCode code
   emitLn "}"
@@ -2242,7 +2480,11 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
           String.intercalate "." (parts.dropLast.map (·.toString))
         else
           ""
-    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\")"
+    let hasUnsignedArrays :=
+      topBuf.contains "UByteArray" || topBuf.contains "UShortArray" || topBuf.contains "UIntArray" || topBuf.contains "ULongArray" ||
+      memberBufs.values.any (fun s => s.contains "UByteArray" || s.contains "UShortArray" || s.contains "UIntArray" || s.contains "ULongArray")
+    let optInUnsigned := if hasUnsignedArrays then "\n@file:OptIn(ExperimentalUnsignedTypes::class)" else ""
+    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\")" ++ optInUnsigned
     match fileSpec? with
     | some spec =>
       let classNames := spec.items.filterMap fun | .cls c => some c.name | _ => none

@@ -41,16 +41,18 @@ def leanStringClass := "lean/runtime/LeanString"
 
 def getScalarNumBytes (ty : Expr) : Nat :=
   match ty with
-  | ImpureType.uint8 => 1
-  | ImpureType.uint16 => 2
-  | ImpureType.uint32 | ImpureType.float32 => 4
-  | ImpureType.uint64 | ImpureType.usize | ImpureType.float => 8
+  | ImpureType.uint8 | ImpureType.bool | ImpureType.int8 => 1
+  | ImpureType.uint16 | ImpureType.int16 => 2
+  | ImpureType.uint32 | ImpureType.int32 | ImpureType.float32 => 4
+  | ImpureType.uint64 | ImpureType.int64 | ImpureType.usize | ImpureType.isize | ImpureType.float => 8
   | _ => 8
 
 def toJVMTypeDesc (type : Expr) : String :=
   match type with
-  | ImpureType.uint8 | ImpureType.uint16 | ImpureType.uint32 => "I"
-  | ImpureType.uint64 | ImpureType.usize => "J"
+  | ImpureType.uint8 | ImpureType.bool | ImpureType.int8
+  | ImpureType.uint16 | ImpureType.int16
+  | ImpureType.uint32 | ImpureType.int32 => "I"
+  | ImpureType.uint64 | ImpureType.int64 | ImpureType.usize | ImpureType.isize => "J"
   | ImpureType.float => "D"
   | ImpureType.float32 => "F"
   | ImpureType.tagged => "I"
@@ -1868,7 +1870,7 @@ def emitLetValue (decl : LetDecl .impure) : EmitJVMM Unit := do
       let getScalarIdx ← addMethodRef "lean/runtime/LeanCtor" "getByteScalar" "(III)J"
       emitOp (.invokevirtual getScalarIdx)
     if isScalarType decl.type then
-      if decl.type == ImpureType.uint8 || decl.type == ImpureType.uint16 || decl.type == ImpureType.uint32 then
+      if toJVMTypeDesc decl.type == "I" then
         emitOp .l2i
       else if decl.type == ImpureType.float then
         let toDoubleIdx ← addMethodRef "java/lang/Double" "longBitsToDouble" "(J)D"

@@ -95,11 +95,11 @@ def LitValue.toExpr : LitValue → Expr
 
 def LitValue.impureTypeScalarNumLit (e : Expr) (n : Nat) : LitValue :=
   match e with
-  | ImpureType.uint8 => .uint8 n.toUInt8
-  | ImpureType.uint16 => .uint16 n.toUInt16
-  | ImpureType.uint32 => .uint32 n.toUInt32
-  | ImpureType.uint64 => .uint64 n.toUInt64
-  | ImpureType.usize => .usize n.toUInt64
+  | ImpureType.uint8 | ImpureType.bool | ImpureType.int8 => .uint8 n.toUInt8
+  | ImpureType.uint16 | ImpureType.int16 => .uint16 n.toUInt16
+  | ImpureType.uint32 | ImpureType.int32 => .uint32 n.toUInt32
+  | ImpureType.uint64 | ImpureType.int64 => .uint64 n.toUInt64
+  | ImpureType.usize | ImpureType.isize => .usize n.toUInt64
   | _ => panic! s!"Provided invalid type to impureTypeScalarNumLit: {e}"
 
 inductive Arg (pu : Purity) where

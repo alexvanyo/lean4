@@ -23,8 +23,15 @@ register_builtin_option compiler.kotlin.typedArrays : Bool := {
 /-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/
 def kotlinArrayType (elemType : Lean.Expr) : String :=
   match elemType with
-  | .const ``UInt64 _ => "LongArray"
-  | .const ``UInt32 _ => "IntArray"
+  | .const ``Int64 _ => "LongArray"
+  | .const ``Int32 _ => "IntArray"
+  | .const ``Int16 _ => "ShortArray"
+  | .const ``Int8 _ => "ByteArray"
+  | .const ``UInt64 _ => "ULongArray"
+  | .const ``UInt32 _ => "UIntArray"
+  | .const ``UInt16 _ => "UShortArray"
+  | .const ``UInt8 _ => "UByteArray"
+  | .const ``Bool _ => "BooleanArray"
   | .const ``Float _ => "DoubleArray"
   | .const ``Float32 _ => "FloatArray"
   | _ => "Array<Any?>"
@@ -79,11 +86,18 @@ compiler's pseudo-constants (`lcErased`/`lcVoid`, which are not inductives). The
 persisted in `impureTypeExt`.
 -/
 def builtinImpureType? : Name → Option Expr
+  | ``Bool => some ImpureType.bool
+  | ``Decidable => some ImpureType.bool
   | ``UInt8 => some ImpureType.uint8
   | ``UInt16 => some ImpureType.uint16
   | ``UInt32 => some ImpureType.uint32
   | ``UInt64 => some ImpureType.uint64
   | ``USize => some ImpureType.usize
+  | ``Int8 => some ImpureType.int8
+  | ``Int16 => some ImpureType.int16
+  | ``Int32 => some ImpureType.int32
+  | ``Int64 => some ImpureType.int64
+  | ``ISize => some ImpureType.isize
   | ``Float => some ImpureType.float
   | ``Float32 => some ImpureType.float32
   | ``lcErased => some ImpureType.erased
@@ -176,6 +190,8 @@ where
   visitApp (declName : Name) (args : Array Lean.Expr) : CoreM Expr := do
     if declName == ``Array && args.size == 1 && compiler.kotlin.typedArrays.get (← getOptions) then
       return ImpureType.jvmType s!"kotlin:{kotlinArrayType args[0]!}"
+    if let some type := builtinImpureType? declName then
+      return type
     if let some info ← hasTrivialImpureStructure? declName then
       let ctorType ← getOtherDeclBaseType info.ctorName []
       let monoType ← toMonoType (getParamTypes (← instantiateForall ctorType args[*...info.numParams]))[info.fieldIdx]!
@@ -240,21 +256,21 @@ where
           let i := nextIdx
           nextIdx := nextIdx + 1
           pure <| .object i irFieldType
-        | ImpureType.usize => pure <| .usize 0
+        | ImpureType.usize | ImpureType.isize => pure <| .usize 0
         | ImpureType.erased => .pure <| .erased
         | ImpureType.void => .pure <| .void
-        | ImpureType.uint8 =>
+        | ImpureType.uint8 | ImpureType.bool | ImpureType.int8 =>
           has1BScalar := true
-          .pure <| .scalar 1 0 ImpureType.uint8
-        | ImpureType.uint16 =>
+          .pure <| .scalar 1 0 irFieldType
+        | ImpureType.uint16 | ImpureType.int16 =>
           has2BScalar := true
-          .pure <| .scalar 2 0 ImpureType.uint16
-        | ImpureType.uint32 =>
+          .pure <| .scalar 2 0 irFieldType
+        | ImpureType.uint32 | ImpureType.int32 =>
           has4BScalar := true
-          .pure <| .scalar 4 0 ImpureType.uint32
-        | ImpureType.uint64 =>
+          .pure <| .scalar 4 0 irFieldType
+        | ImpureType.uint64 | ImpureType.int64 =>
           has8BScalar := true
-          .pure <| .scalar 8 0 ImpureType.uint64
+          .pure <| .scalar 8 0 irFieldType
         | ImpureType.float32 =>
           has4BScalar := true
           .pure <| .scalar 4 0 ImpureType.float32

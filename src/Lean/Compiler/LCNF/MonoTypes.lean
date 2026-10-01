@@ -70,6 +70,8 @@ where
     | .const ``lcErased _ => return erasedExpr
     | .const ``lcAny _ => return anyExpr
     | .const declName us =>
+      if declName == ``Int8 || declName == ``Int16 || declName == ``Int32 || declName == ``Int64 || declName == ``ISize then
+        return mkConst declName
       if let some info ← hasTrivialStructure? declName then
         let ctorType ← getOtherDeclBaseType info.ctorName []
         toMonoType (getParamTypes (← instantiateForall ctorType args[*...info.numParams]))[info.fieldIdx]!

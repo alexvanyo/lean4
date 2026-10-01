@@ -120,8 +120,18 @@ abbrev BoxM := ReaderT Ctx StateRefT State CompilerM
 @[inline]
 def getResultType : BoxM Expr := return (← read).currDeclResultType
 
+def scalarWidthGroup : Expr → UInt8
+  | uint8 | int8 | ImpureType.bool => 1
+  | uint16 | int16 => 2
+  | uint32 | int32 => 4
+  | uint64 | int64 => 8
+  | usize | isize => 9
+  | float32 => 10
+  | float => 11
+  | _ => 0
+
 def typesEqvForBoxing (t₁ t₂ : Expr) : Bool :=
-  (t₁.isScalar == t₂.isScalar) && (!t₁.isScalar || t₁ == t₂)
+  (t₁.isScalar == t₂.isScalar) && (!t₁.isScalar || scalarWidthGroup t₁ == scalarWidthGroup t₂)
 
 
 /--
@@ -131,7 +141,7 @@ and `x`'s type is not cheap to box (e.g., it is `UInt64), then return its value.
 def isExpensiveConstantValueBoxing (x : FVarId) (xType : Expr) :
     BoxM (Option (LetValue .impure)) :=
   match xType with
-  | uint8 | uint16 => return none
+  | uint8 | uint16 | int8 | int16 | ImpureType.bool => return none
   | _ => do
     let some val ← findLetValue? x | return none
     match val with
@@ -304,6 +314,8 @@ where
       -- A more precise reference type (e.g. a typed Kotlin array produced by a generic function
       -- whose signature only says `obj`) is kept: both are references.
       if (getJvmTypeDesc? currentType).isSome && !sig.type.isScalar then
+        return currentType
+      if currentType.isScalar && typesEqvForBoxing currentType sig.type then
         return currentType
       return sig.type
     | .pap .. => return object

@@ -99,7 +99,8 @@ partial def lowerLet (decl : LetDecl .pure) (k : Code .pure) : ToImpureM (Code .
   let value ← normLetValue decl.value
   match value with
   | .lit litValue =>
-    let type := litValueImpureType litValue
+    let declType ← toImpureType decl.type
+    let type := if declType.isScalar then declType else litValueImpureType litValue
     let decl := ⟨decl.fvarId, decl.binderName, type, .lit litValue⟩
     continueLet decl
   | .proj typeName i fvarId =>
