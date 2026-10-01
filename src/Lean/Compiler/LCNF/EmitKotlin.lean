@@ -1943,22 +1943,16 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         else
           let rhs ← emitLetValue decl
           let ty ← inferLetKotlinType decl
-          if !(← isUsed x) then
-            if ← isPureLet decl then
-              pure ()
-            else
-              emitLn rhs
+          if !(← isUsed x) && ty == "Unit" then
+            emitLn rhs
           else
             let n ← getVarName x
             recordVarType n ty
             emitLn s!"val {n} = {rhs}"
     | _ =>
-      if !(← isUsed x) then
-        pure ()
-      else
-        let n ← getVarName x
-        recordVarType n (← inferLetKotlinType decl)
-        emitLn s!"val {n} = {← emitLetValue decl}"
+      let n ← getVarName x
+      recordVarType n (← inferLetKotlinType decl)
+      emitLn s!"val {n} = {← emitLetValue decl}"
   emitCode k
 
 partial def emitCode (code : Code .impure) : EmitM Unit := do
