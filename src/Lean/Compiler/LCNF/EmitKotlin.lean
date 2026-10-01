@@ -2364,10 +2364,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let isInline := !codeJP && !hasSelfCall decl.name code && Compiler.hasInlineAttribute env decl.name
   let (mods, fnName) := match member? with
     | some info => (info.modifiers, memberKotlinName decl.name info)
-    | none =>
-      let topMods := compiler.kotlin.topLevelModifiers.get opts
-      let topMods := if topMods == "internal" then "@PublishedApi internal" else topMods
-      (topMods, toKotlinFnName decl.name)
+    | none => (compiler.kotlin.topLevelModifiers.get opts, toKotlinFnName decl.name)
   let explicitInline := (identTokens mods).contains "inline"
   let auto :=
     if isTailRec then "tailrec "
