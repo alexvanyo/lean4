@@ -419,6 +419,24 @@ We generally assume that `sizeof(size_t) == sizeof(void)`.
 @[inline, expose, match_pattern]
 def usize : Expr := .const ``USize []
 
+@[inline, expose, match_pattern]
+def bool : Expr := .const ``Bool []
+
+@[inline, expose, match_pattern]
+def int8 : Expr := .const ``Int8 []
+
+@[inline, expose, match_pattern]
+def int16 : Expr := .const ``Int16 []
+
+@[inline, expose, match_pattern]
+def int32 : Expr := .const ``Int32 []
+
+@[inline, expose, match_pattern]
+def int64 : Expr := .const ``Int64 []
+
+@[inline, expose, match_pattern]
+def isize : Expr := .const ``ISize []
+
 /--
 `erased` represents type arguments, propositions and proofs which are no longer relevant at this
 point in time.
@@ -475,6 +493,12 @@ def Lean.Expr.isScalar : Expr → Bool
   | ImpureType.uint32   => true
   | ImpureType.uint64   => true
   | ImpureType.usize    => true
+  | ImpureType.bool     => true
+  | ImpureType.int8     => true
+  | ImpureType.int16    => true
+  | ImpureType.int32    => true
+  | ImpureType.int64    => true
+  | ImpureType.isize    => true
   | _        => false
 
 /--
@@ -510,9 +534,10 @@ def Lean.Expr.isDefiniteRef : Expr → Bool
 The boxed version of types.
 -/
 def Lean.Expr.boxed : Expr → Expr
-  | ImpureType.object | ImpureType.float | ImpureType.float32 | ImpureType.uint64 =>
+  | ImpureType.object | ImpureType.float | ImpureType.float32 | ImpureType.uint64 | ImpureType.int64 =>
     ImpureType.object
-  | ImpureType.void | ImpureType.tagged | ImpureType.uint8 | ImpureType.uint16 => ImpureType.tagged
+  | ImpureType.void | ImpureType.tagged | ImpureType.uint8 | ImpureType.uint16
+  | ImpureType.bool | ImpureType.int8 | ImpureType.int16 => ImpureType.tagged
   | t@(.app (.const `jvmType _) _) => t
   | _ => ImpureType.tobject
 

@@ -31,11 +31,11 @@ namespace ImpureType
 def Lean.Expr.toCType : Expr → String
   | float => "double"
   | float32 => "float"
-  | uint8 => "uint8_t"
-  | uint16 => "uint16_t"
-  | uint32 => "uint32_t"
-  | uint64 => "uint64_t"
-  | usize => "size_t"
+  | uint8 | bool | int8 => "uint8_t"
+  | uint16 | int16 => "uint16_t"
+  | uint32 | int32 => "uint32_t"
+  | uint64 | int64 => "uint64_t"
+  | usize | isize => "size_t"
   | object => "lean_object*"
   | tagged => "lean_object*"
   | tobject => "lean_object*"
@@ -46,18 +46,18 @@ def Lean.Expr.toCType : Expr → String
 
 def Lean.Expr.unboxOpName (t : Expr) : String :=
   match t with
-  | usize => "lean_unbox_usize"
-  | uint32 => "lean_unbox_uint32"
-  | uint64 => "lean_unbox_uint64"
+  | usize | isize => "lean_unbox_usize"
+  | uint32 | int32 => "lean_unbox_uint32"
+  | uint64 | int64 => "lean_unbox_uint64"
   | float => "lean_unbox_float"
   | float32 => "lean_unbox_float32"
   | _ => "lean_unbox"
 
 def Lean.Expr.boxOpName (t : Expr) : String :=
   match t with
-  | usize => "lean_box_usize"
-  | uint32 => "lean_box_uint32"
-  | uint64 => "lean_box_uint64"
+  | usize | isize => "lean_box_usize"
+  | uint32 | int32 => "lean_box_uint32"
+  | uint64 | int64 => "lean_box_uint64"
   | float => "lean_box_float"
   | float32 => "lean_box_float32"
   | _ => "lean_box"
@@ -66,31 +66,31 @@ def Lean.Expr.sprojOpName (t : Expr) : String :=
   match t with
   | float => "lean_ctor_get_float"
   | float32 => "lean_ctor_get_float32"
-  | uint8 => "lean_ctor_get_uint8"
-  | uint16 => "lean_ctor_get_uint16"
-  | uint32 => "lean_ctor_get_uint32"
-  | uint64 => "lean_ctor_get_uint64"
+  | uint8 | bool | int8 => "lean_ctor_get_uint8"
+  | uint16 | int16 => "lean_ctor_get_uint16"
+  | uint32 | int32 => "lean_ctor_get_uint32"
+  | uint64 | int64 => "lean_ctor_get_uint64"
   | _ => unreachable!
 
 def Lean.Expr.ssetOpName (t : Expr) : String :=
   match t with
   | float => "lean_ctor_set_float"
   | float32 => "lean_ctor_set_float32"
-  | uint8 => "lean_ctor_set_uint8"
-  | uint16 => "lean_ctor_set_uint16"
-  | uint32 => "lean_ctor_set_uint32"
-  | uint64 => "lean_ctor_set_uint64"
+  | uint8 | bool | int8 => "lean_ctor_set_uint8"
+  | uint16 | int16 => "lean_ctor_set_uint16"
+  | uint32 | int32 => "lean_ctor_set_uint32"
+  | uint64 | int64 => "lean_ctor_set_uint64"
   | _ => unreachable!
 
 def Lean.Expr.closedTermReadOpName (t : Expr) : String :=
   match t with
   | float => "lean_float_once"
   | float32 => "lean_float32_once"
-  | uint8 => "lean_uint8_once"
-  | uint16 => "lean_uint16_once"
-  | uint32 => "lean_uint32_once"
-  | uint64 => "lean_uint64_once"
-  | usize => "lean_usize_once"
+  | uint8 | bool | int8 => "lean_uint8_once"
+  | uint16 | int16 => "lean_uint16_once"
+  | uint32 | int32 => "lean_uint32_once"
+  | uint64 | int64 => "lean_uint64_once"
+  | usize | isize => "lean_usize_once"
   | object | tobject | tagged | void | .app (.const `jvmType _) _ => "lean_obj_once"
   | _ => unreachable!
 
