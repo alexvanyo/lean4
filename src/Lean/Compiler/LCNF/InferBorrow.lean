@@ -9,6 +9,7 @@ prelude
 public import Lean.Compiler.LCNF.CompilerM
 public import Lean.Compiler.LCNF.PassManager
 import Lean.Compiler.ExportAttr
+import Lean.Compiler.KotlinAttrs
 import Lean.Compiler.LCNF.MonadScope
 import Lean.Compiler.LCNF.FVarUtil
 import Lean.Compiler.LCNF.PhaseExt
@@ -400,6 +401,12 @@ where
     | .ctor i args =>
       if !i.isScalar then
         ownFVar z (.constructorResult z); ownArgsIfParam z args
+        -- The Kotlin backend has no allocation for `@[kotlin_class]` structures: a constructor
+        -- application updates the value it is built from in place, so that value must be owned.
+        if let some cls := getKotlinClass? (← getEnv) i.name.getPrefix then
+          let ty := jvmType s!"kotlin:{cls}"
+          for x in (← read).paramSet do
+            if (← getType x) == ty then ownFVar x (.constructorArg z)
     | .fvar x args =>
       ownFVar z (.functionCallResult z); ownFVar x (.fvarCall z); ownArgs (.fvarCall z) args
     | .pap _ args => ownFVar z (.functionCallResult z); ownArgs (.partialApplication z) args
