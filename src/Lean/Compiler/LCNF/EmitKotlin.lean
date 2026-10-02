@@ -163,6 +163,8 @@ structure State where
   aliases : Std.HashMap FVarId FVarId := {}
   /-- Recorded exit expressions for each loop label. -/
   loopExits : Std.HashMap String (Array String) := {}
+  /-- Kotlin variables known to hold general ADT/structure `Array<Any?>` values (not `Pair`). -/
+  adtVars : Std.HashSet String := {}
 
 abbrev EmitM := ReaderT Context StateRefT State CompilerM
 
@@ -238,6 +240,10 @@ partial def toKotlinType (ty : Expr) : String :=
 
 def isRichMonoType (e : Expr) : Bool :=
   e.isForall || e.isConstOf ``String || e.isAppOfArity ``Prod 2
+
+def isAdtMonoType (e : Expr) : Bool :=
+  let fn := e.getAppFn
+  fn.isConst && !fn.isConstOf ``lcAny && !fn.isConstOf ``lcErased && !fn.isConstOf ``Prod
 
 /-- Parse `Pair<A, B>` into `(A, B)`. -/
 partial def parseKotlinPairType? (s : String) : Option (String × String) :=
@@ -1219,6 +1225,28 @@ def escapeKotlinString (s : String) : String :=
     | '\t' => acc ++ "\\t"
     | _ => acc.push c
 
+def formatAdtCtor (info : CtorInfo) (objs : Array String) (usizes : Std.HashMap Nat String)
+    (scalars : Std.HashMap Nat String) : EmitM String := do
+  let kb := (← get).knownBools
+  let resolveBool (s : String) : String :=
+    match kb[s]? with
+    | some true => "true"
+    | some false => "false"
+    | none => s
+  let mut elems : Array String := #[s!"{info.cidx}"]
+  for i in [:info.size] do
+    elems := elems.push (resolveBool (objs[i]?.getD "null"))
+  for i in [info.size : info.size + info.usize] do
+    elems := elems.push (usizes[i]?.getD "0")
+  if !scalars.isEmpty then
+    let maxOff := scalars.fold (init := 0) fun m k _ => max m k
+    for off in [:maxOff + 1] do
+      let v := match scalars[off]? with
+        | some s => resolveBool s
+        | none => "null"
+      elems := elems.push v
+  return s!"arrayOf<Any?>({String.intercalate ", " elems.toList})"
+
 partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
   match decl.value with
   | .lit v =>
@@ -1350,19 +1378,39 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     else
       let xName ← getVarName x
       let xTy := (← get).varTypes[xName]?.getD "Any?"
-      let recv := if (parseKotlinPairType? xTy).isSome then xName else s!"({xName} as Pair<*, *>)"
-      match i with
-      | 0 => return s!"{recv}.first"
-      | 1 => return s!"{recv}.second"
-      | _ => unsupportedProj x
-  | .sproj _ off x =>
-    if (← classStructOf? x).isSome then classField x (·.scalars[off]?) else unsupportedProj x
+      let targetTy := toKotlinType decl.type
+      if (parseKotlinPairType? xTy).isSome then
+        match i with
+        | 0 => return s!"{xName}.first"
+        | 1 => return s!"{xName}.second"
+        | _ => unsupportedProj x
+      else if xTy == "Array<Any?>" then
+        castIfNeeded s!"{xName}[{1 + i}]" targetTy
+      else if (← get).adtVars.contains xName || i >= 2 then
+        castIfNeeded s!"({xName} as Array<*>)[{1 + i}]" targetTy
+      else
+        let prop := if i == 0 then "first" else "second"
+        castIfNeeded s!"(if ({xName} is Pair<*, *>) {xName}.{prop} else ({xName} as Array<*>)[{1 + i}])" targetTy
+  | .sproj n off x =>
+    if (← classStructOf? x).isSome then classField x (·.scalars[off]?)
+    else
+      let xName ← getVarName x
+      let xTy := (← get).varTypes[xName]?.getD "Any?"
+      let targetTy := toKotlinType decl.type
+      let elem := if xTy == "Array<Any?>" then s!"{xName}[{1 + n + off}]" else s!"({xName} as Array<*>)[{1 + n + off}]"
+      castIfNeeded elem targetTy
   | .uproj i x =>
-    if (← classStructOf? x).isSome then classField x (·.usizes[i]?) else unsupportedProj x
-  | .ctor info _ =>
+    if (← classStructOf? x).isSome then classField x (·.usizes[i]?)
+    else
+      let xName ← getVarName x
+      let xTy := (← get).varTypes[xName]?.getD "Any?"
+      let targetTy := toKotlinType decl.type
+      let elem := if xTy == "Array<Any?>" then s!"{xName}[{1 + i}]" else s!"({xName} as Array<*>)[{1 + i}]"
+      castIfNeeded elem targetTy
+  | .ctor info args =>
     if Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
       throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{info.name.getPrefix}` (`@[mutable_kotlin_class]` values are only updated in place)"
-    return "null"
+    formatAdtCtor info (← args.mapM toKotlinArg) {} {}
   | _ => return "null"
 
 /-- Continuation of RC and field-update instructions, which the Kotlin backend ignores. -/
@@ -2380,6 +2428,7 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     emitLn s!"val {n} = {lhs}"
     modify fun st => { st with fieldVals := st.fieldVals.insert lhs n }
   else
+    unless ← isUsed x do return
     let n ← getVarName x
     let ty ← inferLetKotlinType decl
     recordVarType n ty
@@ -2433,7 +2482,7 @@ partial def countUsesCode (x : FVarId) (code : Code .impure) : Nat :=
   | .let decl k => countUsesLetValue x decl.value + countUsesCode x k
   | .jp decl k | .fun decl k _ => countUsesCode x decl.value + countUsesCode x k
   | .cases cs =>
-    if cs.discr == x && cs.alts.size == 2 then 1
+    if cs.discr == x && cs.typeName == ``Bool && cs.alts.size == 2 then 1
     else
       (if cs.discr == x then 1 else 0) +
       cs.alts.foldl (fun acc alt => acc + countUsesCode x alt.getCode) 0
@@ -2521,9 +2570,14 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
 
 def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
   if decl.value matches .pap .. then return true
-  if let .oproj i y := decl.value then
-    if (← classStructOf? y).isNone && !(← get).tuples.contains (← getVarName y) && (i == 0 || i == 1) then
+  match decl.value with
+  | .oproj _ y =>
+    if (← classStructOf? y).isNone && !(← get).tuples.contains (← getVarName y) then
       return true
+  | .sproj _ _ y | .uproj _ y =>
+    if (← classStructOf? y).isNone then
+      return true
+  | _ => pure ()
   let .fap fn args := decl.value | return false
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited" || fn.getString!.contains "boxed_const") then return true
   if (← loopExpandable? decl.value).isSome then return false
@@ -2593,7 +2647,7 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
       match d2.value with
       | .box .. | .unbox .. =>
         return countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
-      | .oproj _ y =>
+      | .oproj _ y | .sproj _ _ y | .uproj _ y =>
         if (← classStructOf? y).isNone then
           return countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
         else
@@ -2808,9 +2862,19 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         emitCode k'
         return
       else
-        let n ← getVarName x
-        recordVarType n (← inferLetKotlinType decl)
-        emitLn s!"val {n} = {← emitLetValue decl}"
+        let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
+        let rhs ← formatAdtCtor info objs usizes scalars
+        if countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+          setParamVarName x rhs
+          recordVarType rhs "Array<Any?>"
+          modify fun st => { st with adtVars := st.adtVars.insert rhs }
+        else
+          let n ← getVarName x
+          recordVarType n "Array<Any?>"
+          modify fun st => { st with adtVars := st.adtVars.insert n }
+          emitLn s!"val {n} = {rhs}"
+        emitCode k'
+        return
     | .oproj i y =>
       match (← get).tuples[← getVarName y]? with
       | some comps => setParamVarName x (comps[i]?.getD "null")
@@ -2856,6 +2920,9 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         else
           let rhs ← emitLetValue decl
           let ty ← inferLetKotlinType decl
+          let isAdtRes ← match (← getMonoDecl? fn).bind monoResultType? with
+            | some r => pure (isAdtMonoType r)
+            | none => pure false
           if !(← isUsed x) then
             if ty == "Unit" then
               emitLn rhs
@@ -2864,11 +2931,13 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             else
               let n ← getVarName x
               recordVarType n ty
+              if isAdtRes then modify fun st => { st with adtVars := st.adtVars.insert n }
               recordIntSource n rhs decl
               emitLn s!"val {n} = {rhs}"
           else
             let n ← getVarName x
             recordVarType n ty
+            if isAdtRes then modify fun st => { st with adtVars := st.adtVars.insert n }
             recordIntSource n rhs decl
             emitLn s!"val {n} = {rhs}"
     | _ =>
@@ -2919,8 +2988,7 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
             | .fap fn _ => do
               pure ((← dropShape? fn).isSome || Ownership.isArraySet fn ||
                 Ownership.isInplaceExtern (← getEnv) fn)
-            | .ctor info _ => do
-              pure (info.name == ``Prod.mk || (Compiler.getKotlinClass? (← getEnv) info.name.getPrefix).isSome)
+            | .ctor .. => pure true
             | .oproj _ y => do pure ((← get).tuples.contains (← getVarName y))
             | .reset .. | .reuse .. => pure true
             | _ => pure false
@@ -2940,7 +3008,9 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
     | _ => emitLetAndContinue decl k
   | .cases cs =>
     let discrName ← getVarName cs.discr
-    if cs.alts.size == 2 then
+    let isBool := cs.typeName == ``Bool || (← get).varTypes[discrName]? == some "Boolean" ||
+      (← get).knownBools.contains discrName
+    if isBool && cs.alts.size == 2 then
       let (thenCode, thenWhen) := match cs.alts[0]! with
         | .ctorAlt info c => (c, info.cidx == 1)
         | .default c => (c, true)
@@ -2972,22 +3042,39 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
           emit elseBuf
           emitLn "}"
     else
-      let discrExpr ← if (← get).varTypes[discrName]? == some "UByte" then pure s!"({discrName}).toInt()" else pure discrName
-      emitIndent; emit s!"when ({discrExpr}) "; emitLn "{"
-      withIndent do
-        for alt in cs.alts do
-          match alt with
-          | .ctorAlt info altCode =>
-            emitIndent; emit s!"{info.cidx} -> "; emitLn "{"
-            withFieldVals <| withIndent (emitCode altCode)
-            emitLn "}"
-          | .default altCode =>
-            emitIndent; emit "else -> "; emitLn "{"
-            withFieldVals <| withIndent (emitCode altCode)
-            emitLn "}"
-        unless cs.alts.any (· matches .default _) do
-          emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
-      emitLn "}"
+      if cs.typeName == `obj || cs.typeName == `tobj then
+        modify fun st => { st with adtVars := st.adtVars.insert discrName }
+      if cs.alts.isEmpty then
+        emitLn "error(\"unreachable\")"
+      else if cs.alts.size == 1 then
+        withFieldVals (emitCode cs.alts[0]!.getCode)
+      else
+        let discrTy? := (← get).varTypes[discrName]?
+        let discrExpr ←
+          if cs.typeName == `obj || cs.typeName == `tobj || discrTy? == some "Array<Any?>" then
+            if discrTy? == some "Array<Any?>" then
+              pure s!"({discrName}[0] as Int)"
+            else
+              pure s!"(({discrName} as Array<*>)[0] as Int)"
+          else if discrTy? == some "UByte" || discrTy? == some "UShort" || discrTy? == some "UInt" then
+            pure s!"({discrName}).toInt()"
+          else
+            pure discrName
+        emitIndent; emit s!"when ({discrExpr}) "; emitLn "{"
+        withIndent do
+          for alt in cs.alts do
+            match alt with
+            | .ctorAlt info altCode =>
+              emitIndent; emit s!"{info.cidx} -> "; emitLn "{"
+              withFieldVals <| withIndent (emitCode altCode)
+              emitLn "}"
+            | .default altCode =>
+              emitIndent; emit "else -> "; emitLn "{"
+              withFieldVals <| withIndent (emitCode altCode)
+              emitLn "}"
+          unless cs.alts.any (· matches .default _) do
+            emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
+        emitLn "}"
   | .return fvarId =>
     emitReturnVar fvarId
   | .oset x i y k =>
@@ -3244,7 +3331,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let decl ← decl.internalize (uniqueIdents := true)
   let initKnownBools := ({} : Std.HashMap String Bool).insert "true" true |>.insert "false" false
   let initVarTypes := ({} : Std.HashMap String String).insert "true" "Boolean" |>.insert "false" "Boolean" |>.insert "Unit" "Unit"
-  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {} }
+  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
   markUsed code
@@ -3311,6 +3398,10 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
         | none => toKotlinType p.type
       let pType := (override? emittedIdx).getD defaultParamTy
       recordVarType pName pType
+      if pType == "Any?" then
+        if let some mp := monoDecl?.bind (·.params[i]?) then
+          if isAdtMonoType mp.type then
+            modify fun st => { st with adtVars := st.adtVars.insert pName }
       paramDecls := paramDecls.push s!"{pName}: {pType}"
   let paramStr := String.intercalate ", " paramDecls.toList
   let codeJP := hasRecursiveJP code
