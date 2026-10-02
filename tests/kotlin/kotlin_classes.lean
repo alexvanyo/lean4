@@ -19,3 +19,7 @@ def Point.translate (p : Point) (dx dy : Int32) : Point :=
 @[kotlin_member "Point" "public" "getXCoord"]
 def Point.getXCoord (p : Point) : Int32 :=
   p.x
+
+@[export lean_make_point]
+def makePoint (x y : Int32) : Point :=
+  { x, y }

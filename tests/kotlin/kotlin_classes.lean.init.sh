@@ -1,3 +1,3 @@
-TEST_LEAN_ARGS=("-Dcompiler.kotlin.preamble=class Point(var x: Int, var y: Int) {
+TEST_LEAN_ARGS=("-Dcompiler.kotlin.preamble=class Point(val x: Int, val y: Int) {
 // @LeanMembers(Point)
 }")

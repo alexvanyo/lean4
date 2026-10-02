@@ -12,3 +12,65 @@ public fun sumFields(): Int {
 
 }
 
+@PublishedApi internal fun f_makePair(a: UInt, b: UInt): Pair<UInt, UInt> {
+    return Pair((a + 1u), (b + 2u))
+}
+
+@PublishedApi internal fun f_makePair___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_18_1 = (a as UInt)
+    val b_boxed_19_2 = (b as UInt)
+    return f_makePair(a_boxed_18_1, b_boxed_19_2)
+}
+
+@PublishedApi internal fun f_sumPair(p: Pair<UInt, UInt>): UInt {
+    return (p.first + p.second)
+}
+
+@PublishedApi internal fun f_sumPair___boxed(p: Any?): Any? {
+    val res_28_1 = f_sumPair((p as Pair<UInt, UInt>))
+    return res_28_1
+}
+
+@PublishedApi internal fun f_swapPair(p: Pair<UInt, String>): Pair<String, UInt> {
+    return Pair(p.second, p.first)
+}
+
+@PublishedApi internal fun f_roundTripPair(a: UInt, b: UInt): UInt {
+    val p_42_1 = f_makePair(a, b)
+    return f_sumPair(p_42_1)
+}
+
+@PublishedApi internal fun f_roundTripPair___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_46_1 = (a as UInt)
+    val b_boxed_47_2 = (b as UInt)
+    val res_48_3 = f_roundTripPair(a_boxed_46_1, b_boxed_47_2)
+    return res_48_3
+}
+
+@PublishedApi internal fun f_nestedPair(a: UInt, b: Int, c: String): Pair<UInt, Pair<Int, String>> {
+    return Pair(a, Pair(b, c))
+}
+
+@PublishedApi internal fun f_nestedPair___boxed(a: Any?, b: Any?, c: Any?): Any? {
+    val a_boxed_60_1 = (a as UInt)
+    val b_boxed_61_2 = (b as Int)
+    return f_nestedPair(a_boxed_60_1, b_boxed_61_2, (c as String))
+}
+
+@PublishedApi internal fun f_readNestedPair___closed__0(): String {
+    return ""
+}
+
+@PublishedApi internal fun f_readNestedPair(p: Pair<UInt, Pair<Int, String>>): String {
+    val snd_66_1 = p.second
+    if (!(0u < p.first))     {
+        return ""
+    } else     {
+        return snd_66_1.second
+    }
+}
+
+@PublishedApi internal fun f_readNestedPair___boxed(p: Any?): Any? {
+    return f_readNestedPair((p as Pair<UInt, Pair<Int, String>>))
+}
+

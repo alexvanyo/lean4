@@ -65,6 +65,8 @@ structure Obj where
   pending : Bool := false
   /-- Object whose field this object was read from. -/
   parent? : Option Nat := none
+  /-- Whether this object is an instance of a `@[mutable_kotlin_class]` structure. -/
+  isMutableClass : Bool := false
   deriving Inhabited
 
 /-- Shape of the results of a declaration, joined over its `return`s. -/
@@ -105,17 +107,25 @@ structure Summary where
 structure PathState where
   objs : Array Obj := #[]
   vars : Std.HashMap FVarId Nat := {}
-  /-- Variables known to be `false` (results of `isShared` on exclusively owned objects). -/
+  /-- Variables known to be `false` (results of `isShared` on exclusively owned mutable objects). -/
   knownFalse : Std.HashSet FVarId := {}
+  /-- Variables known to be `true` (results of `isShared` on immutable objects). -/
+  knownTrue : Std.HashSet FVarId := {}
   deriving Inhabited
 
 structure Ctx where
   decl : Decl .impure
   summaries : Std.HashMap Name Summary
   localParams : Std.HashMap Name (Array (Param .impure))
+  mutableClasses : Std.HashSet String := {}
   jps : Std.HashMap FVarId (FunDecl .impure) := {}
   /-- Object ids of the parameters at entry. -/
   paramObjs : Array Nat := #[]
+
+def isMutableClassType (mutableClasses : Std.HashSet String) (ty : Expr) : Bool :=
+  match ImpureType.getJvmTypeDesc? ty with
+  | some d => d.startsWith "kotlin:" && mutableClasses.contains (d.drop 7).toString
+  | none => false
 
 structure Out where
   requireExclusive : Std.HashSet Nat := {}
@@ -250,14 +260,14 @@ def classCtorSource? (st : PathState) (args : Array (Arg .impure)) : Option Nat 
   return src?
 
 /--
-A constructor application of a `@[kotlin_class]` structure updates the value it reads its other
+A constructor application of a `@[mutable_kotlin_class]` structure updates the value it reads its other
 fields from in place. That is only faithful if that value is no longer referenced: its count must
 have dropped to 0.
 -/
 def visitClassCtor? (st : PathState) (x : FVarId) (info : CtorInfo) (args : Array (Arg .impure))
     (scalars : Array FVarId) : M (Option PathState) := do
   let structName := info.name.getPrefix
-  unless (getKotlinClass? (← getEnv) structName).isSome do return none
+  unless isMutableKotlinClass (← getEnv) structName do return none
   let some p := classCtorSource? st (args ++ scalars.map .fvar)
     | error m!"constructing a `{structName}` requires an update of an existing value (e.g. \
         `\{ s with f := v }` with some field of `s` unchanged)"
@@ -269,7 +279,7 @@ def visitClassCtor? (st : PathState) (x : FVarId) (info : CtorInfo) (args : Arra
     error m!"updating a `{structName}` in place, but the updated value may still be referenced"
   let (st, children) := ctorChildren st args
   let st := modifyObj st p fun o =>
-    { o with rc := .exact 1, children, deep := true, ctor? := some info.name, pristine? := none }
+    { o with rc := .exact 1, children, deep := true, ctor? := some info.name, pristine? := none, isMutableClass := true }
   return some (bind st x p)
 
 /-- Values stored into scalar fields of `x` right after its construction (continuation `k`). -/
@@ -314,6 +324,7 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
         let (st', i) := objOf st a
         st := bind st' p.fvarId i
         if st.knownFalse.contains a then st := { st with knownFalse := st.knownFalse.insert p.fvarId }
+        if st.knownTrue.contains a then st := { st with knownTrue := st.knownTrue.insert p.fvarId }
       | .erased => pure ()
     visitCode st decl.value
   | .cases cs =>
@@ -322,6 +333,11 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
         match alt with
         | .ctorAlt info c => if info.cidx == 0 then visitCode st c
         | .default c => visitCode st c
+    else if st.knownTrue.contains cs.discr then
+      for alt in cs.alts do
+        match alt with
+        | .ctorAlt info c => if info.cidx == 1 then visitCode st c
+        | .default c => visitCode st c
     else
       for alt in cs.alts do visitCode st alt.getCode
   | .return x => visitReturn st x
@@ -329,6 +345,7 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
 
 partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure) : M PathState := do
   let x := decl.fvarId
+  let isMut := isMutableClassType (← read).mutableClasses decl.type
   match decl.value with
   | .oproj idx y =>
     let (st, i) := objOf st y
@@ -336,9 +353,9 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
     if let some (_, c) := o.children.find? (·.1 == idx) then
       return bind st x c
     let child : Obj :=
-      if o.deep && o.rc == .exact 1 then { rc := .exact 1, deep := true, parent? := some i }
-      else if let some j := o.pristine? then { rc := .top, pristine? := some j, parent? := some i }
-      else { rc := .top, parent? := some i }
+      if o.deep && o.rc == .exact 1 then { rc := .exact 1, deep := true, parent? := some i, isMutableClass := isMut }
+      else if let some j := o.pristine? then { rc := .top, pristine? := some j, parent? := some i, isMutableClass := isMut }
+      else { rc := .top, parent? := some i, isMutableClass := isMut }
     let (st, c) := newObj st child
     let st := modifyObj st i fun o => { o with children := o.children.push (idx, c) }
     return bind st x c
@@ -351,7 +368,7 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
         let (st', c) := objOf st1 a
         st1 := st'
         children := children.push (k, c)
-    let (st2, i) := newObj st1 { rc := .exact 1, children, deep := true, ctor? := some info.name }
+    let (st2, i) := newObj st1 { rc := .exact 1, children, deep := true, ctor? := some info.name, isMutableClass := isMut }
     return bind st2 x i
   | .reset _ y =>
     let (st, i) := objOf st y
@@ -375,9 +392,12 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
     return bind st2 x i
   | .isShared y =>
     let (st, i) := objOf st y
-    if ← claim st i false m!"in-place constructor update" then
-      return { st with knownFalse := st.knownFalse.insert x }
-    return st
+    if st.objs[i]!.isMutableClass then
+      if ← claim st i false m!"in-place constructor update" then
+        return { st with knownFalse := st.knownFalse.insert x }
+      return st
+    else
+      return { st with knownTrue := st.knownTrue.insert x }
   | .fap fn args =>
     if let some ai := inplaceArg? (← getEnv) fn args then
       if let some (Arg.fvar a) := args[ai]? then
@@ -387,27 +407,27 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
         return bind st x i
     if isArrayAlloc fn then
       let st ← consumeArgs st none args
-      let (st, i) := newObj st { rc := .exact 1, deep := true }
+      let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
       return bind st x i
     if let some summary := (← read).summaries[fn]? then
-      return ← visitCall st x fn args summary
+      return ← visitCall st x fn args summary isMut
     let st ← consumeArgs st (some fn) args
-    let (st, i) := newObj st { rc := .top }
+    let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st x i
   | .pap _ args | .fvar _ args =>
     let st ← consumeArgs st none args
-    let (st, i) := newObj st { rc := .top }
+    let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st x i
   | .sproj _ _ y | .uproj _ y =>
     let (st, p) := objOf st y
-    let (st, i) := newObj st { rc := .top, parent? := some p }
+    let (st, i) := newObj st { rc := .top, parent? := some p, isMutableClass := isMut }
     return bind st x i
   | _ =>
-    let (st, i) := newObj st { rc := .top }
+    let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st x i
 
 partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (Arg .impure))
-    (summary : Summary) : M PathState := do
+    (summary : Summary) (isMut : Bool) : M PathState := do
   let ps := (← read).localParams[fn]?.getD #[]
   let mut st := st
   let mut argObjs : Array (Option Nat) := #[]
@@ -436,13 +456,13 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
         st := escape st i
   match summary.ret with
   | .none =>
-    let (st2, i) := newObj st { rc := .top, pending := true }
+    let (st2, i) := newObj st { rc := .top, pending := true, isMutableClass := isMut }
     return bind st2 x i
   | .param j =>
     match argObjs[j]? with
     | some (some i) => return bind st x i
     | _ =>
-      let (st2, i) := newObj st { rc := .top }
+      let (st2, i) := newObj st { rc := .top, isMutableClass := isMut }
       return bind st2 x i
   | .prod comps =>
     let mut children := #[]
@@ -457,7 +477,7 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
     let (st2, i) := newObj st { rc := .exact 1, children, deep := true, ctor? := some ``Prod.mk }
     return bind st2 x i
   | .unknown =>
-    let (st2, i) := newObj st { rc := .top }
+    let (st2, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st2 x i
 
 partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
@@ -485,21 +505,23 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
 end
 
 def analyzeDecl (decl : Decl .impure) (summaries : Std.HashMap Name Summary)
-    (localParams : Std.HashMap Name (Array (Param .impure))) : CompilerM Out := do
+    (localParams : Std.HashMap Name (Array (Param .impure)))
+    (mutableClasses : Std.HashSet String) : CompilerM Out := do
   let .code code := decl.value | return {}
   let summary := summaries[decl.name]?.getD { exclusive := decl.params.map fun _ => false }
   let mut st : PathState := {}
   let mut paramObjs := #[]
   for h : j in [:decl.params.size] do
     let p := decl.params[j]
+    let isMut := isMutableClassType mutableClasses p.type
     let o : Obj :=
-      if p.borrow then { rc := .top }
-      else if summary.exclusive[j]?.getD false then { rc := .exact 1, deep := true }
-      else { rc := .top, pristine? := some j }
+      if p.borrow then { rc := .top, isMutableClass := isMut }
+      else if summary.exclusive[j]?.getD false then { rc := .exact 1, deep := true, isMutableClass := isMut }
+      else { rc := .top, pristine? := some j, isMutableClass := isMut }
     let (st', i) := newObj st o
     st := bind st' p.fvarId i
     paramObjs := paramObjs.push i
-  let ctx : Ctx := { decl, summaries, localParams, paramObjs }
+  let ctx : Ctx := { decl, summaries, localParams, mutableClasses, paramObjs }
   let ((), out) ← (visitCode st code).run ctx |>.run {}
   return out
 
@@ -515,6 +537,11 @@ whose parameters cannot be required to be exclusive except for a Kotlin member r
 -/
 def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExternal : Name → Bool) :
     CompilerM Result := do
+  let env ← getEnv
+  let mutableClasses := env.constants.map₂.foldl (init := ({} : Std.HashSet String)) fun s n _ =>
+    match getMutableKotlinClass? env n with
+    | some t => s.insert t
+    | none => s
   let localParams := decls.foldl (init := ({} : Std.HashMap Name _)) fun m d => m.insert d.name d.params
   let mut summaries : Std.HashMap Name Summary := decls.foldl (init := {}) fun m d =>
     m.insert d.name { exclusive := d.params.map fun _ => false }
@@ -524,7 +551,7 @@ def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExterna
     let mut changed := false
     let mut errors := #[]
     for d in decls do
-      let out ← analyzeDecl d summaries localParams
+      let out ← analyzeDecl d summaries localParams mutableClasses
       let old := summaries[d.name]!
       let mut exclusive := old.exclusive
       for j in out.requireExclusive do

@@ -139,6 +139,8 @@ structure State where
   expression of each component.
   -/
   tuples : Std.HashMap String (Array String) := {}
+  /-- `Prod.mk` variables in `tuples` that have also been materialized as Kotlin `Pair` values. -/
+  materializedTuples : Std.HashSet String := {}
   /-- `@[kotlin_class]` structure of Kotlin variables. -/
   nameStructs : Std.HashMap String Name := {}
   /--
@@ -216,6 +218,8 @@ partial def toKotlinType (ty : Expr) : String :=
   | .const ``Bool _ | .const ``Decidable _ => "Boolean"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
   | .const ``String _ => "String"
+  | .app (.app (.const ``Prod _) a) b =>
+    s!"Pair<{toKotlinType a}, {toKotlinType b}>"
   | .app (.const `jvmType _) (.lit (.strVal desc)) =>
     -- Types declared with `@[extern "kotlin:<Kotlin type>"]`.
     if desc.startsWith "kotlin:" then (desc.drop 7).toString else "Any?"
@@ -231,6 +235,27 @@ partial def toKotlinType (ty : Expr) : String :=
         s!"({paramStr}) -> {retTy}"
     go ty []
   | _ => "Any?"
+
+def isRichMonoType (e : Expr) : Bool :=
+  e.isForall || e.isConstOf ``String || e.isAppOfArity ``Prod 2
+
+/-- Parse `Pair<A, B>` into `(A, B)`. -/
+partial def parseKotlinPairType? (s : String) : Option (String × String) :=
+  if !s.startsWith "Pair<" || !s.endsWith ">" then none
+  else
+    let inner := ((s.drop 5).take (s.length - 6)).toString
+    let rec go (cs : List Char) (depth : Nat) (cur : String) : Option (String × String) :=
+      match cs with
+      | [] => none
+      | '<' :: rest => go rest (depth + 1) (cur.push '<')
+      | '(' :: rest => go rest (depth + 1) (cur.push '(')
+      | '>' :: rest => go rest (depth - 1) (cur.push '>')
+      | ')' :: rest => go rest (depth - 1) (cur.push ')')
+      | ',' :: ' ' :: rest =>
+        if depth == 0 then some (cur, String.ofList rest)
+        else go (' ' :: rest) depth (cur.push ',')
+      | c :: rest => go rest depth (cur.push c)
+    go inner.toList 0 ""
 
 /-- Parse a Kotlin function type `(P1, P2, ...) -> R` into `(#[P1, P2, ...], R)`. -/
 partial def parseKotlinFnType? (s : String) : Option (Array String × String) :=
@@ -950,15 +975,25 @@ def classLayout (s : Name) : EmitM ClassLayout := do
     | _ => pure ()
   return r
 
-/-- The `@[kotlin_class]` structure of variable `x`, from its Kotlin type. -/
+/-- The `@[kotlin_class]` or `@[mutable_kotlin_class]` structure of variable `x`, from its Kotlin type. -/
 def classStructOf? (x : FVarId) : EmitM (Option Name) := do
   let n ← getVarName x
   if let some t ← kotlinTypeOf? (.fvar x) then
     if let some s := (← read).classStructs[t]? then
       modify fun st => { st with nameStructs := st.nameStructs.insert n s }
       return some s
-  -- Variables aliased to a `@[kotlin_class]` value (e.g. by `reset`) share its Kotlin name.
+  -- Variables aliased to a `@[mutable_kotlin_class]` value (e.g. by `reset`) share its Kotlin name.
   return (← get).nameStructs[n]?
+
+def mutableClassStructOf? (x : FVarId) : EmitM (Option Name) := do
+  let some s ← classStructOf? x | return none
+  return if Compiler.isMutableKotlinClass (← getEnv) s then some s else none
+
+def isMutableClassFVar (x : FVarId) : EmitM Bool := do
+  if let some t ← kotlinTypeOf? (.fvar x) then
+    if let some s := (← read).classStructs[t]? then
+      return Compiler.isMutableKotlinClass (← getEnv) s
+  return (← mutableClassStructOf? x).isSome
 
 /-- Kotlin property of runtime field `pos` of `x`, which must be a `@[kotlin_class]` value. -/
 def classField (x : FVarId) (pos : ClassLayout → Option String) : EmitM String := do
@@ -973,11 +1008,17 @@ The result shape of `fn` if results identical to parameters are dropped: the res
 parameter, or some components of a `Prod.mk` result are.
 -/
 def dropShape? (fn : Name) : EmitM (Option Ownership.RetShape) := do
-  if let some d := (← read).declMap[fn]? then
+  let declMap := (← read).declMap
+  if let some d := declMap[fn]? then
     if d.type.isScalar then return none
   let some s := (← read).summaries[fn]? | return none
-  if s.ret.identities.isEmpty then return none
-  return some s.ret
+  let canDrop (j : Nat) : Bool := s.exclusive[j]?.getD false
+  match s.ret with
+  | .param j => return if canDrop j then some (.param j) else none
+  | .prod comps =>
+    let comps' := comps.map fun c? => c?.filter canDrop
+    return if comps'.any (·.isSome) then some (.prod comps') else none
+  | _ => return none
 
 /-- Indices of the components that are still returned under a drop shape. -/
 def keptComps : Ownership.RetShape → Array Nat
@@ -1051,7 +1092,7 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
     if t != "Any?" then return t
   if let some md ← getMonoDecl? fn then
     if let some r := monoResultType? md then
-      if r.isForall || r.isConstOf ``String then return toKotlinType r
+      if isRichMonoType r then return toKotlinType r
   return toKotlinType defaultTy
 
 /--
@@ -1229,7 +1270,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       let aStr ← toKotlinArg args[i]!
       let aStr ← match monoDecl?.bind (·.params[i]?) with
         | some mp =>
-          if mp.type.isForall || mp.type.isConstOf ``String then
+          if isRichMonoType mp.type then
             castIfNeeded aStr (toKotlinType mp.type)
           else
             pure aStr
@@ -1305,14 +1346,22 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     else
       castIfNeeded src (toKotlinType decl.type)
   | .oproj i x =>
-    if (← classStructOf? x).isSome then classField x (·.objs[i]?) else unsupportedProj x
+    if (← classStructOf? x).isSome then classField x (·.objs[i]?)
+    else
+      let xName ← getVarName x
+      let xTy := (← get).varTypes[xName]?.getD "Any?"
+      let recv := if (parseKotlinPairType? xTy).isSome then xName else s!"({xName} as Pair<*, *>)"
+      match i with
+      | 0 => return s!"{recv}.first"
+      | 1 => return s!"{recv}.second"
+      | _ => unsupportedProj x
   | .sproj _ off x =>
     if (← classStructOf? x).isSome then classField x (·.scalars[off]?) else unsupportedProj x
   | .uproj i x =>
     if (← classStructOf? x).isSome then classField x (·.usizes[i]?) else unsupportedProj x
   | .ctor info _ =>
-    if let some s := (← read).classStructs.values.find? (· == info.name.getPrefix) then
-      throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{s}` (`@[kotlin_class]` values are only updated in place)"
+    if Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
+      throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{info.name.getPrefix}` (`@[mutable_kotlin_class]` values are only updated in place)"
     return "null"
   | _ => return "null"
 
@@ -1597,13 +1646,38 @@ def emitReturnUnit : EmitM Unit := do
   | .returnLbl lbl _ => emitLn s!"return@{lbl} Unit"
   | .threaded _ failureLbl => emitLn s!"break@{failureLbl}"
 
+def resolveKnownBool (s : String) : EmitM String := do
+  match (← get).knownBools[s]? with
+  | some true => return "true"
+  | some false => return "false"
+  | none => return s
+
+def formatKotlinPair (comps : Array String) (targetTy? : Option String := none) : EmitM (String × String) := do
+  let c0 ← resolveKnownBool (comps[0]?.getD "null")
+  let c1 ← resolveKnownBool (comps[1]?.getD "null")
+  let targetPair? := targetTy?.bind parseKotlinPairType?
+  let c0 ← match targetPair? with
+    | some (t0, _) => castIfNeeded c0 t0
+    | none => pure c0
+  let c1 ← match targetPair? with
+    | some (_, t1) => castIfNeeded c1 t1
+    | none => pure c1
+  let varTypes := (← get).varTypes
+  let t0 := match targetPair? with
+    | some (t0, _) => t0
+    | none => varTypes[c0]?.getD "Any?"
+  let t1 := match targetPair? with
+    | some (_, t1) => t1
+    | none => varTypes[c1]?.getD "Any?"
+  let pairTy := s!"Pair<{t0}, {t1}>"
+  let pairExpr := s!"Pair({c0}, {c1})"
+  recordVarType pairExpr pairTy
+  return (pairExpr, pairTy)
+
 /-- `return x`, dropping the components of the result that are identical to parameters. -/
 def emitReturnVar (x : FVarId) : EmitM Unit := do
   let rawName ← getVarName x
-  let n := match (← get).knownBools[rawName]? with
-    | some true => "true"
-    | some false => "false"
-    | none => rawName
+  let n ← resolveKnownBool rawName
   match (← read).retShape? with
   | some (.param _) => emitReturnUnit
   | some shape@(.prod _) =>
@@ -1612,18 +1686,22 @@ def emitReturnVar (x : FVarId) : EmitM Unit := do
     match keptComps shape with
     | #[] => emitReturnUnit
     | #[c] =>
-      let rawComp := comps[c]!
-      let comp := match (← get).knownBools[rawComp]? with
-        | some true => "true"
-        | some false => "false"
-        | none => rawComp
+      let comp ← resolveKnownBool comps[c]!
       emitReturn comp (← get).varTypes[comp]?
-    | _ => throwError "Kotlin backend: in `{(← read).currFn}`: results with more than one \
-      component that is not a parameter are not supported"
+    | _ =>
+      let (pairExpr, pairTy) ← formatKotlinPair comps (← read).retCast?
+      emitReturn pairExpr (some pairTy)
   | _ =>
-    if (← get).tuples.contains n then
-      throwError "Kotlin backend: in `{(← read).currFn}`: `Prod` values are only supported as \
-        results whose other components are parameters"
+    if let some comps := (← get).tuples[n]? then
+      if !(← get).materializedTuples.contains n then
+        let targetTy? ← match ← currentExit with
+          | .funcReturn => pure (← read).retCast?
+          | .assignOnly _ xTy | .assignAndBreak _ xTy _ => pure (some xTy)
+          | .returnLbl _ retTy? => pure retTy?
+          | _ => pure none
+        let (pairExpr, pairTy) ← formatKotlinPair comps targetTy?
+        emitReturn pairExpr (some pairTy)
+        return
     emitReturn n (← get).varTypes[n]?
 
 /--
@@ -1657,7 +1735,7 @@ Field write `x.f = v` for runtime field `pos` of the `@[kotlin_class]` value `x`
 Skipped if the field is known to hold `v` already (see `State.fieldVals`).
 -/
 def emitFieldWrite (x : FVarId) (pos : ClassLayout → Option String) (v : String) : EmitM Unit := do
-  if (← classStructOf? x).isSome then
+  if (← mutableClassStructOf? x).isSome then
     let lhs ← classField x pos
     if (← get).fieldVals[lhs]? == some v then return
     emitLn s!"{lhs} = {v}"
@@ -1808,13 +1886,173 @@ partial def collectUsed (wb : Std.HashSet (FVarId × FVarId)) (code : Code .impu
 
 def markUsed (code : Code .impure) : EmitM Unit := do
   let env ← getEnv
-  let structs := (← read).classStructs
-  let isClassCtor (s : Name) := structs.values.contains s
+  let isClassCtor (s : Name) := Compiler.isMutableKotlinClass env s
   let wb := ((collectWriteBacks env isClassCtor code {}).run { acc := (← get).writeBacks }).2.acc
   modify fun st => { st with writeBacks := wb, used := collectUsed wb code st.used }
 
 def isWriteBack (x v : FVarId) : EmitM Bool :=
   return (← get).writeBacks.contains (x, v)
+
+def substFVar (s : Std.HashMap FVarId FVarId) (x : FVarId) : FVarId :=
+  s.getD x x
+
+def substArg (s : Std.HashMap FVarId FVarId) (a : Arg .impure) : Arg .impure :=
+  match a with
+  | .fvar x => .fvar (substFVar s x)
+  | .erased => .erased
+
+def substLetValue (s : Std.HashMap FVarId FVarId) (v : LetValue .impure) : LetValue .impure :=
+  match v with
+  | .lit _ | .erased => v
+  | .oproj i x => .oproj i (substFVar s x)
+  | .sproj n off x => .sproj n off (substFVar s x)
+  | .uproj i x => .uproj i (substFVar s x)
+  | .fap fn args => .fap fn (args.map (substArg s))
+  | .pap fn args => .pap fn (args.map (substArg s))
+  | .fvar fn args => .fvar (substFVar s fn) (args.map (substArg s))
+  | .ctor info args => .ctor info (args.map (substArg s))
+  | .box ty x => .box ty (substFVar s x)
+  | .unbox x => .unbox (substFVar s x)
+  | .isShared x => .isShared (substFVar s x)
+  | .reset n x => .reset n (substFVar s x)
+  | .reuse x info u args => .reuse (substFVar s x) info u (args.map (substArg s))
+
+partial def extractLinearJmp? (jpId : FVarId) (c : Code .impure) :
+    Option (Array (Arg .impure) × (Code .impure → Code .impure)) :=
+  match c with
+  | .jmp fn args =>
+    if fn == jpId then some (args, id) else none
+  | .inc x n ch p k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .inc x n ch p (wrap body) u)
+  | .dec x n ch p o k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .dec x n ch p o (wrap body) u)
+  | .del x k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .del x (wrap body) u)
+  | .let d k =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .let d (wrap body))
+  | .oset x i y k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .oset x i y (wrap body) u)
+  | .sset x i off y ty k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .sset x i off y ty (wrap body) u)
+  | .uset x i y k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .uset x i y (wrap body) u)
+  | .setTag x cidx k u =>
+    (extractLinearJmp? jpId k).map fun (args, wrap) => (args, fun body => .setTag x cidx (wrap body) u)
+  | _ => none
+
+/--
+Prunes the dead branch of `ExpandResetReuse`'s `isShared` checks (which evaluate to `false` for
+`@[mutable_kotlin_class]` and `true` for all immutable types) and inlines single-jump linear join
+points (`resetjp` / `reusejp`) so that constructor allocations stay contiguous with their scalar
+field `.sset`/`.uset` writes and mutable in-place updates alias cleanly.
+-/
+partial def simplifyResetReuse (code : Code .impure) : EmitM (Code .impure) := do
+  let kbRef ← IO.mkRef ({} : Std.HashMap FVarId Bool)
+  let rec go (s : Std.HashMap FVarId FVarId) (c : Code .impure) :
+      EmitM (Code .impure) := do
+    match c with
+    | .inc x n ch p k u => return .inc (substFVar s x) n ch p (← go s k) u
+    | .dec x n ch p o k u => return .dec (substFVar s x) n ch p o (← go s k) u
+    | .del x k u => return .del (substFVar s x) (← go s k) u
+    | .let d k =>
+      let v := substLetValue s d.value
+      let d := { d with value := v }
+      if let .isShared y := v then
+        let isMut ← isMutableClassFVar y
+        kbRef.modify (·.insert d.fvarId (!isMut))
+      return .let d (← go s k)
+    | .oset x i y k u =>
+      return .oset (substFVar s x) i (substArg s y) (← go s k) u
+    | .sset x i off y ty k u =>
+      return .sset (substFVar s x) i off (substFVar s y) ty (← go s k) u
+    | .uset x i y k u =>
+      return .uset (substFVar s x) i (substFVar s y) (← go s k) u
+    | .setTag x cidx k u =>
+      return .setTag (substFVar s x) cidx (← go s k) u
+    | .return x =>
+      return .return (substFVar s x)
+    | .unreach ty =>
+      return .unreach ty
+    | .jmp fn args =>
+      return .jmp (substFVar s fn) (args.map (substArg s))
+    | .fun d k u =>
+      let val ← go s d.value
+      return .fun (.mk d.fvarId d.binderName d.params d.type val) (← go s k) u
+    | .jp d k =>
+      let k' ← go s k
+      let useCount := countJmp d.fvarId k'
+      let isRec := countJmp d.fvarId d.value > 0
+      if useCount == 0 then
+        return k'
+      else if useCount == 1 && !isRec then
+        if let some (args, wrap) := extractLinearJmp? d.fvarId k' then
+          let mut s' := s
+          for h : i in [:d.params.size] do
+            let pid := d.params[i].fvarId
+            if let some (.fvar argFv) := args[i]? then
+              let rootFv := substFVar s argFv
+              s' := s'.insert pid rootFv
+          let inlinedVal ← go s' d.value
+          return wrap inlinedVal
+      let val' ← go s d.value
+      return .jp (.mk d.fvarId d.binderName d.params d.type val') k'
+    | .cases cs =>
+      let discr := substFVar s cs.discr
+      if cs.alts.size == 2 then
+        if let some b := (← kbRef.get)[discr]? then
+          let (thenCode, thenWhen) := match cs.alts[0]! with
+            | .ctorAlt info c => (c, info.cidx == 1)
+            | .default c => (c, true)
+          let elseCode := cs.alts[1]!.getCode
+          return ← go s (if b == thenWhen then thenCode else elseCode)
+      let alts' : Array (Alt .impure) ← cs.alts.mapM fun alt => do
+        match alt with
+        | .ctorAlt info c => return Alt.ctorAlt info (← go s c)
+        | .default c => return Alt.default (← go s c)
+      return .cases (.mk cs.typeName cs.resultType discr alts')
+  go {} code
+
+structure CtorFieldSets where
+  objs : Array String := #[]
+  usizes : Std.HashMap Nat String := {}
+  scalars : Std.HashMap Nat String := {}
+  cont : Code .impure := default
+  deriving Inhabited
+
+/--
+Collects `.oset`, `.uset`, and `.sset` field writes to `x` at the head of `k` (skipping RC ops)
+that initialize an immutable constructor allocation `let x := .ctor info args`, returning the
+updated object, usize, and scalar field maps along with the remaining continuation after the writes.
+-/
+partial def collectCtorFieldSets (x : FVarId) (initObjs : EmitM (Array String)) (k : Code .impure) :
+    EmitM CtorFieldSets := do
+  let objs ← initObjs
+  let rec loop (objs : Array String) (usizes : Std.HashMap Nat String) (scalars : Std.HashMap Nat String)
+      (c : Code .impure) : EmitM CtorFieldSets := do
+    match c with
+    | .inc (k := k') .. | .dec (k := k') .. | .del (k := k') .. =>
+      loop objs usizes scalars k'
+    | .oset y i a k' _ =>
+      if y == x then
+        let v ← toKotlinArg a
+        let objs := if i < objs.size then objs.set! i v else objs
+        loop objs usizes scalars k'
+      else
+        return { objs, usizes, scalars, cont := c }
+    | .uset y i z k' _ =>
+      if y == x then
+        let v ← getVarName z
+        loop objs (usizes.insert i v) scalars k'
+      else
+        return { objs, usizes, scalars, cont := c }
+    | .sset y _ off z _ k' _ =>
+      if y == x then
+        let v ← getVarName z
+        loop objs usizes (scalars.insert off v) k'
+      else
+        return { objs, usizes, scalars, cont := c }
+    | _ => return { objs, usizes, scalars, cont := c }
+  loop objs {} {} k
 
 structure AliasState where
   aliases : Std.HashMap FVarId FVarId := {}
@@ -1826,12 +2064,11 @@ structure AliasState where
 
 /--
 Variables of `code` that are emitted as Kotlin aliases of another variable, mapped to the root:
-in-place updates of `@[kotlin_class]` values (aliases of the unique source of their projected
+in-place updates of `@[mutable_kotlin_class]` values (aliases of the unique source of their projected
 fields), results of calls identical to an argument (see `registerDropped`), and join point
 parameters all of whose arguments are aliases of the same variable.
 -/
 partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVarId) := do
-  let structs := (← read).classStructs
   let root (f : FVarId) : StateT AliasState EmitM FVarId := return (← get).aliases.getD f f
   let addAlias (x r : FVarId) : StateT AliasState EmitM Unit :=
     modify fun (s : AliasState) => { s with aliases := s.aliases.insert x r }
@@ -1850,7 +2087,7 @@ partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVa
       | .uproj i y => addProj x (2, i, y)
       | .reset _ y | .reuse y .. => addAlias x (← root y)
       | .ctor info args =>
-        if structs.values.contains info.name.getPrefix then
+        if Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
           let vs := args.filterMap (fun a => match a with | .fvar f => some f | _ => none)
             ++ Ownership.ctorScalars x k
           let roots ← vs.mapM root
@@ -2023,6 +2260,13 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       | none => decl.type
     let retTy ← fnRetKotlinType targetFn defRetTy
     return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
+  | .oproj i x =>
+    let xName ← getVarName x
+    if let some xTy := (← get).varTypes[xName]? then
+      if let some (t0, t1) := parseKotlinPairType? xTy then
+        if i == 0 then return t0
+        if i == 1 then return t1
+    return baseTy
   | _ => return baseTy
 
 def isPureConstantLet (decl : LetDecl .impure) : EmitM Bool := do
@@ -2126,8 +2370,8 @@ unused, and the field is recorded as held by `x` (see `State.fieldVals`).
 -/
 def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : LetDecl .impure) :
     EmitM Unit := do
-  let ty := toKotlinType decl.type
   if (← classStructOf? y).isSome then
+    let ty := toKotlinType decl.type
     let n ← getVarName x
     recordVarType n ty
     modify fun st => { st with projSrc := st.projSrc.insert n y }
@@ -2137,6 +2381,7 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     modify fun st => { st with fieldVals := st.fieldVals.insert lhs n }
   else
     let n ← getVarName x
+    let ty ← inferLetKotlinType decl
     recordVarType n ty
     emitLn s!"val {n} = {← emitLetValue decl}"
 
@@ -2202,6 +2447,29 @@ partial def countUsesCode (x : FVarId) (code : Code .impure) : Nat :=
     (if y == x then 1 else 0) + (if z == x then 1 else 0) + countUsesCode x k
   | .setTag y _ k _ => (if y == x then 1 else 0) + countUsesCode x k
 
+/--
+Checks whether all uses of a `Prod.mk` variable `x` in `code` are either `.oproj _ x` or `.return x`,
+so `x` stays in `State.tuples` without emitting a `val x = Pair(...)` declaration.
+-/
+partial def onlyUsedAsVirtualTuple (x : FVarId) (code : Code .impure) : Bool :=
+  match code with
+  | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. => onlyUsedAsVirtualTuple x k
+  | .let d k =>
+    let okVal := match d.value with
+      | .oproj _ _ => true
+      | v => countUsesLetValue x v == 0
+    okVal && onlyUsedAsVirtualTuple x k
+  | .jp d k | .fun d k _ =>
+    onlyUsedAsVirtualTuple x d.value && onlyUsedAsVirtualTuple x k
+  | .cases cs =>
+    cs.discr != x && cs.alts.all fun alt => onlyUsedAsVirtualTuple x alt.getCode
+  | .jmp fn args => fn != x && !args.any (· == .fvar x)
+  | .return _ => true
+  | .unreach _ => true
+  | .oset y _ a k _ => y != x && a != .fvar x && onlyUsedAsVirtualTuple x k
+  | .sset y _ _ z _ k _ | .uset y _ z k _ => y != x && z != x && onlyUsedAsVirtualTuple x k
+  | .setTag y _ k _ => y != x && onlyUsedAsVirtualTuple x k
+
 def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
   let p := fn.getPrefix
   let s := match fn with | .str _ str => str | _ => ""
@@ -2253,6 +2521,9 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
 
 def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
   if decl.value matches .pap .. then return true
+  if let .oproj i y := decl.value then
+    if (← classStructOf? y).isNone && !(← get).tuples.contains (← getVarName y) && (i == 0 || i == 1) then
+      return true
   let .fap fn args := decl.value | return false
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited" || fn.getString!.contains "boxed_const") then return true
   if (← loopExpandable? decl.value).isSome then return false
@@ -2306,8 +2577,10 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
       usedBeforeSideEffect x k
     else
       return false
-  | .sset y _ _ z _ _ _ | .uset y _ z _ _ =>
-    return z == x && y != x
+  | .sset y _ _ z _ k _ | .uset y _ z k _ =>
+    if z == x then return y != x
+    else if y != x then usedBeforeSideEffect x k
+    else return false
   | .let d2 k2 =>
     if (← loopExpandable? d2.value).isSome || (← papBeta? d2.value).isSome then
       let u := countUsesLetValue x d2.value
@@ -2320,8 +2593,16 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
       match d2.value with
       | .box .. | .unbox .. =>
         return countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
+      | .oproj _ y =>
+        if (← classStructOf? y).isNone then
+          return countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
+        else
+          return false
       | .ctor info _ =>
-        return info.name == ``Prod.mk && (skipRC k2 == .return d2.fvarId)
+        if info.name == ``Prod.mk && (skipRC k2 == .return d2.fvarId) then
+          return true
+        return !Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix &&
+          countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
       | .fap fn2 args2 =>
         if ← mayAliasArg d2 then
           return countUsesCode d2.fvarId k2 == 1 && (← usedBeforeSideEffect d2.fvarId k2)
@@ -2341,7 +2622,7 @@ partial def usedBeforeSideEffect (x : FVarId) (code : Code .impure) : EmitM Bool
       | .oproj .. | .sproj .. | .uproj .. =>
         usedBeforeSideEffect x k2
       | .ctor info _ =>
-        if !(← read).classStructs.values.contains info.name.getPrefix then
+        if !Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
           usedBeforeSideEffect x k2
         else
           return false
@@ -2465,9 +2746,30 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
     | .ctor info args =>
       if info.name == ``Prod.mk then
         let strs ← args.mapM toKotlinArg
-        let n ← getVarName x
-        modify fun st => { st with tuples := st.tuples.insert n strs }
-      else if let some s := (← read).classStructs.values.find? (· == info.name.getPrefix) then
+        if onlyUsedAsVirtualTuple x k then
+          let n ← getVarName x
+          modify fun st => { st with tuples := st.tuples.insert n strs }
+        else
+          let (pairExpr, pairTy) ← formatKotlinPair strs none
+          if countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
+            setParamVarName x pairExpr
+            recordVarType pairExpr pairTy
+            modify fun st => {
+              st with
+              tuples := st.tuples.insert pairExpr strs
+              materializedTuples := st.materializedTuples.insert pairExpr
+            }
+          else
+            let n ← getVarName x
+            recordVarType n pairTy
+            emitLn s!"val {n} = {pairExpr}"
+            modify fun st => {
+              st with
+              tuples := st.tuples.insert n strs
+              materializedTuples := st.materializedTuples.insert n
+            }
+      else if Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
+        let s := info.name.getPrefix
         -- Update in place of the value the other fields are read from (see
         -- `Ownership.visitClassCtor?`, which verifies that it is no longer referenced).
         let mut src? : Option FVarId := none
@@ -2479,12 +2781,32 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
                   throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
               src? := some y
         let some y := src?
-          | throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{s}` (`@[kotlin_class]` values are only updated in place)"
+          | throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{s}` (`@[mutable_kotlin_class]` values are only updated in place)"
         for h : k in [:args.size] do
           if let .fvar v := args[k] then
             if ← isWriteBack x v then continue
           emitFieldWrite y (·.objs[k]?) (← toKotlinArg args[k])
         setParamVarName x (← getVarName y)
+      else if let some cls := Compiler.getImmutableKotlinClass? (← getEnv) info.name.getPrefix then
+        let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
+        let layout ← getCtorLayout info.name
+        let mut ctorArgs : Array String := #[]
+        for fi in layout.fieldInfo do
+          match fi with
+          | .object i _ => ctorArgs := ctorArgs.push (objs[i]?.getD "null")
+          | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
+          | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
+          | _ => pure ()
+        let rhs := s!"{cls}({String.intercalate ", " ctorArgs.toList})"
+        if countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+          setParamVarName x rhs
+          recordVarType rhs cls
+        else
+          let n ← getVarName x
+          recordVarType n cls
+          emitLn s!"val {n} = {rhs}"
+        emitCode k'
+        return
       else
         let n ← getVarName x
         recordVarType n (← inferLetKotlinType decl)
@@ -2495,9 +2817,8 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
       | none => emitFieldRead x y (·.objs[i]?) decl
     | .sproj _ off y => emitFieldRead x y (·.scalars[off]?) decl
     | .uproj i y => emitFieldRead x y (·.usizes[i]?) decl
-    | .isShared _ =>
-      -- Verified by the ownership analysis: values updated in place are exclusively owned.
-      setParamVarName x "false"
+    | .isShared y =>
+      setParamVarName x (if (← isMutableClassFVar y) then "false" else "true")
     | .reset _ y => setParamVarName x (← getVarName y)
     | .reuse y _ _ args =>
       for h : k in [:args.size] do
@@ -2598,7 +2919,8 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
             | .fap fn _ => do
               pure ((← dropShape? fn).isSome || Ownership.isArraySet fn ||
                 Ownership.isInplaceExtern (← getEnv) fn)
-            | .ctor info _ => pure (info.name == ``Prod.mk)
+            | .ctor info _ => do
+              pure (info.name == ``Prod.mk || (Compiler.getKotlinClass? (← getEnv) info.name.getPrefix).isSome)
             | .oproj _ y => do pure ((← get).tuples.contains (← getVarName y))
             | .reset .. | .reuse .. => pure true
             | _ => pure false
@@ -2772,6 +3094,7 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
     (dest : LoopDest) : EmitM Unit := do
   let callee ← callee.internalize (uniqueIdents := true)
   let .code body := callee.value | return
+  let body ← simplifyResetReuse body
   markUsed body
   let n := (← get).loopCounter + 1
   modify fun st => { st with loopCounter := n }
@@ -2921,8 +3244,9 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let decl ← decl.internalize (uniqueIdents := true)
   let initKnownBools := ({} : Std.HashMap String Bool).insert "true" true |>.insert "false" false
   let initVarTypes := ({} : Std.HashMap String String).insert "true" "Boolean" |>.insert "false" "Boolean" |>.insert "Unit" "Unit"
-  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, nameStructs := {}, fieldVals := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {} }
+  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {} }
   let .code code := decl.value | return ()
+  let code ← simplifyResetReuse code
   markUsed code
   let fnAliases ← collectAliases code
   modify fun st => { st with aliases := fnAliases }
@@ -2961,7 +3285,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | none => pure (retUnit, retCast?)
   let monoDecl? ← getMonoDecl? decl.name
   let defaultRetTy := match monoDecl?.bind monoResultType? with
-    | some r => if r.isForall || r.isConstOf ``String then toKotlinType r else toKotlinType decl.type
+    | some r => if isRichMonoType r then toKotlinType r else toKotlinType decl.type
     | none => toKotlinType decl.type
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
@@ -2983,7 +3307,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       setParamVarName p.fvarId pName
       let emittedIdx := if member?.isSome then i - 1 else i
       let defaultParamTy := match monoDecl?.bind (·.params[i]?) with
-        | some mp => if mp.type.isForall || mp.type.isConstOf ``String then toKotlinType mp.type else toKotlinType p.type
+        | some mp => if isRichMonoType mp.type then toKotlinType mp.type else toKotlinType p.type
         | none => toKotlinType p.type
       let pType := (override? emittedIdx).getD defaultParamTy
       recordVarType pName pType
