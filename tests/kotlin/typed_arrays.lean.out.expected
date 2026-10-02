@@ -30,3 +30,49 @@
     return a.size
 }
 
+@PublishedApi internal fun f_swapArrayU32___redArg(a: UIntArray, i: Any?, j: Any?): Unit {
+    val tmp_1 = a[(i as Int)]
+    a[(i as Int)] = a[(j as Int)]
+    a[(j as Int)] = tmp_1
+    return
+}
+
+@PublishedApi internal fun f_swapArrayU32(a: UIntArray, i: Any?, j: Any?, hi: Any?, hj: Any?): Unit {
+    val tmp_1 = a[(i as Int)]
+    a[(i as Int)] = a[(j as Int)]
+    a[(j as Int)] = tmp_1
+    return
+}
+
+@PublishedApi internal fun f_swapIfInBoundsU32(a: UIntArray, i: Any?, j: Any?): Unit {
+    if ((i as Int) >= 0 && (i as Int) < a.size && (j as Int) >= 0 && (j as Int) < a.size) { val tmp_1 = a[(i as Int)]; a[(i as Int)] = a[(j as Int)]; a[(j as Int)] = tmp_1 }
+    return
+}
+
+@PublishedApi internal fun f_pushPopU32(a: UIntArray, x: UInt, y: UInt): UIntArray {
+    val a1_43_1 = (a + x)
+    val a2_45_2 = (a1_43_1 + y)
+    return (if (a2_45_2.isNotEmpty()) a2_45_2.copyOf(a2_45_2.size - 1) else a2_45_2)
+}
+
+@PublishedApi internal fun f_makeLiteralU32(a: UInt, b: UInt, c: UInt): UIntArray {
+    val v_x_51_1 = UIntArray(0)
+    val v_x_53_2 = (v_x_51_1 + a)
+    val v_x_55_3 = (v_x_53_2 + b)
+    return (v_x_55_3 + c)
+}
+
+@PublishedApi internal fun f_appendU32(a: UIntArray, b: UIntArray): UIntArray {
+    return (a + b)
+}
+
+@PublishedApi internal fun f_sliceU32(a: UIntArray, start: Any?, stop: Any?): UIntArray {
+    return a.copyOfRange(((start as Int)).coerceIn(0, a.size), ((stop as Int)).coerceIn(((start as Int)).coerceIn(0, a.size), a.size))
+}
+
+@PublishedApi internal fun f_makeLiteralStr(a: String, b: String): Array<Any?> {
+    val v_x_68_1 = arrayOfNulls<Any?>(0)
+    val v_x_69_2 = (v_x_68_1.copyOf(v_x_68_1.size + 1).also { it[v_x_68_1.size] = a })
+    return (v_x_69_2.copyOf(v_x_69_2.size + 1).also { it[v_x_69_2.size] = b })
+}
+

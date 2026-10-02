@@ -188,11 +188,18 @@ def escape (st : PathState) (i : Nat) : PathState :=
   modifyObj st i fun o => { o with rc := .top, pristine? := none }
 
 def isArraySet (fn : Name) : Bool :=
-  fn == ``Array.set! || fn == ``Array.uset || fn == `Array.setIfInBounds || fn == `Array.fset
+  fn == ``Array.set! || fn == ``Array.uset || fn == `Array.setIfInBounds || fn == `Array.fset ||
+    fn == ``Array.swap || fn == ``Array.swapIfInBounds || fn == `Array.uswap
 
 def isArrayAlloc (fn : Name) : Bool :=
   fn == ``Array.replicate || fn == `Array.mkArray || fn == ``Array.mkEmpty ||
-    fn == ``Array.emptyWithCapacity
+    fn == ``Array.emptyWithCapacity || fn == ``Array.push || fn == ``Array.pop ||
+    fn == ``Array.append || fn == `Array.append._redArg ||
+    fn == ``Array.appendCore || fn == `Array.appendCore._redArg ||
+    fn == ``Array.extract || fn == `Array.extract._redArg ||
+    fn == ``Array.mkArray0 || fn == ``Array.mkArray1 || fn == ``Array.mkArray2 ||
+    fn == ``Array.mkArray3 || fn == ``Array.mkArray4 || fn == ``Array.mkArray5 ||
+    fn == ``Array.mkArray6 || fn == ``Array.mkArray7 || fn == ``Array.mkArray8
 
 /--
 `@[extern "kotlin_inplace:<template>"]`: a Kotlin statement that updates its first argument, which
