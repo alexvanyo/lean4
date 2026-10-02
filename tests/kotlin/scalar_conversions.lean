@@ -26,3 +26,13 @@ def testDirectCast (a : UInt32) (b : Int32) : UInt64 :=
   let b_as_u : UInt64 := UInt64.ofNat (Int.toNat b.toInt)
   let a_as_u : UInt64 := a.toUInt64
   a_as_u + b_as_u
+
+def testFloatConversions (f : Float) (f32 : Float32) (u32 : UInt32) (i32 : Int32) : Float :=
+  let u : UInt32 := f.toUInt32
+  let s : Int32 := f.toInt32
+  let s32 : Int32 := f32.toInt32
+  let f_from_u : Float := u.toFloat + u32.toFloat
+  let f_from_s : Float := s.toFloat + i32.toFloat + s32.toFloat
+  let f32_sum : Float32 := f.toFloat32 + u32.toFloat32 + i32.toFloat32
+  f_from_u + f_from_s + f32_sum.toFloat
+

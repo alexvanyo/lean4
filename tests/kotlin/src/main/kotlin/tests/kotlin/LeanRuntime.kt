@@ -5,27 +5,6 @@ import kotlin.toUShort as stdlibToUShort
 import kotlin.toUInt as stdlibToUInt
 import kotlin.toULong as stdlibToULong
 
-@Suppress("NOTHING_TO_INLINE", "UNCHECKED_CAST")
-inline operator fun Any?.invoke(vararg args: Any?): Any? {
-    return (this as Function<*>).let {
-        when (it) {
-            is Function0<*> -> it()
-            is Function1<*, *> -> (it as (Any?) -> Any?)(args[0])
-            is Function2<*, *, *> -> (it as (Any?, Any?) -> Any?)(args[0], args[1])
-            else -> error("Unsupported function arity: $it")
-        }
-    }
-}
-
-fun f_Float_ofScientific(m: Any?, s: Boolean, e: Any?): Double {
-    val mantissa = (m as Number).toDouble()
-    val exponent = (e as Number).toDouble()
-    val scale = Math.pow(10.0, if (s) -exponent else exponent)
-    return mantissa * scale
-}
-
-fun f_Float_add(a: Double, b: Double): Double = a + b
-
 private fun toJvmNumber(a: Any?): java.lang.Number = when (a) {
     is java.lang.Number -> a
     is UByte -> a.toByte() as java.lang.Number

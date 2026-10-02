@@ -85,29 +85,172 @@
     return res_92_3
 }
 
-@PublishedApi internal fun f_testFloats___redArg___closed__0(): Double {
-    return f_Float_ofScientific(15, true, 1)
+@PublishedApi internal fun f_testFloats___closed__0(): Double {
+    return 15e-1
 }
 
-@PublishedApi internal fun f_testFloats___redArg(f1: Double): Double {
-    val v_x_99_1 = f_testFloats___redArg___closed__0()
-    return f_Float_add(f1, v_x_99_1)
+@PublishedApi internal fun f_testFloats___closed__1(): Double {
+    return 5e-1
 }
 
-@PublishedApi internal fun f_testFloats___redArg___boxed(f1: Any?): Any? {
-    val f1_boxed_102_1 = (f1 as Double)
-    val res_103_2 = f_testFloats___redArg(f1_boxed_102_1)
-    return res_103_2
+@PublishedApi internal fun f_testFloats___closed__2(): Double {
+    return 20e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__3(): Double {
+    return 40e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__4(): Double {
+    return 90e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__5(): Double {
+    val v_x_114_1 = f_testFloats___closed__4()
+    return kotlin.math.sqrt(v_x_114_1)
+}
+
+@PublishedApi internal fun f_testFloats___closed__6(): Double {
+    return 27e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__7(): Double {
+    val v_x_120_1 = f_testFloats___closed__6()
+    return kotlin.math.floor(v_x_120_1)
+}
+
+@PublishedApi internal fun f_testFloats___closed__8(): Double {
+    return 23e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__9(): Double {
+    val v_x_126_1 = f_testFloats___closed__8()
+    return kotlin.math.ceil(v_x_126_1)
+}
+
+@PublishedApi internal fun f_testFloats___closed__10(): Double {
+    return 0e-1
+}
+
+@PublishedApi internal fun f_testFloats___closed__11(): Double {
+    return 100e-1
 }
 
 @PublishedApi internal fun f_testFloats(f1: Double, f2: Float): Double {
-    return f_testFloats___redArg(f1)
+    val v_x_138_1 = f_testFloats___closed__0()
+    val sum_139_2 = (f1 + v_x_138_1)
+    val v_x_140_3 = f_testFloats___closed__1()
+    val diff_141_4 = (sum_139_2 - v_x_140_3)
+    val v_x_142_5 = f_testFloats___closed__2()
+    val prod_143_6 = (diff_141_4 * v_x_142_5)
+    val v_x_144_7 = f_testFloats___closed__3()
+    val neg_146_8 = (-(prod_143_6 / v_x_144_7))
+    val v_y_148_9: Double
+    jp_1@ do     {
+        val v_x_159_10 = f_testFloats___closed__11()
+        if ((f1 < v_x_159_10))         {
+            if ((f1 <= v_x_159_10))             {
+                val v_x_162_11 = f_testFloats___closed__10()
+                if (!(f1 == v_x_162_11))                 {
+                    val from32_164_12 = (f2).toDouble()
+                    v_y_148_9 = from32_164_12
+                    break@jp_1
+                }
+            }
+        }
+        val v_x_158_13 = f_testFloats___closed__10()
+        v_y_148_9 = v_x_158_13
+        break@jp_1
+        } while (false)
+    val v_x_149_14 = kotlin.math.abs(neg_146_8)
+    val v_x_150_15 = f_testFloats___closed__5()
+    val v_x_151_16 = (v_x_149_14 + v_x_150_15)
+    val v_x_152_17 = f_testFloats___closed__7()
+    val v_x_153_18 = (v_x_151_16 + v_x_152_17)
+    val v_x_154_19 = f_testFloats___closed__9()
+    return ((v_x_153_18 + v_x_154_19) + v_y_148_9)
 }
 
 @PublishedApi internal fun f_testFloats___boxed(f1: Any?, f2: Any?): Any? {
-    val f1_boxed_110_1 = (f1 as Double)
-    val f2_boxed_111_2 = (f2 as Float)
-    val res_112_3 = f_testFloats(f1_boxed_110_1, f2_boxed_111_2)
-    return res_112_3
+    val f1_boxed_167_1 = (f1 as Double)
+    val f2_boxed_168_2 = (f2 as Float)
+    val res_169_3 = f_testFloats(f1_boxed_167_1, f2_boxed_168_2)
+    return res_169_3
+}
+
+@PublishedApi internal fun f_testFloat32s___closed__0(): Float {
+    return 0e-1f
+}
+
+@PublishedApi internal fun f_testFloat32s___closed__1(): Float {
+    return 5e-1f
+}
+
+@PublishedApi internal fun f_testFloat32s___closed__2(): Float {
+    return 20e-1f
+}
+
+@PublishedApi internal fun f_testFloat32s___closed__3(): Float {
+    return 40e-1f
+}
+
+@PublishedApi internal fun f_testFloat32s(a: Float, b: Float): Float {
+    val v_x_189_1 = (a + b)
+    val v_x_192_2 = f_testFloat32s___closed__1()
+    if ((a < b))     {
+        if ((a <= b))         {
+            if (!(a == b))             {
+                val v_x_196_3 = f_testFloat32s___closed__2()
+                val v_x_198_4 = ((v_x_189_1 - v_x_192_2) * v_x_196_3)
+                val v_x_199_5 = f_testFloat32s___closed__3()
+                return kotlin.math.abs((-(v_x_198_4 / v_x_199_5)))
+            }
+        }
+    }
+    return f_testFloat32s___closed__0()
+}
+
+@PublishedApi internal fun f_testFloat32s___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_205_1 = (a as Float)
+    val b_boxed_206_2 = (b as Float)
+    val res_207_3 = f_testFloat32s(a_boxed_205_1, b_boxed_206_2)
+    return res_207_3
+}
+
+@PublishedApi internal fun f_testLeanInts___closed__0(): Any? {
+    return 3
+}
+
+@PublishedApi internal fun f_testLeanInts___closed__1(): Any? {
+    return 2
+}
+
+@PublishedApi internal fun f_testLeanInts___closed__2(): Any? {
+    val v_x_213_1 = f_testLeanInts___closed__1()
+    return (-(v_x_213_1 as Int))
+}
+
+@PublishedApi internal fun f_testLeanInts(a: Any?, b: Any?): Any? {
+    val sum_217_1 = ((a as Int) + (b as Int))
+    val v_x_218_2 = f_testLeanInts___closed__0()
+    val diff_219_3 = (sum_217_1 - (v_x_218_2 as Int))
+    val v_x_220_4 = f_testLeanInts___closed__2()
+    val prod_221_5 = (diff_219_3 * (v_x_220_4 as Int))
+    val r_223_6 = (prod_221_5 % (v_x_218_2 as Int))
+    val eq_224_7 = (if ((b as Int) == 0) 0 else if ((b as Int) > 0) Math.floorDiv((a as Int), (b as Int)) else -Math.floorDiv((a as Int), -(b as Int)))
+    val er_225_8 = (if ((b as Int) == 0) (a as Int) else Math.floorMod((a as Int), kotlin.math.abs((b as Int))))
+    val neg_226_9 = (-(prod_221_5 / (v_x_218_2 as Int)))
+    if (!((a as Int) == (b as Int)))     {
+        if (!((a as Int) < (b as Int)))         {
+            if (!((a as Int) <= (b as Int)))             {
+                return ((neg_226_9 - r_223_6) + kotlin.math.abs((a as Int)))
+            }
+        }
+    }
+    return ((((neg_226_9 + r_223_6) + eq_224_7) + er_225_8) + kotlin.math.abs((a as Int)))
+}
+
+@PublishedApi internal fun f_testLeanInts___boxed(a: Any?, b: Any?): Any? {
+    return f_testLeanInts(a, b)
 }
 
