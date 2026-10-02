@@ -1,0 +1,19 @@
+// Generated automatically by the Lean 4 Kotlin backend. DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:JvmName("MyGeneratedFile")
+
+import java.util.concurrent.atomic.AtomicInteger
+
+public class MyCounter(initial: Int) {
+    private var current: Int = initial
+
+    init {
+        current = initial
+    }
+
+    public fun add(delta: Int): Int {
+        return ((this as Int) + delta)
+    }
+
+    fun reset() { current = 0 }
+}

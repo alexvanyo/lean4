@@ -1,0 +1,136 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal tailrec fun f_loopSum(n: UInt, acc: UInt): UInt {
+    if (!(n == 0u))     {
+        var n_9_1: UInt = (n - 1u)
+        var acc_10_2: UInt = (acc + n)
+        loop_1@ while (true)         {
+            if (!(n_9_1 == 0u))             {
+                val n_9_1_t = (n_9_1 - 1u)
+                val acc_10_2_t = (acc_10_2 + n_9_1)
+                n_9_1 = n_9_1_t
+                acc_10_2 = acc_10_2_t
+                continue@loop_1
+            } else             {
+                return acc_10_2
+            }
+        }
+    } else     {
+        return acc
+    }
+}
+
+@PublishedApi internal fun f_loopSum___boxed(n: Any?, acc: Any?): Any? {
+    val n_boxed_19_1 = (n as UInt)
+    val acc_boxed_20_2 = (acc as UInt)
+    var n_23_4: UInt = n_boxed_19_1
+    var acc_24_5: UInt = acc_boxed_20_2
+    val res_21_3: UInt
+    loop_1@ while (true)     {
+        if (!(n_23_4 == 0u))         {
+            val n_23_4_t = (n_23_4 - 1u)
+            val acc_24_5_t = (acc_24_5 + n_23_4)
+            n_23_4 = n_23_4_t
+            acc_24_5 = acc_24_5_t
+            continue@loop_1
+        } else         {
+            res_21_3 = acc_24_5
+            break@loop_1
+        }
+    }
+    return res_21_3
+}
+
+@PublishedApi internal fun f_computeSum(limit: UInt): UInt {
+    var n_34_1: UInt = limit
+    var acc_35_2: UInt = 0u
+    loop_1@ while (true)     {
+        if (!(n_34_1 == 0u))         {
+            val n_34_1_t = (n_34_1 - 1u)
+            val acc_35_2_t = (acc_35_2 + n_34_1)
+            n_34_1 = n_34_1_t
+            acc_35_2 = acc_35_2_t
+            continue@loop_1
+        } else         {
+            return acc_35_2
+        }
+    }
+}
+
+@PublishedApi internal fun f_computeSum___boxed(limit: Any?): Any? {
+    val limit_boxed_43_1 = (limit as UInt)
+    val res_44_2 = f_computeSum(limit_boxed_43_1)
+    return res_44_2
+}
+
+@PublishedApi internal tailrec fun f_findIndexLoop(limit: UInt, target: UInt, idx: UInt): Int {
+    if (!(limit <= idx))     {
+        if (!(idx == target))         {
+            var idx_57_1: UInt = (idx + 1u)
+            loop_1@ while (true)             {
+                if (!(limit <= idx_57_1))                 {
+                    if (!(idx_57_1 == target))                     {
+                        idx_57_1 = (idx_57_1 + 1u)
+                        continue@loop_1
+                    } else                     {
+                        return (idx_57_1).toInt()
+                    }
+                } else                 {
+                    return (-1)
+                }
+            }
+        } else         {
+            return (idx).toInt()
+        }
+    } else     {
+        return (-1)
+    }
+}
+
+@PublishedApi internal fun f_findIndexLoop___boxed(limit: Any?, target: Any?, idx: Any?): Any? {
+    val limit_boxed_67_1 = (limit as UInt)
+    val target_boxed_68_2 = (target as UInt)
+    val idx_boxed_69_3 = (idx as UInt)
+    var idx_74_5: UInt = idx_boxed_69_3
+    val res_70_4: Int
+    loop_1@ while (true)     {
+        if (!(limit_boxed_67_1 <= idx_74_5))         {
+            if (!(idx_74_5 == target_boxed_68_2))             {
+                idx_74_5 = (idx_74_5 + 1u)
+                continue@loop_1
+            } else             {
+                res_70_4 = (idx_74_5).toInt()
+                break@loop_1
+            }
+        } else         {
+            res_70_4 = (-1)
+            break@loop_1
+        }
+    }
+    return res_70_4
+}
+
+@PublishedApi internal fun f_searchWithEarlyReturn(limit: UInt, target: UInt): Int {
+    var idx_87_1: UInt = 0u
+    loop_1@ while (true)     {
+        if (!(limit <= idx_87_1))         {
+            if (!(idx_87_1 == target))             {
+                idx_87_1 = (idx_87_1 + 1u)
+                continue@loop_1
+            } else             {
+                return (idx_87_1).toInt()
+            }
+        } else         {
+            return (-1)
+        }
+    }
+}
+
+@PublishedApi internal fun f_searchWithEarlyReturn___boxed(limit: Any?, target: Any?): Any? {
+    val limit_boxed_96_1 = (limit as UInt)
+    val target_boxed_97_2 = (target as UInt)
+    val res_98_3 = f_searchWithEarlyReturn(limit_boxed_96_1, target_boxed_97_2)
+    return res_98_3
+}
+

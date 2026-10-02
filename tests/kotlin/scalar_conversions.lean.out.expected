@@ -1,0 +1,24 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_testConversions(n: Any?, i: Any?, u64: ULong, i64: Long): Any? {
+    return ((((((((((((n).toUByte()).toInt()).toInt() + (((n).toUShort()).toInt()).toInt()) as Int) + (((n).toUInt()).toInt()).toInt()) as Int) + ((u64).toInt()).toInt()) as Int) + ((((i).toByte()).toInt()).toInt() as Int)) as Int) + (((i64).toInt()).toInt() as Int))
+}
+
+@PublishedApi internal fun f_testConversions___boxed(n: Any?, i: Any?, u64: Any?, i64: Any?): Any? {
+    val u64_boxed_26_1 = (u64 as ULong)
+    val i64_boxed_27_2 = (i64 as Long)
+    return f_testConversions(n, i, u64_boxed_26_1, i64_boxed_27_2)
+}
+
+@PublishedApi internal fun f_testDirectCast(a: UInt, b: Int): ULong {
+    return ((a).toULong() + (b).toULong())
+}
+
+@PublishedApi internal fun f_testDirectCast___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_38_1 = (a as UInt)
+    val b_boxed_39_2 = (b as Int)
+    val res_40_3 = f_testDirectCast(a_boxed_38_1, b_boxed_39_2)
+    return res_40_3
+}
+

@@ -333,6 +333,18 @@ add_test_pile(misc *.sh)
 add_test_pile(misc_bench *.sh BENCH PART2)
 add_test_pile(server *.lean)
 add_test_pile(server_interactive *.lean)
+add_test_pile(kotlin *.lean)
+
+add_test(
+  NAME kotlin_gradle
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/kotlin"
+  COMMAND
+    bash -c
+    "
+           set -eu
+           export ${TEST_VARS}
+           ./gradlew test"
+)
 
 add_test_dir(../doc/examples/compiler)
 add_test_dir(bench/build BENCH PART1)

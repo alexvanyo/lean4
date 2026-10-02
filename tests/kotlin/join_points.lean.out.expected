@@ -1,0 +1,65 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_testJoinPointAliases(flag: Boolean, x: UInt, y: UInt): UInt {
+    val v_y_5_1: UInt
+    if (!flag)     {
+        val v_x_9_2 = (x - y)
+        v_y_5_1 = v_x_9_2
+    } else     {
+        val v_x_10_3 = (x + y)
+        v_y_5_1 = v_x_10_3
+    }
+    return ((v_y_5_1 shl 1) + 1u)
+}
+
+@PublishedApi internal fun f_testJoinPointAliases___boxed(flag: Any?, x: Any?, y: Any?): Any? {
+    val flag_boxed_14_1 = (flag as Boolean)
+    val x_boxed_15_2 = (x as UInt)
+    val y_boxed_16_3 = (y as UInt)
+    val res_17_4 = f_testJoinPointAliases(flag_boxed_14_1, x_boxed_15_2, y_boxed_16_3)
+    return res_17_4
+}
+
+@PublishedApi internal fun f_testNestedJoinPoints(cond1: Boolean, cond2: Boolean, a: Int, b: Int, c: Int): Int {
+    val v_y_25_1: Int
+    if (!cond1)     {
+        if (!cond2)         {
+            val v_x_28_2 = (b - c)
+            v_y_25_1 = v_x_28_2
+        } else         {
+            val v_x_29_3 = (b + c)
+            v_y_25_1 = v_x_29_3
+        }
+    } else     {
+        if (!cond2)         {
+            val v_x_30_4 = (a - b)
+            v_y_25_1 = v_x_30_4
+        } else         {
+            val v_x_31_5 = (a + b)
+            v_y_25_1 = v_x_31_5
+        }
+    }
+    return (v_y_25_1 * 2)
+}
+
+@PublishedApi internal fun f_testNestedJoinPoints___boxed(cond1: Any?, cond2: Any?, a: Any?, b: Any?, c: Any?): Any? {
+    val cond1_boxed_37_1 = (cond1 as Boolean)
+    val cond2_boxed_38_2 = (cond2 as Boolean)
+    val a_boxed_39_3 = (a as Int)
+    val b_boxed_40_4 = (b as Int)
+    val c_boxed_41_5 = (c as Int)
+    val res_42_6 = f_testNestedJoinPoints(cond1_boxed_37_1, cond2_boxed_38_2, a_boxed_39_3, b_boxed_40_4, c_boxed_41_5)
+    return res_42_6
+}
+
+@PublishedApi internal fun f_testPreserveLet(x: UInt): UInt {
+    return ((x + 10u) + 5u)
+}
+
+@PublishedApi internal fun f_testPreserveLet___boxed(x: Any?): Any? {
+    val x_boxed_50_1 = (x as UInt)
+    val res_51_2 = f_testPreserveLet(x_boxed_50_1)
+    return res_51_2
+}
+

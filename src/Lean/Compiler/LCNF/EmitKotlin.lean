@@ -2229,7 +2229,8 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
           emit elseBuf
           emitLn "}"
     else
-      emitIndent; emit s!"when ({discrName}) "; emitLn "{"
+      let discrExpr ← if (← get).varTypes[discrName]? == some "UByte" then pure s!"({discrName}).toInt()" else pure discrName
+      emitIndent; emit s!"when ({discrExpr}) "; emitLn "{"
       withIndent do
         for alt in cs.alts do
           match alt with
@@ -2241,6 +2242,8 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
             emitIndent; emit "else -> "; emitLn "{"
             withFieldVals <| withIndent (emitCode altCode)
             emitLn "}"
+        unless cs.alts.any (· matches .default _) do
+          emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
       emitLn "}"
   | .return fvarId =>
     emitReturnVar fvarId
@@ -2543,6 +2546,8 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       setParamVarName p.fvarId "this"
       if let some info := member? then
         recordVarType "this" info.recvType
+        if let some s := (← read).classStructs[info.className]? then
+          modify fun st => { st with nameStructs := st.nameStructs.insert "this" s }
     else
       -- Parameter names are part of the Kotlin API (named arguments, API files), so keep the
       -- binder name when it is a plain identifier. Locals always get a numeric suffix.

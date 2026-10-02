@@ -1,0 +1,25 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+class Buffer(var size: Int, var capacity: Int) {
+public fun clear(): Unit {
+    val v_x_4_2: Any?
+    v_x_4_2 = this
+    val v_x_8_3: Any?
+    v_x_8_3 = v_x_4_2
+    return
+}
+
+public fun grow(additional: Int): Unit {
+    val capacity_14_2 = capacity
+    val v_x_16_3: Any?
+    v_x_16_3 = this
+    val v_x_18_4 = (capacity_14_2 + additional)
+    val v_x_20_5: Any?
+    v_x_20_5 = v_x_16_3
+    return
+}
+
+
+}
+

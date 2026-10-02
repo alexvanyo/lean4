@@ -1,0 +1,139 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_Color_ctorIdx(x: UByte): Any? {
+    when ((x).toInt())     {
+        0 ->         {
+            return 0
+        }
+        1 ->         {
+            return 1
+        }
+        2 ->         {
+            return 2
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Color_ctorIdx___boxed(x: Any?): Any? {
+    val x_boxed_6_1 = (x as UByte)
+    return f_Color_ctorIdx(x_boxed_6_1)
+}
+
+@PublishedApi internal fun f_Color_ctorElim___redArg(k: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_ctorElim___redArg___boxed(k: Any?): Unit {
+    f_Color_ctorElim___redArg(k)
+    return
+}
+
+@PublishedApi internal fun f_Color_ctorElim(motive: Any?, ctorIdx: Any?, t: UByte, h: Any?, k: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Unit {
+    val t_boxed_21_1 = (t as UByte)
+    f_Color_ctorElim(motive, ctorIdx, t_boxed_21_1, h, k)
+    return
+}
+
+@PublishedApi internal fun f_Color_red_elim___redArg(red: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_red_elim___redArg___boxed(red: Any?): Unit {
+    f_Color_red_elim___redArg(red)
+    return
+}
+
+@PublishedApi internal fun f_Color_red_elim(motive: Any?, t: UByte, h: Any?, red: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_red_elim___boxed(motive: Any?, t: Any?, h: Any?, red: Any?): Unit {
+    val t_boxed_34_1 = (t as UByte)
+    f_Color_red_elim(motive, t_boxed_34_1, h, red)
+    return
+}
+
+@PublishedApi internal fun f_Color_green_elim___redArg(green: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_green_elim___redArg___boxed(green: Any?): Unit {
+    f_Color_green_elim___redArg(green)
+    return
+}
+
+@PublishedApi internal fun f_Color_green_elim(motive: Any?, t: UByte, h: Any?, green: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_green_elim___boxed(motive: Any?, t: Any?, h: Any?, green: Any?): Unit {
+    val t_boxed_47_1 = (t as UByte)
+    f_Color_green_elim(motive, t_boxed_47_1, h, green)
+    return
+}
+
+@PublishedApi internal fun f_Color_blue_elim___redArg(blue: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_blue_elim___redArg___boxed(blue: Any?): Unit {
+    f_Color_blue_elim___redArg(blue)
+    return
+}
+
+@PublishedApi internal fun f_Color_blue_elim(motive: Any?, t: UByte, h: Any?, blue: Any?): Unit {
+    return
+}
+
+@PublishedApi internal fun f_Color_blue_elim___boxed(motive: Any?, t: Any?, h: Any?, blue: Any?): Unit {
+    val t_boxed_60_1 = (t as UByte)
+    f_Color_blue_elim(motive, t_boxed_60_1, h, blue)
+    return
+}
+
+@PublishedApi internal fun f_colorToCode(c: UByte): UInt {
+    when ((c).toInt())     {
+        0 ->         {
+            return 1u
+        }
+        1 ->         {
+            return 2u
+        }
+        2 ->         {
+            return 3u
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_colorToCode___boxed(c: Any?): Any? {
+    val c_boxed_67_1 = (c as UByte)
+    val res_68_2 = f_colorToCode(c_boxed_67_1)
+    return res_68_2
+}
+
+@PublishedApi internal fun f_compareValues(a: UInt, b: UInt): UByte {
+    if (!(a < b))     {
+        if (!(a == b))         {
+            return (2u).toUByte()
+        } else         {
+            return (1u).toUByte()
+        }
+    } else     {
+        return (0u).toUByte()
+    }
+}
+
+@PublishedApi internal fun f_compareValues___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_79_1 = (a as UInt)
+    val b_boxed_80_2 = (b as UInt)
+    val res_81_3 = f_compareValues(a_boxed_79_1, b_boxed_80_2)
+    return res_81_3
+}
+

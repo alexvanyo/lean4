@@ -1,0 +1,14 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+class Triple(var fst: Int, var snd: Int, var thd: Int) {
+public fun sumFields(): Int {
+    val fst_2_1 = fst
+    val snd_3_2 = snd
+    val thd_4_3 = thd
+    return ((fst_2_1 + snd_3_2) + thd_4_3)
+}
+
+
+}
+

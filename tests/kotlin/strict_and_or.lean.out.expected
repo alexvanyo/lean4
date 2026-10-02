@@ -1,0 +1,57 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_myStrictAnd(a: Boolean, b: Boolean): Boolean {
+    if (!a)     {
+        return false
+    } else     {
+        return b
+    }
+}
+
+@PublishedApi internal fun f_myStrictAnd___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_5_1 = (a as Boolean)
+    val b_boxed_6_2 = (b as Boolean)
+    val res_7_3 = f_myStrictAnd(a_boxed_5_1, b_boxed_6_2)
+    return res_7_3
+}
+
+@PublishedApi internal fun f_myStrictOr(a: Boolean, b: Boolean): Boolean {
+    if (!a)     {
+        return b
+    } else     {
+        return true
+    }
+}
+
+@PublishedApi internal fun f_myStrictOr___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_13_1 = (a as Boolean)
+    val b_boxed_14_2 = (b as Boolean)
+    val res_15_3 = f_myStrictOr(a_boxed_13_1, b_boxed_14_2)
+    return res_15_3
+}
+
+@PublishedApi internal fun f_condBranch(x: UInt, y: UInt): UInt {
+    if ((y < x))     {
+        if ((0u < y))         {
+            return (x - y)
+        }
+    }
+    if (!(x == y))     {
+        if (!(x == 0u))         {
+            return 0u
+        } else         {
+            return (x + y)
+        }
+    } else     {
+        return (x + y)
+    }
+}
+
+@PublishedApi internal fun f_condBranch___boxed(x: Any?, y: Any?): Any? {
+    val x_boxed_31_1 = (x as UInt)
+    val y_boxed_32_2 = (y as UInt)
+    val res_33_3 = f_condBranch(x_boxed_31_1, y_boxed_32_2)
+    return res_33_3
+}
+

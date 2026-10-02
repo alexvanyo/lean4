@@ -1,0 +1,15 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+package org.leanprover.demo
+
+// Custom Preamble Header
+
+@PublishedApi internal fun f_reachableHelper(x: UInt): UInt {
+    return (x + 42u)
+}
+
+@PublishedApi internal fun f_exportedAdd(a: UInt, b: UInt): UInt {
+    return f_reachableHelper((a + b))
+}
+
