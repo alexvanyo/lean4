@@ -1,15 +1,15 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
-@PublishedApi internal inline fun f_applyTwice(f: Any?, x: UInt): UInt {
+@PublishedApi internal inline fun f_applyTwice(f: (UInt) -> UInt, x: UInt): UInt {
     val v_x_4_1 = f(x)
     val v_x_5_2 = f(v_x_4_1)
-    return (v_x_5_2 as UInt)
+    return v_x_5_2
 }
 
 @PublishedApi internal fun f_applyTwice___boxed(f: Any?, x: Any?): Any? {
     val x_boxed_9_1 = (x as UInt)
-    val res_10_2 = f_applyTwice(f, x_boxed_9_1)
+    val res_10_2 = f_applyTwice((f as (UInt) -> UInt), x_boxed_9_1)
     return res_10_2
 }
 
@@ -32,5 +32,76 @@
     val inputVal_boxed_26_1 = (inputVal as UInt)
     val res_27_2 = f_testClosureApp(inputVal_boxed_26_1)
     return res_27_2
+}
+
+@PublishedApi internal fun f_applyTwiceNoInline(f: (UInt) -> UInt, x: UInt): UInt {
+    val v_x_32_1 = f(x)
+    val v_x_33_2 = f(v_x_32_1)
+    return v_x_33_2
+}
+
+@PublishedApi internal fun f_applyTwiceNoInline___boxed(f: Any?, x: Any?): Any? {
+    val x_boxed_37_1 = (x as UInt)
+    val res_38_2 = f_applyTwiceNoInline((f as (UInt) -> UInt), x_boxed_37_1)
+    return res_38_2
+}
+
+@PublishedApi internal fun f_testNoInlineClosure___lam__0(p_0: UInt, p_1: UInt): UInt {
+    return (p_1 + p_0)
+}
+
+@PublishedApi internal fun f_testNoInlineClosure___lam__0___boxed(p_0: Any?, p_1: Any?): Any? {
+    val v_x_15_boxed_45_1 = (p_0 as UInt)
+    val v_y_16_boxed_46_2 = (p_1 as UInt)
+    val res_47_3 = f_testNoInlineClosure___lam__0(v_x_15_boxed_45_1, v_y_16_boxed_46_2)
+    return res_47_3
+}
+
+@PublishedApi internal fun f_testNoInlineClosure___closed__0___boxed__const__1(): Any? {
+    return 5u
+}
+
+@PublishedApi internal fun f_testNoInlineClosure___closed__0(): (UInt) -> UInt {
+    return { p_0: UInt -> f_testNoInlineClosure___lam__0(5u, p_0) }
+}
+
+@PublishedApi internal fun f_testNoInlineClosure(inputVal: UInt): UInt {
+    val v_f_54_1 = f_testNoInlineClosure___closed__0()
+    return f_applyTwiceNoInline(v_f_54_1, inputVal)
+}
+
+@PublishedApi internal fun f_testNoInlineClosure___boxed(inputVal: Any?): Any? {
+    val inputVal_boxed_57_1 = (inputVal as UInt)
+    val res_58_2 = f_testNoInlineClosure(inputVal_boxed_57_1)
+    return res_58_2
+}
+
+@PublishedApi internal fun f_applyBinary(g: (UInt, UInt) -> UInt, a: UInt, b: UInt): UInt {
+    val v_x_65_1 = g(a, b)
+    return v_x_65_1
+}
+
+@PublishedApi internal fun f_applyBinary___boxed(g: Any?, a: Any?, b: Any?): Any? {
+    val a_boxed_70_1 = (a as UInt)
+    val b_boxed_71_2 = (b as UInt)
+    val res_72_3 = f_applyBinary((g as (UInt, UInt) -> UInt), a_boxed_70_1, b_boxed_71_2)
+    return res_72_3
+}
+
+@PublishedApi internal fun f_chooseFn(b: Boolean, f: (UInt) -> UInt, g: (UInt) -> UInt, p_3: UInt): UInt {
+    if (!b)     {
+        val v_x_79_1 = g(p_3)
+        return v_x_79_1
+    } else     {
+        val v_x_82_2 = f(p_3)
+        return v_x_82_2
+    }
+}
+
+@PublishedApi internal fun f_chooseFn___boxed(b: Any?, f: Any?, g: Any?, p_3: Any?): Any? {
+    val b_boxed_88_1 = (b as Boolean)
+    val a_17_boxed_89_2 = (p_3 as UInt)
+    val res_90_3 = f_chooseFn(b_boxed_88_1, (f as (UInt) -> UInt), (g as (UInt) -> UInt), a_17_boxed_89_2)
+    return res_90_3
 }
 

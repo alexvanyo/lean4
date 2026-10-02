@@ -197,7 +197,7 @@ def splitLines (s : String) : List String :=
     if c == '\n' then (cur :: acc, "") else (acc, cur.push c)
   (cur :: acc).reverse
 
-def toKotlinType (ty : Expr) : String :=
+partial def toKotlinType (ty : Expr) : String :=
   match ty with
   | ImpureType.bool => "Boolean"
   | ImpureType.uint8 => "UByte"
@@ -218,7 +218,46 @@ def toKotlinType (ty : Expr) : String :=
   | .app (.const `jvmType _) (.lit (.strVal desc)) =>
     -- Types declared with `@[extern "kotlin:<Kotlin type>"]`.
     if desc.startsWith "kotlin:" then (desc.drop 7).toString else "Any?"
+  | .forallE .. =>
+    let rec go (e : Expr) (params : List String) : String :=
+      match e with
+      | .forallE _ d b _ =>
+        let pTy := toKotlinType d
+        go b (pTy :: params)
+      | r =>
+        let retTy := toKotlinType r
+        let paramStr := String.intercalate ", " params.reverse
+        s!"({paramStr}) -> {retTy}"
+    go ty []
   | _ => "Any?"
+
+/-- Parse a Kotlin function type `(P1, P2, ...) -> R` into `(#[P1, P2, ...], R)`. -/
+partial def parseKotlinFnType? (s : String) : Option (Array String × String) :=
+  if !s.startsWith "(" then none
+  else
+    let rec go (cs : List Char) (depth : Nat) (cur : String) (params : Array String) : Option (Array String × String) :=
+      match cs with
+      | [] => none
+      | '(' :: rest =>
+        go rest (depth + 1) (if depth == 0 then cur else cur.push '(') params
+      | ')' :: rest =>
+        if depth == 0 then none
+        else if depth == 1 then
+          let params := if cur.isEmpty && params.isEmpty then params else params.push cur
+          match rest with
+          | ' ' :: '-' :: '>' :: ' ' :: retChars =>
+            some (params, String.ofList retChars)
+          | _ => none
+        else
+          go rest (depth - 1) (cur.push ')') params
+      | ',' :: ' ' :: rest =>
+        if depth == 1 then
+          go rest 1 "" (params.push cur)
+        else
+          go (' ' :: rest) depth (cur.push ',') params
+      | c :: rest =>
+        go rest depth (cur.push c) params
+    go s.toList 0 "" #[]
 
 def defaultKotlinVal (ty : String) : String :=
   match ty with
@@ -796,6 +835,23 @@ def prodComponentKotlinType? (type : Expr) (c : Nat) : EmitM (Option String) := 
     return if t == "Any?" then none else some t
   catch _ => return none
 
+def monoResultType? (md : Decl .pure) : Option Expr :=
+  let rec go (e : Expr) (n : Nat) : Option Expr :=
+    match n with
+    | 0 => some e
+    | n + 1 =>
+      match e with
+      | .forallE _ _ b _ => go b n
+      | _ => none
+  go md.type md.params.size
+
+def unboxedPapFn (fn : Name) : EmitM Name := do
+  match fn with
+  | .str p "_boxed" =>
+    if (← read).declMap.contains p || (← getMonoDecl? p).isSome then return p
+    else return fn
+  | _ => return fn
+
 /-- The Kotlin return type of declaration `fn`. -/
 def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
   let env ← getEnv
@@ -819,6 +875,9 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
   if let some d := (← read).declMap[fn]? then
     let t := toKotlinType d.type
     if t != "Any?" then return t
+  if let some md ← getMonoDecl? fn then
+    if let some r := monoResultType? md then
+      if r.isForall then return toKotlinType r
   return toKotlinType defaultTy
 
 /--
@@ -979,14 +1038,74 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     if let some expr ← emitMemberCall? fn args then
       return expr
     let fnName := toKotlinFnName fn
-    let argStrs ← args.mapM toKotlinArg
+    let monoDecl? ← getMonoDecl? fn
+    let mut argStrs : Array String := #[]
+    for i in [:args.size] do
+      let aStr ← toKotlinArg args[i]!
+      let aStr ← match monoDecl?.bind (·.params[i]?) with
+        | some mp =>
+          if mp.type.isForall then
+            castIfNeeded aStr (toKotlinType mp.type)
+          else
+            pure aStr
+        | none => pure aStr
+      argStrs := argStrs.push aStr
     let argStr := String.intercalate ", " argStrs.toList
     return s!"{fnName}({argStr})"
   | .fvar fvarId args =>
     let fnName ← getVarName fvarId
-    let argStrs ← args.mapM toKotlinArg
+    let paramTys? := ((← get).varTypes[fnName]?).bind parseKotlinFnType? |>.map (·.1)
+    let mut argStrs : Array String := #[]
+    for i in [:args.size] do
+      let aStr ← toKotlinArg args[i]!
+      let aStr ← match paramTys?.bind (·[i]?) with
+        | some pTy => castIfNeeded aStr pTy
+        | none => pure aStr
+      argStrs := argStrs.push aStr
+    if let some paramTys := paramTys? then
+      if args.size < paramTys.size then
+        let mut lambdaParams : Array String := #[]
+        for i in [args.size:paramTys.size] do
+          let pName := s!"p_{i - args.size}"
+          lambdaParams := lambdaParams.push s!"{pName}: {paramTys[i]!}"
+          argStrs := argStrs.push pName
+        let argStr := String.intercalate ", " argStrs.toList
+        let paramStr := String.intercalate ", " lambdaParams.toList
+        return s!"\{ {paramStr} -> {fnName}({argStr}) }"
     let argStr := String.intercalate ", " argStrs.toList
     return s!"{fnName}({argStr})"
+  | .pap fn args =>
+    let targetFn ← unboxedPapFn fn
+    let monoDecl? ← getMonoDecl? targetFn
+    let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[targetFn]? with
+      | some d => pure (some d.params)
+      | none => (·.map (·.params)) <$> getImpureSignature? targetFn
+    let numParams := match impureParams? with
+      | some ps => ps.size
+      | none => (monoDecl?.map (·.params.size)).getD args.size
+    let paramTy (i : Nat) : String :=
+      let impTy := match impureParams?.bind (·[i]?) with
+        | some p => toKotlinType p.type
+        | none => "Any?"
+      if impTy != "Any?" then impTy
+      else match monoDecl?.bind (·.params[i]?) with
+        | some mp => toKotlinType mp.type
+        | none => "Any?"
+    let mut callArgs : Array String := #[]
+    for i in [:args.size] do
+      let aStr ← toKotlinArg args[i]!
+      let aStr ← castIfNeeded aStr (paramTy i)
+      callArgs := callArgs.push aStr
+    let mut lambdaParams : Array String := #[]
+    for i in [args.size:numParams] do
+      let pName := s!"p_{i - args.size}"
+      let pTy := paramTy i
+      lambdaParams := lambdaParams.push s!"{pName}: {pTy}"
+      callArgs := callArgs.push pName
+    let fnName := toKotlinFnName targetFn
+    let callStr := s!"{fnName}({String.intercalate ", " callArgs.toList})"
+    let paramStr := String.intercalate ", " lambdaParams.toList
+    return s!"\{ {paramStr} -> {callStr} }"
   | .box _ fvarId =>
     getVarName fvarId
   | .unbox fvarId =>
@@ -1106,18 +1225,70 @@ partial def collectSelfCallArgs (fnName : Name) (code : Code .impure)
   | .cases c => c.alts.foldl (fun acc alt => collectSelfCallArgs fnName alt.getCode acc) acc
   | c => match skipCont? c with | some k => collectSelfCallArgs fnName k acc | none => acc
 
+/--
+An `@[inline]` self-tail-recursive function (all self-calls in tail position, no recursive join
+points) is emitted as a `while (true)` loop at each call site instead of being called.
+-/
+def isLoopExpandable (env : Environment) (decl : Decl .impure) : Bool :=
+  match decl.value with
+  | .code code =>
+    Compiler.hasInlineAttribute env decl.name &&
+    (Compiler.getKotlinMemberInfo? env decl.name).isNone &&
+    hasSelfCall decl.name code && selfCallsAllTail decl.name code && !hasRecursiveJP code
+  | _ => false
+
+/--
+Checks whether all uses of `x` in `code` are either as the callee of `.fvar x args` or passed to a
+`loopExpandable` function, so `x` is beta-inlined at every use and does not need a Kotlin variable.
+-/
+partial def allUsesAreBetaInlined (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
+    (x : FVarId) (code : Code .impure) : Bool :=
+  let usesLV (v : LetValue .impure) : Bool :=
+    ((v.forFVarM (m := StateM Bool) (fun f => if f == x then set true else pure ())).run false).2
+  match code with
+  | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
+    allUsesAreBetaInlined env declMap x k
+  | .let d k =>
+    let okVal := match d.value with
+      | .fvar _ args => !args.any (· == .fvar x)
+      | .fap fn _ =>
+        if !usesLV d.value then true
+        else match declMap[fn]? with
+          | some callee => isLoopExpandable env callee
+          | none => false
+      | v => !usesLV v
+    okVal && allUsesAreBetaInlined env declMap x k
+  | .jp d k | .fun d k _ =>
+    allUsesAreBetaInlined env declMap x d.value && allUsesAreBetaInlined env declMap x k
+  | .cases cs =>
+    cs.discr != x && cs.alts.all fun alt => allUsesAreBetaInlined env declMap x alt.getCode
+  | .jmp fn args => fn != x && !args.any (· == .fvar x)
+  | .return f => f != x
+  | .unreach _ => true
+  | .oset y _ a k _ =>
+    y != x && a != .fvar x && allUsesAreBetaInlined env declMap x k
+  | .sset y _ _ z _ k _ | .uset y _ z k _ =>
+    y != x && z != x && allUsesAreBetaInlined env declMap x k
+  | .setTag y _ k _ =>
+    y != x && allUsesAreBetaInlined env declMap x k
+
 /-- Declarations called (or, if `paps`, also partially applied) in `code`. -/
-partial def collectCalls (code : Code .impure) (acc : Array Name) (paps := true) : Array Name :=
+partial def collectCalls (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
+    (code : Code .impure) (acc : Array Name) (paps := true) : Array Name :=
   match code with
   | .let decl k =>
     let acc := match decl.value with
       | .fap n _ => acc.push n
-      | .pap n _ => if paps then acc.push n else acc
+      | .pap n _ =>
+        let unboxed := match n with | .str p "_boxed" => p | _ => n
+        if paps then (acc.push n).push unboxed
+        else if !allUsesAreBetaInlined env declMap decl.fvarId k then acc.push unboxed
+        else acc
       | _ => acc
-    collectCalls k acc paps
-  | .jp decl k => collectCalls k (collectCalls decl.value acc paps) paps
-  | .cases c => c.alts.foldl (fun acc alt => collectCalls alt.getCode acc paps) acc
-  | c => match skipCont? c with | some k => collectCalls k acc paps | none => acc
+    collectCalls env declMap k acc paps
+  | .jp decl k => collectCalls env declMap k (collectCalls env declMap decl.value acc paps) paps
+  | .cases c => c.alts.foldl (fun acc alt => collectCalls env declMap alt.getCode acc paps) acc
+  | c => match skipCont? c with | some k => collectCalls env declMap k acc paps | none => acc
 
 /-- Declarations that are partially applied (closures) in `code`. -/
 partial def collectPaps (code : Code .impure) (acc : Std.HashSet Name) : Std.HashSet Name :=
@@ -1130,18 +1301,6 @@ partial def collectPaps (code : Code .impure) (acc : Std.HashSet Name) : Std.Has
   | .jp decl k => collectPaps k (collectPaps decl.value acc)
   | .cases c => c.alts.foldl (fun acc alt => collectPaps alt.getCode acc) acc
   | c => match skipCont? c with | some k => collectPaps k acc | none => acc
-
-/--
-An `@[inline]` self-tail-recursive function (all self-calls in tail position, no recursive join
-points) is emitted as a `while (true)` loop at each call site instead of being called.
--/
-def isLoopExpandable (env : Environment) (decl : Decl .impure) : Bool :=
-  match decl.value with
-  | .code code =>
-    Compiler.hasInlineAttribute env decl.name &&
-    (Compiler.getKotlinMemberInfo? env decl.name).isNone &&
-    hasSelfCall decl.name code && selfCallsAllTail decl.name code && !hasRecursiveJP code
-  | _ => false
 
 def loopExpandable? (v : LetValue .impure) : EmitM (Option (Decl .impure × Array (Arg .impure))) := do
   let .fap fn args := v | return none
@@ -1160,11 +1319,12 @@ def papBeta? (v : LetValue .impure) : EmitM (Option (Decl .impure × Array (Arg 
   let some d := (← read).declMap[fn]? | return none
   return some (d, papArgs ++ args)
 
-/-- Records `let x := pap fn args` of a local code declaration, emitting nothing. -/
-def recordPap? (decl : LetDecl .impure) : EmitM Bool := do
+/-- Records `let x := pap fn args` of a local code declaration, emitting nothing if all uses are beta-inlined. -/
+def recordPap? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
   let .pap fn args := decl.value | return false
   let some d := (← read).declMap[fn]? | return false
   let .code _ := d.value | return false
+  unless allUsesAreBetaInlined (← getEnv) (← read).declMap decl.fvarId k do return false
   let x ← getVarName decl.fvarId
   modify fun st => { st with paps := st.paps.insert x (fn, args) }
   return true
@@ -1626,6 +1786,41 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       return "Int"
     if baseTy != "Any?" then return baseTy
     fnRetKotlinType fn decl.type
+  | .fvar fvarId args =>
+    if baseTy != "Any?" then return baseTy
+    let fnName ← getVarName fvarId
+    if let some fnTy := (← get).varTypes[fnName]? then
+      if let some (paramTys, retTy) := parseKotlinFnType? fnTy then
+        if args.size < paramTys.size then
+          let remParams := (paramTys.extract args.size paramTys.size).toList
+          return s!"({String.intercalate ", " remParams}) -> {retTy}"
+        return retTy
+    return baseTy
+  | .pap fn args =>
+    let targetFn ← unboxedPapFn fn
+    let monoDecl? ← getMonoDecl? targetFn
+    let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[targetFn]? with
+      | some d => pure (some d.params)
+      | none => (·.map (·.params)) <$> getImpureSignature? targetFn
+    let numParams := match impureParams? with
+      | some ps => ps.size
+      | none => (monoDecl?.map (·.params.size)).getD args.size
+    let paramTy (i : Nat) : String :=
+      let impTy := match impureParams?.bind (·[i]?) with
+        | some p => toKotlinType p.type
+        | none => "Any?"
+      if impTy != "Any?" then impTy
+      else match monoDecl?.bind (·.params[i]?) with
+        | some mp => toKotlinType mp.type
+        | none => "Any?"
+    let mut remParams : Array String := #[]
+    for i in [args.size:numParams] do
+      remParams := remParams.push (paramTy i)
+    let defRetTy := match (← read).declMap[targetFn]? with
+      | some d => d.type
+      | none => decl.type
+    let retTy ← fnRetKotlinType targetFn defRetTy
+    return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
   | _ => return baseTy
 
 def isPureConstantLet (decl : LetDecl .impure) : EmitM Bool := do
@@ -1832,6 +2027,7 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
     else false
 
 def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
+  if decl.value matches .pap .. then return true
   let .fap fn args := decl.value | return false
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited" || fn.getString!.contains "boxed_const") then return true
   if (← loopExpandable? decl.value).isSome then return false
@@ -2032,7 +2228,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           emitCode k2
           return
     emitLoopExpansion lam args (.assign decl.fvarId decl.type)
-  else if ← recordPap? decl then
+  else if ← recordPap? decl k then
     pure ()
   else if ← tryAliasLet? decl then
     pure ()
@@ -2538,7 +2734,11 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
             | none => pure none
           pure (false, t?)
     | none => pure (retUnit, retCast?)
-  let retType := if retUnit then "Unit" else retCast?.getD (toKotlinType decl.type)
+  let monoDecl? ← getMonoDecl? decl.name
+  let defaultRetTy := match monoDecl?.bind monoResultType? with
+    | some r => if r.isForall then toKotlinType r else toKotlinType decl.type
+    | none => toKotlinType decl.type
+  let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
   for i in [:params.size] do
     let p := params[i]!
@@ -2557,7 +2757,10 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
         else s!"p_{i}"
       setParamVarName p.fvarId pName
       let emittedIdx := if member?.isSome then i - 1 else i
-      let pType := (override? emittedIdx).getD (toKotlinType p.type)
+      let defaultParamTy := match monoDecl?.bind (·.params[i]?) with
+        | some mp => if mp.type.isForall then toKotlinType mp.type else toKotlinType p.type
+        | none => toKotlinType p.type
+      let pType := (override? emittedIdx).getD defaultParamTy
       recordVarType pName pType
       paramDecls := paramDecls.push s!"{pName}: {pType}"
   let paramStr := String.intercalate ", " paramDecls.toList
@@ -2685,10 +2888,10 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
           visited := visited.insert n
           if let some d := declMap[n]? then
             if let .code c := d.value then
-              for m in collectCalls c #[] do
+              for m in collectCalls env declMap c #[] do
                 if declMap.contains m && !visited.contains m then
                   work := work.push m
-              for m in collectCalls (paps := false) c #[] do
+              for m in collectCalls env declMap (paps := false) c #[] do
                 applied := applied.insert m
       let rootNames := roots.map (·.name)
       -- Loop-expandable declarations are emitted inline at every call site, and declarations
