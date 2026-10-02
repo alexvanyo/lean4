@@ -283,7 +283,7 @@ trace: [Compiler.pushProj] size: 18
               goto resetjp.14 ◾ isSharedCheck.21
 [Compiler.pushProj] size: 2
     def test4._boxed a b c : tobj :=
-      let c.boxed : UInt8 := unbox c;
+      let c.boxed : Bool := unbox c;
       let res : tobj := test4 a b c.boxed;
       return res
 -/

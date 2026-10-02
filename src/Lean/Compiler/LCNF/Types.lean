@@ -172,7 +172,7 @@ where
     if ← isProp type then
       return erasedExpr
     if let .const declName us := type then
-      if let some desc := getExternNameFor (← getEnv) `jvm declName then
+      if let some desc := getExternNameFor (← getEnv) `kotlin declName then
         if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
           return .const declName us
     let type ← whnfEta type
@@ -226,7 +226,7 @@ where
           -- This branch can happen under `backward.privateInPublic`; restore original behavior of
           -- failing here, which is caught and ignored above by `observing`.
           throwError "internal compiler error: private in public"
-        if let some desc := getExternNameFor (← getEnv) `jvm declName then
+        if let some desc := getExternNameFor (← getEnv) `kotlin declName then
           if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
             return .const declName us
         let .inductInfo _ ← getConstInfo declName | return anyExpr
