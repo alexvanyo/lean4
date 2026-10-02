@@ -1,0 +1,113 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_testUInts___redArg(c: UInt, d: ULong): ULong {
+    val v_x_14_1 = (((d shr 2) + ((d shl 2) shr 1)) + ((d and 255uL) or (d xor 1024uL)))
+    if (!(0u < c))     {
+        return v_x_14_1
+    } else     {
+        return (v_x_14_1 + 100uL)
+    }
+}
+
+@PublishedApi internal fun f_testUInts___redArg___boxed(c: Any?, d: Any?): Any? {
+    val c_boxed_21_1 = (c as UInt)
+    val d_boxed_22_2 = (d as ULong)
+    val res_23_3 = f_testUInts___redArg(c_boxed_21_1, d_boxed_22_2)
+    return res_23_3
+}
+
+@PublishedApi internal fun f_testUInts(a: UByte, b: UShort, c: UInt, d: ULong, s: Int): ULong {
+    return f_testUInts___redArg(c, d)
+}
+
+@PublishedApi internal fun f_testUInts___boxed(a: Any?, b: Any?, c: Any?, d: Any?, s: Any?): Any? {
+    val a_boxed_36_1 = (a as UByte)
+    val b_boxed_37_2 = (b as UShort)
+    val c_boxed_38_3 = (c as UInt)
+    val d_boxed_39_4 = (d as ULong)
+    val s_boxed_40_5 = (s as Int)
+    val res_41_6 = f_testUInts(a_boxed_36_1, b_boxed_37_2, c_boxed_38_3, d_boxed_39_4, s_boxed_40_5)
+    return res_41_6
+}
+
+@PublishedApi internal fun f_testInts___redArg(c: Int, d: Long): Long {
+    val v_x_52_1 = ((d / 4L) + ((d and 255L) or (d xor 1024L)))
+    if (!(c <= 0))     {
+        return (v_x_52_1 + 1L)
+    } else     {
+        return (v_x_52_1 + (-1L))
+    }
+}
+
+@PublishedApi internal fun f_testInts___redArg___boxed(c: Any?, d: Any?): Any? {
+    val c_boxed_61_1 = (c as Int)
+    val d_boxed_62_2 = (d as Long)
+    val res_63_3 = f_testInts___redArg(c_boxed_61_1, d_boxed_62_2)
+    return res_63_3
+}
+
+@PublishedApi internal fun f_testInts(a: Byte, b: Short, c: Int, d: Long, s: Int): Long {
+    return f_testInts___redArg(c, d)
+}
+
+@PublishedApi internal fun f_testInts___boxed(a: Any?, b: Any?, c: Any?, d: Any?, s: Any?): Any? {
+    val a_boxed_76_1 = (a as Byte)
+    val b_boxed_77_2 = (b as Short)
+    val c_boxed_78_3 = (c as Int)
+    val d_boxed_79_4 = (d as Long)
+    val s_boxed_80_5 = (s as Int)
+    val res_81_6 = f_testInts(a_boxed_76_1, b_boxed_77_2, c_boxed_78_3, d_boxed_79_4, s_boxed_80_5)
+    return res_81_6
+}
+
+@PublishedApi internal fun f_testBools(p: Boolean, q: Boolean): Boolean {
+    if (p)     {
+        if (q)         {
+            return true
+        }
+    }
+    if (!p)     {
+        if (!q)         {
+            return true
+        } else         {
+            return false
+        }
+    } else     {
+        return false
+    }
+}
+
+@PublishedApi internal fun f_testBools___boxed(p: Any?, q: Any?): Any? {
+    val p_boxed_90_1 = (p as Boolean)
+    val q_boxed_91_2 = (q as Boolean)
+    val res_92_3 = f_testBools(p_boxed_90_1, q_boxed_91_2)
+    return res_92_3
+}
+
+@PublishedApi internal fun f_testFloats___redArg___closed__0(): Double {
+    return f_Float_ofScientific(15, true, 1)
+}
+
+@PublishedApi internal fun f_testFloats___redArg(f1: Double): Double {
+    val v_x_99_1 = f_testFloats___redArg___closed__0()
+    return f_Float_add(f1, v_x_99_1)
+}
+
+@PublishedApi internal fun f_testFloats___redArg___boxed(f1: Any?): Any? {
+    val f1_boxed_102_1 = (f1 as Double)
+    val res_103_2 = f_testFloats___redArg(f1_boxed_102_1)
+    return res_103_2
+}
+
+@PublishedApi internal fun f_testFloats(f1: Double, f2: Float): Double {
+    return f_testFloats___redArg(f1)
+}
+
+@PublishedApi internal fun f_testFloats___boxed(f1: Any?, f2: Any?): Any? {
+    val f1_boxed_110_1 = (f1 as Double)
+    val f2_boxed_111_2 = (f2 as Float)
+    val res_112_3 = f_testFloats(f1_boxed_110_1, f2_boxed_111_2)
+    return res_112_3
+}
+

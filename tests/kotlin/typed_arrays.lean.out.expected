@@ -1,0 +1,32 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:OptIn(ExperimentalUnsignedTypes::class)
+@PublishedApi internal fun f_makeU64Array___boxed__const__1(): Any? {
+    return 0uL
+}
+
+@PublishedApi internal fun f_makeU64Array(n: Any?): ULongArray {
+    return ULongArray((n as Int))
+}
+
+@PublishedApi internal fun f_makeU32Array(n: Any?, initVal: UInt): UIntArray {
+    return UIntArray((n as Int)).apply { fill(initVal) }
+}
+
+@PublishedApi internal fun f_makeBoolArray(n: Any?): BooleanArray {
+    return BooleanArray((n as Int))
+}
+
+@PublishedApi internal fun f_readArrayU64___redArg(a: ULongArray, i: Int): ULong {
+    return a[i]
+}
+
+@PublishedApi internal fun f_readArrayU64(a: ULongArray, i: Int, h: Any?): ULong {
+    return a[i]
+}
+
+@PublishedApi internal fun f_getArraySize(a: ULongArray): Any? {
+    return a.size
+}
+

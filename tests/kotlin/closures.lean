@@ -1,0 +1,18 @@
+import Lean.Compiler.Kotlin
+
+/-!
+Tests higher-order functions, closures, currying, and partial applications in the Kotlin backend.
+Adapted from .
+-/
+
+set_option linter.unusedVariables false
+
+@[inline]
+def applyTwice (f : UInt32 → UInt32) (x : UInt32) : UInt32 :=
+  f (f x)
+
+def makeAdder (delta : UInt32) : UInt32 → UInt32 :=
+  fun x => x + delta
+
+def testClosureApp (inputVal : UInt32) : UInt32 :=
+  applyTwice (makeAdder 5) inputVal
