@@ -105,3 +105,14 @@
     return res_90_3
 }
 
+@PublishedApi internal fun f_applyErased(f: Any?, x: UInt): UInt {
+    val v_x_95_1 = (f as (Any?) -> Any?)(x)
+    return (v_x_95_1 as UInt)
+}
+
+@PublishedApi internal fun f_applyErased___boxed(f: Any?, x: Any?): Any? {
+    val x_boxed_99_1 = (x as UInt)
+    val res_100_2 = f_applyErased((f as (UInt) -> UInt), x_boxed_99_1)
+    return res_100_2
+}
+

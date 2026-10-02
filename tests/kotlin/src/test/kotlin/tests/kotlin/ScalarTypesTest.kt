@@ -28,6 +28,23 @@ class ScalarTypesTest {
     @Test
     fun testFloats() {
         val res = f_testFloats(2.5, 1.0f)
-        assertEquals(4.0, res, 0.001)
+        // sum = 4.0, diff = 3.5, prod = 7.0, quot = 1.75, neg = -1.75
+        // abs(neg) = 1.75, sqrt(9.0) = 3.0, floor(2.7) = 2.0, ceil(2.3) = 3.0, c = 1.0 -> 10.75
+        assertEquals(10.75, res, 0.001)
+    }
+
+    @Test
+    fun testFloat32s() {
+        val res = f_testFloat32s(1.5f, 3.0f)
+        // x = (4.5 - 0.5) * 2.0 / 4.0 = 2.0f, y = -2.0f, abs(y) = 2.0f
+        assertEquals(2.0f, res, 0.001f)
+    }
+
+    @Test
+    fun testLeanInts() {
+        val res = f_testLeanInts(-7, 3)
+        // sum = -4, diff = -7, prod = 14, q = 4, r = 2, eq = -3, er = 2, neg = -4, absVal = 7
+        // -7 < 3 is true -> -4 + 2 + (-3) + 2 + 7 = 4
+        assertEquals(4, (res as Number).toInt())
     }
 }

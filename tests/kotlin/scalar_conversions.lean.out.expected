@@ -2,7 +2,7 @@
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
 @PublishedApi internal fun f_testConversions(n: Any?, i: Any?, u64: ULong, i64: Long): Any? {
-    return ((((((((((((n).toUByte()).toInt()).toInt() + (((n).toUShort()).toInt()).toInt()) as Int) + (((n).toUInt()).toInt()).toInt()) as Int) + ((u64).toInt()).toInt()) as Int) + ((((i).toByte()).toInt()).toInt() as Int)) as Int) + (((i64).toInt()).toInt() as Int))
+    return ((((((((((((n).toUByte()).toInt()).toInt() + (((n).toUShort()).toInt()).toInt()) as Int) + (((n).toUInt()).toInt()).toInt()) as Int) + ((u64).toInt()).toInt()) as Int) + (((i).toByte()).toInt()).toInt()) as Int) + ((i64).toInt()).toInt())
 }
 
 @PublishedApi internal fun f_testConversions___boxed(n: Any?, i: Any?, u64: Any?, i64: Any?): Any? {
@@ -20,5 +20,18 @@
     val b_boxed_39_2 = (b as Int)
     val res_40_3 = f_testDirectCast(a_boxed_38_1, b_boxed_39_2)
     return res_40_3
+}
+
+@PublishedApi internal fun f_testFloatConversions(f: Double, f32: Float, u32: UInt, i32: Int): Double {
+    return (((((f).toUInt()).toDouble() + (u32).toDouble()) + ((((f).toInt()).toDouble() + (i32).toDouble()) + ((f32).toInt()).toDouble())) + ((((f).toFloat() + (u32).toFloat()) + (i32).toFloat())).toDouble())
+}
+
+@PublishedApi internal fun f_testFloatConversions___boxed(f: Any?, f32: Any?, u32: Any?, i32: Any?): Any? {
+    val f_boxed_69_1 = (f as Double)
+    val f32_boxed_70_2 = (f32 as Float)
+    val u32_boxed_71_3 = (u32 as UInt)
+    val i32_boxed_72_4 = (i32 as Int)
+    val res_73_5 = f_testFloatConversions(f_boxed_69_1, f32_boxed_70_2, u32_boxed_71_3, i32_boxed_72_4)
+    return res_73_5
 }
 

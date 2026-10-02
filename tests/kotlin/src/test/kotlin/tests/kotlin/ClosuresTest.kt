@@ -38,4 +38,10 @@ class ClosuresTest {
         assertEquals(11u, f_chooseFn(true, { it + 1u }, { it * 2u }, 10u))
         assertEquals(20u, f_chooseFn(false, { it + 1u }, { it * 2u }, 10u))
     }
+
+    @Test
+    fun testApplyErased() {
+        val erasedFn: Any? = { x: UInt -> x + 7u }
+        assertEquals(17u, f_applyErased(erasedFn, 10u))
+    }
 }

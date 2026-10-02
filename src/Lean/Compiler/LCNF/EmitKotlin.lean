@@ -215,6 +215,7 @@ partial def toKotlinType (ty : Expr) : String :=
   | ImpureType.void => "Unit"
   | .const ``Bool _ | .const ``Decidable _ => "Boolean"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
+  | .const ``String _ => "String"
   | .app (.const `jvmType _) (.lit (.strVal desc)) =>
     -- Types declared with `@[extern "kotlin:<Kotlin type>"]`.
     if desc.startsWith "kotlin:" then (desc.drop 7).toString else "Any?"
@@ -272,6 +273,7 @@ def defaultKotlinVal (ty : String) : String :=
   | "ULong" => "0uL"
   | "Double" => "0.0"
   | "Float" => "0.0f"
+  | "String" => "\"\""
   | "Unit" => "Unit"
   | _ => if ty.endsWith "?" then "null" else s!"(null as {ty})"
 
@@ -401,52 +403,84 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     -- Conversions to Int8 (Byte)
     | ``Int8.ofNat | ``Int8.ofInt | ``UInt8.toInt8 | ``Int16.toInt8 | ``Int32.toInt8 | ``Int64.toInt8 | ``ISize.toInt8 =>
       return some (if a0Ty? == some "Byte" then a0 else s!"({a0}).toByte()")
+    | `Float.toInt8 | `Float32.toInt8 =>
+      return some s!"({a0}).toInt().toByte()"
     | ``Bool.toInt8 =>
       return some s!"(if ({a0}) (1).toByte() else (0).toByte())"
     -- Conversions to Int16 (Short)
     | ``Int16.ofNat | ``Int16.ofInt | ``UInt16.toInt16 | ``Int8.toInt16 | ``Int32.toInt16 | ``Int64.toInt16 | ``ISize.toInt16 =>
       return some (if a0Ty? == some "Short" then a0 else s!"({a0}).toShort()")
+    | `Float.toInt16 | `Float32.toInt16 =>
+      return some s!"({a0}).toInt().toShort()"
     | ``Bool.toInt16 =>
       return some s!"(if ({a0}) (1).toShort() else (0).toShort())"
-    -- Conversions to Int32 / ISize / USize / Nat (Int)
-    | ``Int.toNat | ``Int8.toInt | ``Int16.toInt | ``Int32.toInt | ``Int64.toInt
-    | ``Int.toInt32 | ``Int.toInt64
+    -- Conversions to Int32 / ISize / USize / Nat / Int (Int)
+    | `Int.ofNat | `Int.toNat | `Int8.toInt | `Int16.toInt | `Int32.toInt | `Int64.toInt
+    | `Int.toInt32 | `Int.toInt64
     | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt | ``USize.ofNat
     | ``UInt32.toInt32 | ``Int8.toInt32 | ``Int16.toInt32 | ``Int64.toInt32 | ``ISize.toInt32
     | ``Int32.toISize | ``Int64.toISize | ``UInt32.toUSize | ``UInt64.toUSize
     | ``UInt8.toNat | ``UInt16.toNat | ``UInt32.toNat | ``UInt64.toNat | ``USize.toNat
-    | ``Int8.toNatClampNeg | ``Int16.toNatClampNeg | ``Int32.toNatClampNeg | ``Int64.toNatClampNeg =>
+    | ``Int8.toNatClampNeg | ``Int16.toNatClampNeg | ``Int32.toNatClampNeg | ``Int64.toNatClampNeg
+    | `Float.toInt32 | `Float.toISize | `Float32.toInt32 | `Float32.toISize =>
       return some (if a0Ty? == some "Int" then a0 else s!"({a0}).toInt()")
+    | `Float.toUSize | `Float32.toUSize =>
+      return some s!"({a0}).toUInt().toInt()"
     | ``Bool.toInt32 | ``Bool.toISize | ``Bool.toNat | ``Bool.toUSize =>
       return some s!"(if ({a0}) 1 else 0)"
     -- Conversions to Int64 (Long)
-    | ``Int64.ofNat | ``Int64.ofInt | ``UInt64.toInt64 | ``Int8.toInt64 | ``Int16.toInt64 | ``Int32.toInt64 | ``ISize.toInt64 =>
+    | ``Int64.ofNat | ``Int64.ofInt | ``UInt64.toInt64 | ``Int8.toInt64 | ``Int16.toInt64 | ``Int32.toInt64 | ``ISize.toInt64
+    | `Float.toInt64 | `Float32.toInt64 =>
       return some (if a0Ty? == some "Long" then a0 else s!"({a0}).toLong()")
     | ``Bool.toInt64 =>
       return some s!"(if ({a0}) 1L else 0L)"
     -- Conversions to UInt8 (UByte)
     | ``UInt8.ofNat | ``Int8.toUInt8 | ``UInt16.toUInt8 | ``UInt32.toUInt8 | ``UInt64.toUInt8 | ``USize.toUInt8 =>
       return some (if a0Ty? == some "UByte" then a0 else s!"({a0}).toUByte()")
+    | `Float.toUInt8 | `Float32.toUInt8 =>
+      return some s!"({a0}).toUInt().toUByte()"
     | ``Bool.toUInt8 =>
       return some s!"(if ({a0}) (1u).toUByte() else (0u).toUByte())"
     -- Conversions to UInt16 (UShort)
     | ``UInt16.ofNat | ``Int16.toUInt16 | ``UInt8.toUInt16 | ``UInt32.toUInt16 | ``UInt64.toUInt16 | ``USize.toUInt16 =>
       return some (if a0Ty? == some "UShort" then a0 else s!"({a0}).toUShort()")
+    | `Float.toUInt16 | `Float32.toUInt16 =>
+      return some s!"({a0}).toUInt().toUShort()"
     | ``Bool.toUInt16 =>
       return some s!"(if ({a0}) (1u).toUShort() else (0u).toUShort())"
     -- Conversions to UInt32 (UInt)
-    | ``UInt32.ofNat | ``Int32.toUInt32 | ``UInt8.toUInt32 | ``UInt16.toUInt32 | ``UInt64.toUInt32 | ``USize.toUInt32 =>
+    | ``UInt32.ofNat | ``Int32.toUInt32 | ``UInt8.toUInt32 | ``UInt16.toUInt32 | ``UInt64.toUInt32 | ``USize.toUInt32
+    | `Float.toUInt32 | `Float32.toUInt32 =>
       return some (if a0Ty? == some "UInt" then a0 else s!"({a0}).toUInt()")
     | ``Bool.toUInt32 =>
       return some s!"(if ({a0}) 1u else 0u)"
     -- Conversions to UInt64 (ULong)
-    | ``UInt64.ofNat | ``Int64.toUInt64 | ``UInt8.toUInt64 | ``UInt16.toUInt64 | ``UInt32.toUInt64 | ``USize.toUInt64 =>
+    | ``UInt64.ofNat | ``Int64.toUInt64 | ``UInt8.toUInt64 | ``UInt16.toUInt64 | ``UInt32.toUInt64 | ``USize.toUInt64
+    | `Float.toUInt64 | `Float32.toUInt64 =>
       return some (if a0Ty? == some "ULong" then a0 else s!"({a0}).toULong()")
     | ``Bool.toUInt64 =>
       return some s!"(if ({a0}) 1uL else 0uL)"
+    -- Conversions to Float (Double)
+    | `Float32.toFloat | `UInt8.toFloat | `UInt16.toFloat | `UInt32.toFloat | `UInt64.toFloat | `USize.toFloat
+    | `Int8.toFloat | `Int16.toFloat | `Int32.toFloat | `Int64.toFloat | `ISize.toFloat
+    | `Float.ofNat | `Float.ofInt | `Nat.toFloat | `Int.toFloat =>
+      return some (if a0Ty? == some "Double" then a0 else s!"({a0}).toDouble()")
+    -- Conversions to Float32 (Float)
+    | `Float.toFloat32 | `UInt8.toFloat32 | `UInt16.toFloat32 | `UInt32.toFloat32 | `UInt64.toFloat32 | `USize.toFloat32
+    | `Int8.toFloat32 | `Int16.toFloat32 | `Int32.toFloat32 | `Int64.toFloat32 | `ISize.toFloat32
+    | `Float32.ofNat | `Float32.ofInt | `Nat.toFloat32 | `Int.toFloat32 =>
+      return some (if a0Ty? == some "Float" then a0 else s!"({a0}).toFloat()")
     -- Unary negation
     | ``Int32.neg | ``Int64.neg | ``ISize.neg =>
       return some s!"(-{a0})"
+    | `Int.neg | `Int.negOfNat =>
+      return some s!"(-{← castIfNeeded a0 "Int"})"
+    | `Int.negSucc =>
+      return some s!"(-({← castIfNeeded a0 "Int"} + 1))"
+    | `Int.natAbs =>
+      return some s!"kotlin.math.abs({← castIfNeeded a0 "Int"})"
+    | `Int.decNonneg =>
+      return some s!"({← castIfNeeded a0 "Int"} >= 0)"
     | ``Int8.neg =>
       return some s!"(-({a0}).toInt()).toByte()"
     | ``Int16.neg =>
@@ -465,6 +499,72 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | ``Int8.complement | ``Int16.complement | ``Int32.complement | ``Int64.complement | ``ISize.complement
     | ``UInt8.complement | ``UInt16.complement | ``UInt32.complement | ``UInt64.complement | ``USize.complement =>
       return some s!"{a0}.inv()"
+    -- Unary Float (Double)
+    | `Float.neg => return some s!"(-{← castIfNeeded a0 "Double"})"
+    | `Float.abs => return some s!"kotlin.math.abs({← castIfNeeded a0 "Double"})"
+    | `Float.sqrt => return some s!"kotlin.math.sqrt({← castIfNeeded a0 "Double"})"
+    | `Float.sin => return some s!"kotlin.math.sin({← castIfNeeded a0 "Double"})"
+    | `Float.cos => return some s!"kotlin.math.cos({← castIfNeeded a0 "Double"})"
+    | `Float.tan => return some s!"kotlin.math.tan({← castIfNeeded a0 "Double"})"
+    | `Float.asin => return some s!"kotlin.math.asin({← castIfNeeded a0 "Double"})"
+    | `Float.acos => return some s!"kotlin.math.acos({← castIfNeeded a0 "Double"})"
+    | `Float.atan => return some s!"kotlin.math.atan({← castIfNeeded a0 "Double"})"
+    | `Float.sinh => return some s!"kotlin.math.sinh({← castIfNeeded a0 "Double"})"
+    | `Float.cosh => return some s!"kotlin.math.cosh({← castIfNeeded a0 "Double"})"
+    | `Float.tanh => return some s!"kotlin.math.tanh({← castIfNeeded a0 "Double"})"
+    | `Float.asinh => return some s!"kotlin.math.asinh({← castIfNeeded a0 "Double"})"
+    | `Float.acosh => return some s!"kotlin.math.acosh({← castIfNeeded a0 "Double"})"
+    | `Float.atanh => return some s!"kotlin.math.atanh({← castIfNeeded a0 "Double"})"
+    | `Float.exp => return some s!"kotlin.math.exp({← castIfNeeded a0 "Double"})"
+    | `Float.exp2 => return some s!"Math.pow(2.0, {← castIfNeeded a0 "Double"})"
+    | `Float.log => return some s!"kotlin.math.ln({← castIfNeeded a0 "Double"})"
+    | `Float.log2 => return some s!"kotlin.math.log2({← castIfNeeded a0 "Double"})"
+    | `Float.log10 => return some s!"kotlin.math.log10({← castIfNeeded a0 "Double"})"
+    | `Float.cbrt => return some s!"Math.cbrt({← castIfNeeded a0 "Double"})"
+    | `Float.floor => return some s!"kotlin.math.floor({← castIfNeeded a0 "Double"})"
+    | `Float.ceil => return some s!"kotlin.math.ceil({← castIfNeeded a0 "Double"})"
+    | `Float.round => return some s!"kotlin.math.round({← castIfNeeded a0 "Double"})"
+    | `Float.isNaN => return some s!"({← castIfNeeded a0 "Double"}).isNaN()"
+    | `Float.isFinite => return some s!"({← castIfNeeded a0 "Double"}).isFinite()"
+    | `Float.isInf => return some s!"({← castIfNeeded a0 "Double"}).isInfinite()"
+    | `Float.toString => return some s!"({← castIfNeeded a0 "Double"}).toString()"
+    | `Float.toBits => return some s!"({← castIfNeeded a0 "Double"}).toRawBits().toULong()"
+    | `Float.ofBits => return some s!"Double.fromBits(({← castIfNeeded a0 "ULong"}).toLong())"
+    -- Unary Float32 (Float)
+    | `Float32.neg => return some s!"(-{← castIfNeeded a0 "Float"})"
+    | `Float32.abs => return some s!"kotlin.math.abs({← castIfNeeded a0 "Float"})"
+    | `Float32.sqrt => return some s!"kotlin.math.sqrt({← castIfNeeded a0 "Float"})"
+    | `Float32.sin => return some s!"kotlin.math.sin({← castIfNeeded a0 "Float"})"
+    | `Float32.cos => return some s!"kotlin.math.cos({← castIfNeeded a0 "Float"})"
+    | `Float32.tan => return some s!"kotlin.math.tan({← castIfNeeded a0 "Float"})"
+    | `Float32.asin => return some s!"kotlin.math.asin({← castIfNeeded a0 "Float"})"
+    | `Float32.acos => return some s!"kotlin.math.acos({← castIfNeeded a0 "Float"})"
+    | `Float32.atan => return some s!"kotlin.math.atan({← castIfNeeded a0 "Float"})"
+    | `Float32.sinh => return some s!"kotlin.math.sinh({← castIfNeeded a0 "Float"})"
+    | `Float32.cosh => return some s!"kotlin.math.cosh({← castIfNeeded a0 "Float"})"
+    | `Float32.tanh => return some s!"kotlin.math.tanh({← castIfNeeded a0 "Float"})"
+    | `Float32.asinh => return some s!"kotlin.math.asinh({← castIfNeeded a0 "Float"})"
+    | `Float32.acosh => return some s!"kotlin.math.acosh({← castIfNeeded a0 "Float"})"
+    | `Float32.atanh => return some s!"kotlin.math.atanh({← castIfNeeded a0 "Float"})"
+    | `Float32.exp => return some s!"kotlin.math.exp({← castIfNeeded a0 "Float"})"
+    | `Float32.exp2 => return some s!"Math.pow(2.0, ({← castIfNeeded a0 "Float"}).toDouble()).toFloat()"
+    | `Float32.log => return some s!"kotlin.math.ln({← castIfNeeded a0 "Float"})"
+    | `Float32.log2 => return some s!"kotlin.math.log2({← castIfNeeded a0 "Float"})"
+    | `Float32.log10 => return some s!"kotlin.math.log10({← castIfNeeded a0 "Float"})"
+    | `Float32.cbrt => return some s!"Math.cbrt(({← castIfNeeded a0 "Float"}).toDouble()).toFloat()"
+    | `Float32.floor => return some s!"kotlin.math.floor({← castIfNeeded a0 "Float"})"
+    | `Float32.ceil => return some s!"kotlin.math.ceil({← castIfNeeded a0 "Float"})"
+    | `Float32.round => return some s!"kotlin.math.round({← castIfNeeded a0 "Float"})"
+    | `Float32.isNaN => return some s!"({← castIfNeeded a0 "Float"}).isNaN()"
+    | `Float32.isFinite => return some s!"({← castIfNeeded a0 "Float"}).isFinite()"
+    | `Float32.isInf => return some s!"({← castIfNeeded a0 "Float"}).isInfinite()"
+    | `Float32.toString => return some s!"({← castIfNeeded a0 "Float"}).toString()"
+    | `Float32.toBits => return some s!"({← castIfNeeded a0 "Float"}).toRawBits().toUInt()"
+    | `Float32.ofBits => return some s!"Float.fromBits(({← castIfNeeded a0 "UInt"}).toInt())"
+    -- Unary String
+    | `String.length | `String.Internal.length => return some s!"({← castIfNeeded a0 "String"}).length"
+    | `String.utf8ByteSize => return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().size"
+    | `String.isEmpty | `String.Internal.isEmpty => return some s!"({← castIfNeeded a0 "String"}).isEmpty()"
     | _ =>
       if fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64") then
         if a0Ty? == some "Long" then return some a0
@@ -625,6 +725,59 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | ``UInt16.decLt => return some s!"({← castIfNeeded a0 "UShort"} < {← castIfNeeded a1 "UShort"})"
     | ``UInt16.decLe => return some s!"({← castIfNeeded a0 "UShort"} <= {← castIfNeeded a1 "UShort"})"
 
+    -- Binary Float (Double)
+    | `Float.add => return some s!"({← castIfNeeded a0 "Double"} + {← castIfNeeded a1 "Double"})"
+    | `Float.sub => return some s!"({← castIfNeeded a0 "Double"} - {← castIfNeeded a1 "Double"})"
+    | `Float.mul => return some s!"({← castIfNeeded a0 "Double"} * {← castIfNeeded a1 "Double"})"
+    | `Float.div => return some s!"({← castIfNeeded a0 "Double"} / {← castIfNeeded a1 "Double"})"
+    | `Float.beq => return some s!"({← castIfNeeded a0 "Double"} == {← castIfNeeded a1 "Double"})"
+    | `Float.decLt | `Float.lt => return some s!"({← castIfNeeded a0 "Double"} < {← castIfNeeded a1 "Double"})"
+    | `Float.decLe | `Float.le => return some s!"({← castIfNeeded a0 "Double"} <= {← castIfNeeded a1 "Double"})"
+    | `Float.pow => return some s!"Math.pow({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
+    | `Float.atan2 => return some s!"kotlin.math.atan2({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
+    | `Float.scaleB => return some s!"Math.scalb({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Int"})"
+    | `Float.minimum => return some s!"kotlin.math.min({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
+    | `Float.maximum => return some s!"kotlin.math.max({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
+
+    -- Binary Float32 (Float)
+    | `Float32.add => return some s!"({← castIfNeeded a0 "Float"} + {← castIfNeeded a1 "Float"})"
+    | `Float32.sub => return some s!"({← castIfNeeded a0 "Float"} - {← castIfNeeded a1 "Float"})"
+    | `Float32.mul => return some s!"({← castIfNeeded a0 "Float"} * {← castIfNeeded a1 "Float"})"
+    | `Float32.div => return some s!"({← castIfNeeded a0 "Float"} / {← castIfNeeded a1 "Float"})"
+    | `Float32.beq => return some s!"({← castIfNeeded a0 "Float"} == {← castIfNeeded a1 "Float"})"
+    | `Float32.decLt | `Float32.lt => return some s!"({← castIfNeeded a0 "Float"} < {← castIfNeeded a1 "Float"})"
+    | `Float32.decLe | `Float32.le => return some s!"({← castIfNeeded a0 "Float"} <= {← castIfNeeded a1 "Float"})"
+    | `Float32.pow => return some s!"Math.pow(({← castIfNeeded a0 "Float"}).toDouble(), ({← castIfNeeded a1 "Float"}).toDouble()).toFloat()"
+    | `Float32.atan2 => return some s!"kotlin.math.atan2({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
+    | `Float32.scaleB => return some s!"Math.scalb({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Int"})"
+    | `Float32.minimum => return some s!"kotlin.math.min({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
+    | `Float32.maximum => return some s!"kotlin.math.max({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
+
+    -- Binary String
+    | `String.append | `String.Internal.append => return some s!"({← castIfNeeded a0 "String"} + {← castIfNeeded a1 "String"})"
+    | `String.push => return some s!"({← castIfNeeded a0 "String"} + ({a1}).toInt().toChar())"
+    | `String.decEq => return some s!"({← castIfNeeded a0 "String"} == {← castIfNeeded a1 "String"})"
+    | `String.decLt | `String.decidableLT | `String.lt => return some s!"({← castIfNeeded a0 "String"} < {← castIfNeeded a1 "String"})"
+    | `String.Internal.isPrefixOf => return some s!"({← castIfNeeded a1 "String"}).startsWith({← castIfNeeded a0 "String"})"
+
+    -- Binary Int (Int)
+    | `Int.add => return some s!"({← castIfNeeded a0 "Int"} + {← castIfNeeded a1 "Int"})"
+    | `Int.sub => return some s!"({← castIfNeeded a0 "Int"} - {← castIfNeeded a1 "Int"})"
+    | `Int.mul => return some s!"({← castIfNeeded a0 "Int"} * {← castIfNeeded a1 "Int"})"
+    | `Int.div | `Int.tdiv => return some s!"({← castIfNeeded a0 "Int"} / {← castIfNeeded a1 "Int"})"
+    | `Int.mod | `Int.tmod => return some s!"({← castIfNeeded a0 "Int"} % {← castIfNeeded a1 "Int"})"
+    | `Int.ediv =>
+      let x ← castIfNeeded a0 "Int"
+      let y ← castIfNeeded a1 "Int"
+      return some s!"(if ({y} == 0) 0 else if ({y} > 0) Math.floorDiv({x}, {y}) else -Math.floorDiv({x}, -{y}))"
+    | `Int.emod =>
+      let x ← castIfNeeded a0 "Int"
+      let y ← castIfNeeded a1 "Int"
+      return some s!"(if ({y} == 0) {x} else Math.floorMod({x}, kotlin.math.abs({y})))"
+    | `Int.decEq => return some s!"({← castIfNeeded a0 "Int"} == {← castIfNeeded a1 "Int"})"
+    | `Int.decLt => return some s!"({← castIfNeeded a0 "Int"} < {← castIfNeeded a1 "Int"})"
+    | `Int.decLe => return some s!"({← castIfNeeded a0 "Int"} <= {← castIfNeeded a1 "Int"})"
+
     | ``Bool.decEq => return some s!"({a0} == {a1})"
     | ``Nat.decEq =>
       return some s!"({← castIfNeeded a0 "Int"} == {← castIfNeeded a1 "Int"})"
@@ -644,6 +797,26 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"({← castIfNeeded a0 "Int"} / {← castIfNeeded a1 "Int"})"
     | `Nat.mod =>
       return some s!"({← castIfNeeded a0 "Int"} % {← castIfNeeded a1 "Int"})"
+    | _ => return none
+  if args.size == 3 then
+    let a0 ← toKotlinArg args[0]!
+    let a1 ← toKotlinArg args[1]!
+    let a2 ← toKotlinArg args[2]!
+    match fn with
+    | `Float.ofScientific =>
+      if !a0.isEmpty && a0.all Char.isDigit && !a2.isEmpty && a2.all Char.isDigit && (a1 == "true" || a1 == "false") then
+        if a2 == "0" then return some s!"{a0}.0"
+        else if a1 == "true" then return some s!"{a0}e-{a2}"
+        else return some s!"{a0}e{a2}"
+      else
+        return some s!"(({← castIfNeeded a0 "Int"}).toDouble() * Math.pow(10.0, if ({a1}) -({← castIfNeeded a2 "Int"}).toDouble() else ({← castIfNeeded a2 "Int"}).toDouble()))"
+    | `Float32.ofScientific =>
+      if !a0.isEmpty && a0.all Char.isDigit && !a2.isEmpty && a2.all Char.isDigit && (a1 == "true" || a1 == "false") then
+        if a2 == "0" then return some s!"{a0}.0f"
+        else if a1 == "true" then return some s!"{a0}e-{a2}f"
+        else return some s!"{a0}e{a2}f"
+      else
+        return some s!"(({← castIfNeeded a0 "Int"}).toDouble() * Math.pow(10.0, if ({a1}) -({← castIfNeeded a2 "Int"}).toDouble() else ({← castIfNeeded a2 "Int"}).toDouble())).toFloat()"
     | _ => return none
   return none
 
@@ -872,12 +1045,13 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
         return t
   if let some ci := env.find? fn then
     if resultType ci.type == mkConst ``Unit then return "Unit"
+    if resultType ci.type == mkConst ``String then return "String"
   if let some d := (← read).declMap[fn]? then
     let t := toKotlinType d.type
     if t != "Any?" then return t
   if let some md ← getMonoDecl? fn then
     if let some r := monoResultType? md then
-      if r.isForall then return toKotlinType r
+      if r.isForall || r.isConstOf ``String then return toKotlinType r
   return toKotlinType defaultTy
 
 /--
@@ -993,6 +1167,17 @@ def isInlinedConstDecl? (d : Decl .impure) : Option (LetDecl .impure) :=
     if r == d1.fvarId && isInlinedConstLet? d0 && d1.value matches .box _ _ then some d0 else none
   | _ => none
 
+def escapeKotlinString (s : String) : String :=
+  s.foldl (init := "") fun acc c =>
+    match c with
+    | '\\' => acc ++ "\\\\"
+    | '"' => acc ++ "\\\""
+    | '$' => acc ++ "\\$"
+    | '\n' => acc ++ "\\n"
+    | '\r' => acc ++ "\\r"
+    | '\t' => acc ++ "\\t"
+    | _ => acc.push c
+
 partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
   match decl.value with
   | .lit v =>
@@ -1021,7 +1206,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         return s!"({signedVal})"
       else
         return s!"{n}"
-    | .str s => return s!"\"{s}\""
+    | .str s => return s!"\"{escapeKotlinString s}\""
   | .erased => return "null"
   | .fap fn args =>
     -- Constants whose value is a literal (e.g. boxed literals) are inlined.
@@ -1044,7 +1229,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       let aStr ← toKotlinArg args[i]!
       let aStr ← match monoDecl?.bind (·.params[i]?) with
         | some mp =>
-          if mp.type.isForall then
+          if mp.type.isForall || mp.type.isConstOf ``String then
             castIfNeeded aStr (toKotlinType mp.type)
           else
             pure aStr
@@ -1072,8 +1257,12 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         let argStr := String.intercalate ", " argStrs.toList
         let paramStr := String.intercalate ", " lambdaParams.toList
         return s!"\{ {paramStr} -> {fnName}({argStr}) }"
-    let argStr := String.intercalate ", " argStrs.toList
-    return s!"{fnName}({argStr})"
+      let argStr := String.intercalate ", " argStrs.toList
+      return s!"{fnName}({argStr})"
+    else
+      let argStr := String.intercalate ", " argStrs.toList
+      let anyParams := String.intercalate ", " (List.replicate args.size "Any?")
+      return s!"({fnName} as ({anyParams}) -> Any?)({argStr})"
   | .pap fn args =>
     let targetFn ← unboxedPapFn fn
     let monoDecl? ← getMonoDecl? targetFn
@@ -1751,6 +1940,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     if s == "toUInt16" then return "UShort"
     if s == "toInt8" then return "Byte"
     if s == "toUInt8" then return "UByte"
+    if s == "toFloat" then return "Double"
+    if s == "toFloat32" then return "Float"
+    if s == "toString" then return "String"
     if p == ``Int64 || s == "shl64" || s == "ushr64" || s == "ashr64" then
       if s.startsWith "dec" then return "Boolean" else return "Long"
     if p == ``Int32 || s == "ushr32" then
@@ -1767,6 +1959,16 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       if s.startsWith "dec" then return "Boolean" else return "UShort"
     if p == ``UInt8 then
       if s.startsWith "dec" then return "Boolean" else return "UByte"
+    if p == `Float then
+      if s.startsWith "dec" || s == "beq" || s == "lt" || s == "le" || s.startsWith "is" then return "Boolean" else return "Double"
+    if p == `Float32 then
+      if s.startsWith "dec" || s == "beq" || s == "lt" || s == "le" || s.startsWith "is" then return "Boolean" else return "Float"
+    if p == `Int then
+      if s.startsWith "dec" then return "Boolean" else return "Int"
+    if p == `String || p == `String.Internal then
+      if s.startsWith "dec" || s == "lt" || s == "isEmpty" || s == "isPrefixOf" then return "Boolean"
+      else if s == "length" || s == "utf8ByteSize" then return "Int"
+      else if s == "append" || s == "push" then return "String"
     if p == ``Bool then
       return "Boolean"
     if args.isEmpty then
@@ -1891,8 +2093,8 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
         match fn with
         | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat
         | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt
-        | ``Int.toNat | ``Int8.toInt | ``Int16.toInt | ``Int32.toInt
-        | ``Int.toInt32 | ``Int.toInt64
+        | `Int.ofNat | `Int.toNat | `Int8.toInt | `Int16.toInt | `Int32.toInt
+        | `Int.toInt32 | `Int.toInt64
         | ``Int32.toNatClampNeg | ``Int32.toISize | ``ISize.toInt32 =>
           setParamVarName x a0
           return true
@@ -2013,10 +2215,33 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
       s == "shiftLeft" || s == "shiftRight" ||
       s == "decEq" || s == "decLt" || s == "decLe"
     else false
-  else if p == ``Nat || p == ``Int then
-    if numArgs == 1 then s.startsWith "to" || s.startsWith "of" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
+  else if p == `Float || p == `Float32 then
+    if numArgs == 1 then
+      s.startsWith "to" || s.startsWith "of" || s.startsWith "is" ||
+      s == "neg" || s == "abs" || s == "sqrt" || s == "sin" || s == "cos" || s == "tan" ||
+      s == "asin" || s == "acos" || s == "atan" || s == "sinh" || s == "cosh" || s == "tanh" ||
+      s == "asinh" || s == "acosh" || s == "atanh" || s == "exp" || s == "exp2" ||
+      s == "log" || s == "log2" || s == "log10" || s == "cbrt" || s == "floor" || s == "ceil" || s == "round"
     else if numArgs == 2 then
-      s == "decEq" || s == "decLt" || s == "decLe" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod"
+      s == "add" || s == "sub" || s == "mul" || s == "div" ||
+      s == "beq" || s == "decLt" || s == "lt" || s == "decLe" || s == "le" ||
+      s == "pow" || s == "atan2" || s == "scaleB" || s == "minimum" || s == "maximum"
+    else if numArgs == 3 then
+      s == "ofScientific"
+    else false
+  else if p == `String || p == `String.Internal then
+    if numArgs == 1 then
+      s == "length" || s == "utf8ByteSize" || s == "isEmpty"
+    else if numArgs == 2 then
+      s == "append" || s == "push" || s == "decEq" || s == "decLt" || s == "decidableLT" || s == "lt" || s == "isPrefixOf"
+    else false
+  else if p == ``Nat || p == `Int then
+    if numArgs == 1 then
+      s.startsWith "to" || s.startsWith "of" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" ||
+      s == "neg" || s == "negSucc" || s == "negOfNat" || s == "natAbs" || s == "decNonneg"
+    else if numArgs == 2 then
+      s == "decEq" || s == "decLt" || s == "decLe" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" ||
+      s == "tdiv" || s == "tmod" || s == "ediv" || s == "emod"
     else false
   else if p == ``Bool then
     if numArgs == 1 then s.startsWith "to"
@@ -2736,7 +2961,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | none => pure (retUnit, retCast?)
   let monoDecl? ← getMonoDecl? decl.name
   let defaultRetTy := match monoDecl?.bind monoResultType? with
-    | some r => if r.isForall then toKotlinType r else toKotlinType decl.type
+    | some r => if r.isForall || r.isConstOf ``String then toKotlinType r else toKotlinType decl.type
     | none => toKotlinType decl.type
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
@@ -2758,7 +2983,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       setParamVarName p.fvarId pName
       let emittedIdx := if member?.isSome then i - 1 else i
       let defaultParamTy := match monoDecl?.bind (·.params[i]?) with
-        | some mp => if mp.type.isForall then toKotlinType mp.type else toKotlinType p.type
+        | some mp => if mp.type.isForall || mp.type.isConstOf ``String then toKotlinType mp.type else toKotlinType p.type
         | none => toKotlinType p.type
       let pType := (override? emittedIdx).getD defaultParamTy
       recordVarType pName pType

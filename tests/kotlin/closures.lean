@@ -29,3 +29,8 @@ def applyBinary (g : UInt32 → UInt32 → UInt32) (a b : UInt32) : UInt32 :=
 
 def chooseFn (b : Bool) (f g : UInt32 → UInt32) : UInt32 → UInt32 :=
   if b then f else g
+
+@[kotlin_types "Any?" "UInt" "UInt"]
+def applyErased (f : UInt32 → UInt32) (x : UInt32) : UInt32 :=
+  f x
+

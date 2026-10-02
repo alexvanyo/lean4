@@ -1,0 +1,50 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_testStringEscape___closed__0(): String {
+    return "line1\nline2\t\"quoted\" \$dollar \\backslash"
+}
+
+@PublishedApi internal fun f_testStringEscape(): String {
+    return "line1\nline2\t\"quoted\" \$dollar \\backslash"
+}
+
+@PublishedApi internal fun f_testStringConcat___closed__0(): String {
+    return " - "
+}
+
+@PublishedApi internal fun f_testStringConcat(a: String, b: String): String {
+    val v_x_6_1 = " - "
+    return ((a + v_x_6_1) + b)
+}
+
+@PublishedApi internal fun f_testStringConcat___boxed(a: Any?, b: Any?): Any? {
+    return f_testStringConcat((a as String), (b as String))
+}
+
+@PublishedApi internal fun f_testStringMetrics(s: String): Any? {
+    val v_x_13_1 = (s).encodeToByteArray().size
+    if (!(v_x_13_1 == 0))     {
+        return ((s).length + v_x_13_1)
+    } else     {
+        return 0
+    }
+}
+
+@PublishedApi internal fun f_testStringMetrics___boxed(s: Any?): Any? {
+    return f_testStringMetrics((s as String))
+}
+
+@PublishedApi internal fun f_testStringCompare(a: String, b: String): Boolean {
+    if (!(a == b))     {
+        return (a < b)
+    } else     {
+        return true
+    }
+}
+
+@PublishedApi internal fun f_testStringCompare___boxed(a: Any?, b: Any?): Any? {
+    val res_26_1 = f_testStringCompare((a as String), (b as String))
+    return res_26_1
+}
+
