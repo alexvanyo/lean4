@@ -102,20 +102,23 @@ namespace Lean.Parser.Attr
 @[builtin_attr_parser] def kotlin_class := leading_parser
   nonReservedSymbol "kotlin_class" >> ppSpace >> strLit
 
+/-- `@[mutable_kotlin_class "Type"]`: see `Lean.Compiler.mutableKotlinClassAttr`. -/
+@[builtin_attr_parser] def mutable_kotlin_class := leading_parser
+  nonReservedSymbol "mutable_kotlin_class" >> ppSpace >> strLit
+
 end Lean.Parser.Attr
 
 namespace Lean.Compiler
 
 /--
 `@[kotlin_class "Type"]` on a structure makes the Kotlin backend represent values of the structure
-as instances of the Kotlin class `Type` (e.g. `"Foo<*, *>"`), whose properties have the names of the
-structure fields. Values are mutated in place: the backend verifies statically that every value
-it updates is exclusively owned, and rejects the program otherwise.
+as instances of the immutable Kotlin class `Type` (e.g. `"Foo<*, *>"`), whose properties have the
+names of the structure fields and whose constructor takes the fields in declaration order.
 -/
 builtin_initialize kotlinClassAttr : ParametricAttribute String ←
   registerParametricAttribute {
     name := `kotlin_class
-    descr := "represent this structure as a Kotlin class (Kotlin backend)"
+    descr := "represent this structure as an immutable Kotlin class (Kotlin backend)"
     getParam := fun declName stx => do
       let some s := stx[1].isStrLit? | throwError "`kotlin_class` expects a string argument"
       unless isStructure (← getEnv) declName do
@@ -123,7 +126,33 @@ builtin_initialize kotlinClassAttr : ParametricAttribute String ←
       return s
   }
 
-def getKotlinClass? (env : Environment) (n : Name) : Option String :=
+/--
+`@[mutable_kotlin_class "Type"]` on a structure makes the Kotlin backend represent values of the
+structure as instances of the mutable Kotlin class `Type` (e.g. `"Foo<*, *>"`), whose properties
+have the names of the structure fields. Values are mutated in place: the backend verifies statically
+that every value it updates is exclusively owned, and rejects the program otherwise.
+-/
+builtin_initialize mutableKotlinClassAttr : ParametricAttribute String ←
+  registerParametricAttribute {
+    name := `mutable_kotlin_class
+    descr := "represent this structure as a mutable Kotlin class updated in place (Kotlin backend)"
+    getParam := fun declName stx => do
+      let some s := stx[1].isStrLit? | throwError "`mutable_kotlin_class` expects a string argument"
+      unless isStructure (← getEnv) declName do
+        throwError "`mutable_kotlin_class` can only be used on structures"
+      return s
+  }
+
+def getImmutableKotlinClass? (env : Environment) (n : Name) : Option String :=
   kotlinClassAttr.getParam? env n
+
+def getMutableKotlinClass? (env : Environment) (n : Name) : Option String :=
+  mutableKotlinClassAttr.getParam? env n
+
+def getKotlinClass? (env : Environment) (n : Name) : Option String :=
+  (kotlinClassAttr.getParam? env n).orElse fun _ => mutableKotlinClassAttr.getParam? env n
+
+def isMutableKotlinClass (env : Environment) (n : Name) : Bool :=
+  (mutableKotlinClassAttr.getParam? env n).isSome
 
 end Lean.Compiler

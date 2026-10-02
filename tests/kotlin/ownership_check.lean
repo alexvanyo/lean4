@@ -7,7 +7,7 @@ in-place updates and redundant parameter identity elimination (dropShape?).
 
 set_option linter.unusedVariables false
 
-@[kotlin_class "Buffer"]
+@[mutable_kotlin_class "Buffer"]
 structure Buffer where
   size : Int32
   capacity : Int32

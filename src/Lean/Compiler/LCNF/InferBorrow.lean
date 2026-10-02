@@ -401,9 +401,9 @@ where
     | .ctor i args =>
       if !i.isScalar then
         ownFVar z (.constructorResult z); ownArgsIfParam z args
-        -- The Kotlin backend has no allocation for `@[kotlin_class]` structures: a constructor
+        -- The Kotlin backend has no allocation for `@[mutable_kotlin_class]` structures: a constructor
         -- application updates the value it is built from in place, so that value must be owned.
-        if let some cls := getKotlinClass? (← getEnv) i.name.getPrefix then
+        if let some cls := getMutableKotlinClass? (← getEnv) i.name.getPrefix then
           let ty := jvmType s!"kotlin:{cls}"
           for x in (← read).paramSet do
             if (← getType x) == ty then ownFVar x (.constructorArg z)

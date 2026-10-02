@@ -1,17 +1,11 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
-class Point(var x: Int, var y: Int) {
-public fun translate(dx: Int, dy: Int): Unit {
+class Point(val x: Int, val y: Int) {
+public fun translate(dx: Int, dy: Int): Point {
     val x_4_1 = x
     val y_5_2 = y
-    val v_x_7_3: Any?
-    v_x_7_3 = this
-    val v_x_9_4 = (x_4_1 + dx)
-    val v_x_10_5 = (y_5_2 + dy)
-    val v_x_12_6: Any?
-    v_x_12_6 = v_x_7_3
-    return
+    return Point((x_4_1 + dx), (y_5_2 + dy))
 }
 
 public fun getXCoord(): Int {
@@ -19,5 +13,9 @@ public fun getXCoord(): Int {
 }
 
 
+}
+
+@PublishedApi internal fun f_makePoint(x: Int, y: Int): Point {
+    return Point(x, y)
 }
 
