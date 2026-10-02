@@ -154,7 +154,7 @@ public def nameToImpureType (name : Name) : CoreM Expr := do
   if let some cls := Compiler.getKotlinClass? env name then
     return ImpureType.jvmType s!"kotlin:{cls}"
   let some (.inductInfo _) := env.find? name | do
-    if let some desc := getExternNameFor env `jvm name then
+    if let some desc := getExternNameFor env `kotlin name then
       if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
         return ImpureType.jvmType desc
     return ImpureType.tobject

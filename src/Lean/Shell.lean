@@ -11,7 +11,6 @@ import Lean.Elab.ParseImportsFast
 import Lean.Server.Watchdog
 import Lean.Server.FileWorker
 import Lean.Compiler.LCNF.EmitC
-import Lean.Compiler.LCNF.EmitJVM
 import Lean.Compiler.LCNF.EmitKotlin
 import Init.System.Platform
 import Lean.Compiler.Options
@@ -245,7 +244,6 @@ structure ShellOptions where
   ileanFileName? : Option System.FilePath := none
   cFileName? : Option System.FilePath := none
   bcFileName? : Option System.FilePath := none
-  jvmFileName? : Option System.FilePath := none
   kotlinFileName? : Option System.FilePath := none
   jsonOutput : Bool := false
   errorOnKinds : Array Name := #[]
@@ -332,8 +330,6 @@ def ShellOptions.process (opts : ShellOptions)
     return {opts with cFileName? := ← checkOptArg "c" optArg?}
   | 'b' => -- `-b, --bc=fname`
     return {opts with bcFileName? := ← checkOptArg "b" optArg?}
-  | 'k' => -- `--jvm=fname`
-    return {opts with jvmFileName? := ← checkOptArg "jvm" optArg?}
   | 'K' => -- `-K, --kotlin=fname`
     return {opts with kotlinFileName? := ← checkOptArg "kotlin" optArg?}
   | 's' => -- `-s, --tstack=num`
@@ -578,28 +574,6 @@ def shellMain (args : List String) (opts : ShellOptions) : IO UInt32 := do
       initLLVM
       profileitIO "LLVM code generation" opts.leanOpts do
         emitLLVM env mainModuleName bc
-    if let some jvm := opts.jvmFileName? then
-      if let some parent := jvm.parent then
-        IO.FS.createDirAll parent
-      profileitIO "JVM bytecode generation" opts.leanOpts do
-        let classFiles ← Compiler.LCNF.JVM.emitJVM mainModuleName
-          |>.toIO' { fileName, fileMap := default } { env }
-        -- Write the main module class to jvmFileName; write synthetic closure
-        -- classes (Foo$Clo_N.class) alongside it in the same directory.
-        let parent := jvm.parent.getD "."
-        let mut isFirst := true
-        for (className, bytes) in classFiles do
-          if isFirst then
-            -- The first entry is always the main module class; write it to the
-            -- requested jvmFileName path so callers find it there.
-            writeFileAtomically jvm fun out => out.write bytes
-            isFirst := false
-          else
-            -- Synthetic closure classes: place them in the same directory using
-            -- the last segment of the JVM binary class name as the file stem.
-            let baseName := (className : System.FilePath).fileName.getD className
-            let outPath := parent / (baseName ++ ".class")
-            writeFileAtomically outPath fun out => out.write bytes
     if let some kt := opts.kotlinFileName? then
       if let some parent := kt.parent then
         IO.FS.createDirAll parent
