@@ -129,3 +129,292 @@
     return res_81_3
 }
 
+@PublishedApi internal fun f_optionGetD(o: Any?, d: UInt): UInt {
+    when (((o as Array<*>)[0] as Int))     {
+        0 ->         {
+            return d
+        }
+        1 ->         {
+            return ((o as Array<*>)[1] as UInt)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_optionGetD___boxed(o: Any?, d: Any?): Any? {
+    val d_boxed_89_1 = (d as UInt)
+    val res_90_2 = f_optionGetD(o, d_boxed_89_1)
+    return res_90_2
+}
+
+@PublishedApi internal fun f_optionMapInc(o: Any?): Any? {
+    when (((o as Array<*>)[0] as Int))     {
+        0 ->         {
+            return o
+        }
+        1 ->         {
+            val v_x_98_2 = ((o as Array<*>)[1] as UInt)
+            return arrayOf<Any?>(1, (v_x_98_2 + 1u))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_testOption___closed__0(): Any? {
+    return f_optionMapInc(arrayOf<Any?>(0))
+}
+
+@PublishedApi internal fun f_testOption(x: UInt): UInt {
+    val v_y_109_1: UInt
+    val v_x_118_2 = f_optionMapInc(arrayOf<Any?>(1, x))
+    when (((v_x_118_2 as Array<*>)[0] as Int))     {
+        0 ->         {
+            v_y_109_1 = 0u
+        }
+        1 ->         {
+            val val_120_3 = (v_x_118_2 as Array<*>)[1]
+            val v_x_121_4 = (val_120_3 as UInt)
+            v_y_109_1 = v_x_121_4
+        }
+        else ->         { error("unreachable") }
+    }
+    val v_x_110_5 = f_testOption___closed__0()
+    when (((v_x_110_5 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return (v_y_109_1 + 10u)
+        }
+        1 ->         {
+            val v_x_114_6 = ((v_x_110_5 as Array<*>)[1] as UInt)
+            return (v_y_109_1 + v_x_114_6)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_testOption___boxed(x: Any?): Any? {
+    val x_boxed_123_1 = (x as UInt)
+    val res_124_2 = f_testOption(x_boxed_123_1)
+    return res_124_2
+}
+
+@PublishedApi internal fun f_sumList(xs: Any?): UInt {
+    when (((xs as Array<*>)[0] as Int))     {
+        0 ->         {
+            return 0u
+        }
+        1 ->         {
+            val head_128_1 = (xs as Array<*>)[1]
+            val v_x_130_2 = f_sumList((xs as Array<*>)[2])
+            val v_x_131_3 = (head_128_1 as UInt)
+            return (v_x_131_3 + v_x_130_2)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_sumList___boxed(xs: Any?): Any? {
+    val res_134_1 = f_sumList(xs)
+    return res_134_1
+}
+
+@PublishedApi internal fun f_makeList3(a: UInt, b: UInt, c: UInt): Any? {
+    return arrayOf<Any?>(1, a, arrayOf<Any?>(1, b, arrayOf<Any?>(1, c, arrayOf<Any?>(0))))
+}
+
+@PublishedApi internal fun f_makeList3___boxed(a: Any?, b: Any?, c: Any?): Any? {
+    val a_boxed_149_1 = (a as UInt)
+    val b_boxed_150_2 = (b as UInt)
+    val c_boxed_151_3 = (c as UInt)
+    return f_makeList3(a_boxed_149_1, b_boxed_150_2, c_boxed_151_3)
+}
+
+@PublishedApi internal fun f_makeExcept___closed__0(): String {
+    return "failed"
+}
+
+@PublishedApi internal fun f_makeExcept___closed__1(): Any? {
+    val v_x_154_1 = "failed"
+    return arrayOf<Any?>(0, v_x_154_1)
+}
+
+@PublishedApi internal fun f_makeExcept(ok: Boolean, v: UInt): Any? {
+    if (!ok)     {
+        return f_makeExcept___closed__1()
+    } else     {
+        return arrayOf<Any?>(1, v)
+    }
+}
+
+@PublishedApi internal fun f_makeExcept___boxed(ok: Any?, v: Any?): Any? {
+    val ok_boxed_163_1 = (ok as Boolean)
+    val v_boxed_164_2 = (v as UInt)
+    return f_makeExcept(ok_boxed_163_1, v_boxed_164_2)
+}
+
+@PublishedApi internal fun f_exceptToCode(e: Any?): UInt {
+    when (((e as Array<*>)[0] as Int))     {
+        0 ->         {
+            return 999u
+        }
+        1 ->         {
+            return ((e as Array<*>)[1] as UInt)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_exceptToCode___boxed(e: Any?): Any? {
+    val res_171_1 = f_exceptToCode(e)
+    return res_171_1
+}
+
+@PublishedApi internal fun f_mkBoxedItem(tag: String, count: UInt, weight: Double): Any? {
+    return arrayOf<Any?>(0, tag, weight, null, null, null, null, null, null, null, count)
+}
+
+@PublishedApi internal fun f_mkBoxedItem___boxed(tag: Any?, count: Any?, weight: Any?): Any? {
+    val count_boxed_180_1 = (count as UInt)
+    val weight_boxed_181_2 = (weight as Double)
+    return f_mkBoxedItem((tag as String), count_boxed_180_1, weight_boxed_181_2)
+}
+
+@PublishedApi internal fun f_bumpBoxedItem(item: Any?, delta: UInt): Any? {
+    val tag_185_2 = (item as Array<*>)[1]
+    return arrayOf<Any?>(0, tag_185_2, ((item as Array<*>)[2] as Double), null, null, null, null, null, null, null, (((item as Array<*>)[10] as UInt) + delta))
+}
+
+@PublishedApi internal fun f_bumpBoxedItem___boxed(item: Any?, delta: Any?): Any? {
+    val delta_boxed_198_1 = (delta as UInt)
+    return f_bumpBoxedItem(item, delta_boxed_198_1)
+}
+
+@PublishedApi internal fun f_boxedItemTag(item: Any?): String {
+    return ((item as Array<*>)[1] as String)
+}
+
+@PublishedApi internal fun f_boxedItemTag___boxed(item: Any?): Any? {
+    return f_boxedItemTag(item)
+}
+
+@PublishedApi internal fun f_boxedItemCount(item: Any?): UInt {
+    return ((item as Array<*>)[10] as UInt)
+}
+
+@PublishedApi internal fun f_boxedItemCount___boxed(item: Any?): Any? {
+    val res_207_1 = f_boxedItemCount(item)
+    return res_207_1
+}
+
+@PublishedApi internal fun f_boxedItemWeight(item: Any?): Double {
+    return ((item as Array<*>)[2] as Double)
+}
+
+@PublishedApi internal fun f_boxedItemWeight___boxed(item: Any?): Any? {
+    val res_212_1 = f_boxedItemWeight(item)
+    return res_212_1
+}
+
+@PublishedApi internal fun f_ExprTree_ctorIdx(x: Any?): Any? {
+    when (((x as Array<*>)[0] as Int))     {
+        0 ->         {
+            return 0
+        }
+        1 ->         {
+            return 1
+        }
+        2 ->         {
+            return 2
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_ExprTree_ctorIdx___boxed(x: Any?): Any? {
+    return f_ExprTree_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_ExprTree_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (((t as Array<*>)[0] as Int))     {
+        0 ->         {
+            val v_222_1 = ((t as Array<*>)[1] as Int)
+            return (k as (Any?) -> Any?)(v_222_1)
+        }
+        1 ->         {
+            val l_225_2 = (t as Array<*>)[1]
+            val r_226_3 = (t as Array<*>)[2]
+            return (k as (Any?, Any?) -> Any?)(l_225_2, r_226_3)
+        }
+        2 ->         {
+            val e_228_4 = (t as Array<*>)[1]
+            return (k as (Any?) -> Any?)(e_228_4)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_ExprTree_ctorElim(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_ExprTree_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_ExprTree_ctorElim(motive, ctorIdx, t, h, k)
+}
+
+@PublishedApi internal fun f_ExprTree_lit_elim___redArg(t: Any?, lit: (Int) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, lit)
+}
+
+@PublishedApi internal fun f_ExprTree_lit_elim(motive: Any?, t: Any?, h: Any?, lit: (Int) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, lit)
+}
+
+@PublishedApi internal fun f_ExprTree_add_elim___redArg(t: Any?, add: (Any?, Any?) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, add)
+}
+
+@PublishedApi internal fun f_ExprTree_add_elim(motive: Any?, t: Any?, h: Any?, add: (Any?, Any?) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, add)
+}
+
+@PublishedApi internal fun f_ExprTree_neg_elim___redArg(t: Any?, neg: (Any?) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, neg)
+}
+
+@PublishedApi internal fun f_ExprTree_neg_elim(motive: Any?, t: Any?, h: Any?, neg: (Any?) -> Any?): Any? {
+    return f_ExprTree_ctorElim___redArg(t, neg)
+}
+
+@PublishedApi internal fun f_evalTree(t: Any?): Int {
+    when (((t as Array<*>)[0] as Int))     {
+        0 ->         {
+            return ((t as Array<*>)[1] as Int)
+        }
+        1 ->         {
+            val r_269_1 = (t as Array<*>)[2]
+            val v_x_270_2 = f_evalTree((t as Array<*>)[1])
+            val v_x_271_3 = f_evalTree(r_269_1)
+            return (v_x_270_2 + v_x_271_3)
+        }
+        2 ->         {
+            val v_x_274_4 = f_evalTree((t as Array<*>)[1])
+            return (-v_x_274_4)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_evalTree___boxed(t: Any?): Any? {
+    val res_277_1 = f_evalTree(t)
+    return res_277_1
+}
+
+@PublishedApi internal fun f_sampleTree(x: Int, y: Int): Any? {
+    return arrayOf<Any?>(1, arrayOf<Any?>(0, x), arrayOf<Any?>(2, arrayOf<Any?>(0, y)))
+}
+
+@PublishedApi internal fun f_sampleTree___boxed(x: Any?, y: Any?): Any? {
+    val x_boxed_287_1 = (x as Int)
+    val y_boxed_288_2 = (y as Int)
+    return f_sampleTree(x_boxed_287_1, y_boxed_288_2)
+}
+
