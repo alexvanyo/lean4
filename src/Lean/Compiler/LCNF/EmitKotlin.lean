@@ -944,8 +944,41 @@ def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Emi
       | throwError "Kotlin backend: in `{(← read).currFn}`: `Array` operations require `set_option compiler.kotlin.typedArrays true`"
     let t := (d.drop 7).toString
     return some (if (kotlinArrayElem? t).isSome then s!"{t}(0)" else "arrayOfNulls<Any?>(0)")
+  if fn == arrOp "push" then
+    let arrTy ← match getJvmTypeDesc? resTy with
+      | some d => pure (d.drop 7).toString
+      | none => arrayType (args[1]?.getD .erased)
+    let aStr ← arg 1
+    let vStr ← arg 2
+    match kotlinArrayElem? arrTy with
+    | some e =>
+      let vc ← castIfNeeded vStr e
+      return some s!"({aStr} + {vc})"
+    | none =>
+      return some s!"({aStr}.copyOf({aStr}.size + 1).also \{ it[{aStr}.size] = {vStr} })"
+  if fn == arrOp "pop" then
+    discard <| arrayType (args[1]?.getD .erased)
+    let aStr ← arg 1
+    return some s!"(if ({aStr}.isNotEmpty()) {aStr}.copyOf({aStr}.size - 1) else {aStr})"
+  if fn == arrOp "append" || fn == `Array.append._redArg ||
+     fn == arrOp "appendCore" || fn == `Array.appendCore._redArg then
+    let aIdx := args.size - 2
+    let bIdx := args.size - 1
+    discard <| arrayType (args[aIdx]?.getD .erased)
+    let aStr ← arg aIdx
+    let bStr ← arg bIdx
+    return some s!"({aStr} + {bStr})"
+  if fn == arrOp "extract" || fn == `Array.extract._redArg then
+    let aIdx := args.size - 3
+    let startIdx := args.size - 2
+    let stopIdx := args.size - 1
+    discard <| arrayType (args[aIdx]?.getD .erased)
+    let aStr ← arg aIdx
+    let startStr ← castIfNeeded (← arg startIdx) "Int"
+    let stopStr ← castIfNeeded (← arg stopIdx) "Int"
+    return some s!"{aStr}.copyOfRange(({startStr}).coerceIn(0, {aStr}.size), ({stopStr}).coerceIn(({startStr}).coerceIn(0, {aStr}.size), {aStr}.size))"
   if fn.getPrefix == `Array && (fn matches .str _ _) then
-    let supported := ["set!", "uset", "setIfInBounds"]
+    let supported := ["set!", "uset", "setIfInBounds", "swap", "uswap", "swapIfInBounds"]
     unless supported.contains fn.getString! do
       throwError "Kotlin backend: `{fn}` is not supported (Kotlin arrays have a fixed size)"
   return none
@@ -956,6 +989,18 @@ def arraySet? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .imp
     return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!)
   if fn == arrOp "uset" then
     return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!)
+  return none
+
+/-- In-place `Array` element swaps: `(array arg, idx1 expr, idx2 expr, checkBounds)`. -/
+def arraySwap? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × String × Bool)) := do
+  if fn == arrOp "swap" || fn == arrOp "uswap" then
+    let iStr ← castIfNeeded (← toKotlinArg args[2]!) "Int"
+    let jStr ← castIfNeeded (← toKotlinArg args[3]!) "Int"
+    return some (args[1]!, iStr, jStr, false)
+  if fn == arrOp "swapIfInBounds" then
+    let iStr ← castIfNeeded (← toKotlinArg args[2]!) "Int"
+    let jStr ← castIfNeeded (← toKotlinArg args[3]!) "Int"
+    return some (args[1]!, iStr, jStr, true)
   return none
 
 /-- Kotlin property names of a `@[kotlin_class]` structure by runtime position. -/
@@ -2269,6 +2314,13 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
        fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
       let arrTy ← arrayType (args[1]?.getD .erased)
       return (kotlinArrayElem? arrTy).getD baseTy
+    if fn == arrOp "push" || fn == arrOp "pop" then
+      return ← arrayType (args[1]?.getD .erased)
+    if fn == arrOp "append" || fn == `Array.append._redArg ||
+       fn == arrOp "appendCore" || fn == `Array.appendCore._redArg then
+      return ← arrayType (args[args.size - 2]?.getD .erased)
+    if fn == arrOp "extract" || fn == `Array.extract._redArg then
+      return ← arrayType (args[args.size - 3]?.getD .erased)
     if fn == arrOp "size" || fn == arrOp "usize" then
       return "Int"
     if baseTy != "Any?" then return baseTy
@@ -2897,6 +2949,19 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           | none => pure vStr
         let aStr ← toKotlinArg a
         emitLn s!"{aStr}[{idx}] = {vStr}"
+        setParamVarName x aStr
+      else if let some (a, iStr, jStr, checkBounds) ← arraySwap? fn args then
+        discard <| arrayType a
+        let aStr ← toKotlinArg a
+        let count := (← get).nameCounter + 1
+        modify fun st => { st with nameCounter := count }
+        let tmpName := s!"tmp_{count}"
+        if checkBounds then
+          emitLn s!"if ({iStr} >= 0 && {iStr} < {aStr}.size && {jStr} >= 0 && {jStr} < {aStr}.size) \{ val {tmpName} = {aStr}[{iStr}]; {aStr}[{iStr}] = {aStr}[{jStr}]; {aStr}[{jStr}] = {tmpName} }"
+        else
+          emitLn s!"val {tmpName} = {aStr}[{iStr}]"
+          emitLn s!"{aStr}[{iStr}] = {aStr}[{jStr}]"
+          emitLn s!"{aStr}[{jStr}] = {tmpName}"
         setParamVarName x aStr
       else if let some ai := Ownership.inplaceArg? (← getEnv) fn args then
         -- `kotlin_inplace:` extern: a statement updating argument `ai`, which is the result.
