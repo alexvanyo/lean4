@@ -254,3 +254,64 @@
     return f_testLeanInts(a, b)
 }
 
+@PublishedApi internal fun f_testNatOps(a: Any?, b: Any?): Any? {
+    val bit_251_1 = ((((((((a as Int) and (b as Int)) as Int) + (((a as Int) or (b as Int)) as Int)) as Int) + (((a as Int) xor (b as Int)) as Int)) as Int) + (((a as Int) ushr 1) as Int))
+    val p_253_2 = Math.pow(((a as Int)).toDouble(), (2).toDouble()).toInt()
+    val g_254_3 = java.math.BigInteger.valueOf(((a as Int)).toLong()).gcd(java.math.BigInteger.valueOf(((b as Int)).toLong())).toInt()
+    val lg_255_4 = (if ((a as Int) <= 1) 0 else 31 - ((a as Int)).countLeadingZeroBits())
+    val pr_256_5 = (maxOf(0, (a as Int) - 1))
+    val v_y_263_6: Boolean
+    if (!((a as Int) < (b as Int)))     {
+        val v_x_266_7 = ((a as Int) <= (b as Int))
+        v_y_263_6 = v_x_266_7
+    } else     {
+        v_y_263_6 = true
+    }
+    if (!v_y_263_6)     {
+        if (!((a as Int) == (b as Int)))         {
+            return bit_251_1
+        }
+    }
+    return ((((((((bit_251_1 as Int) + (p_253_2 as Int)) as Int) + (g_254_3 as Int)) as Int) + (lg_255_4 as Int)) as Int) + (pr_256_5 as Int))
+}
+
+@PublishedApi internal fun f_testNatOps___boxed(a: Any?, b: Any?): Any? {
+    return f_testNatOps(a, b)
+}
+
+@PublishedApi internal fun f_testPanicOpt___closed__0(): String {
+    return "Init.Data.Option.BasicAux"
+}
+
+@PublishedApi internal fun f_testPanicOpt___closed__1(): String {
+    return "Option.get!"
+}
+
+@PublishedApi internal fun f_testPanicOpt___closed__2(): String {
+    return "value is none"
+}
+
+@PublishedApi internal fun f_testPanicOpt___closed__3(): String {
+    val v_x_273_1 = "value is none"
+    val v_x_276_2 = "Option.get!"
+    val v_x_277_3 = "Init.Data.Option.BasicAux"
+    return ("PANIC at " + v_x_276_2 + " " + v_x_277_3 + ":" + (22).toString() + ":" + (14).toString() + ": " + v_x_273_1)
+}
+
+@PublishedApi internal fun f_testPanicOpt(x: Any?): Any? {
+    when (((x as Array<*>)[0] as Int))     {
+        0 ->         {
+            val v_x_280_1 = f_testPanicOpt___closed__3()
+            return (error(v_x_280_1) as Any?)
+        }
+        1 ->         {
+            return (x as Array<*>)[1]
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_testPanicOpt___boxed(x: Any?): Any? {
+    return f_testPanicOpt(x)
+}
+

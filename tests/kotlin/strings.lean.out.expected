@@ -48,3 +48,98 @@
     return res_26_1
 }
 
+@PublishedApi internal fun f_testStringInterp___closed__0(): String {
+    return ": nat="
+}
+
+@PublishedApi internal fun f_testStringInterp___closed__1(): String {
+    return ", int="
+}
+
+@PublishedApi internal fun f_testStringInterp(name: String, n: Any?, i: Any?): String {
+    val v_x_33_1 = ": nat="
+    val v_x_36_2 = ((name + v_x_33_1) + (n).toString())
+    val v_x_37_3 = ", int="
+    return ((v_x_36_2 + v_x_37_3) + (i).toString())
+}
+
+@PublishedApi internal fun f_testStringInterp___boxed(name: Any?, n: Any?, i: Any?): Any? {
+    return f_testStringInterp((name as String), n, i)
+}
+
+@PublishedApi internal fun f_List_mapTR_loop___at___00testStringChars_spec__0(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_1)
+        }
+        1 ->         {
+            val head_48_2 = (p_0 as Array<*>)[1]
+            val tail_49_3 = (p_0 as Array<*>)[2]
+            val v_y_54_4: UInt
+            val v_y_61_5: Boolean
+            val v_x_67_6 = (head_48_2 as UInt)
+            if (!(97u <= v_x_67_6))             {
+                v_y_61_5 = false
+            } else             {
+                val v_x_70_7 = (head_48_2 as UInt)
+                val v_x_71_8 = (v_x_70_7 <= 122u)
+                v_y_61_5 = v_x_71_8
+            }
+            if (!v_y_61_5)             {
+                val v_x_62_9 = (head_48_2 as UInt)
+                v_y_54_4 = v_x_62_9
+            } else             {
+                val v_x_64_10 = (head_48_2 as UInt)
+                val v_x_65_11 = (v_x_64_10 + 4294967264u)
+                v_y_54_4 = v_x_65_11
+            }
+            return f_List_mapTR_loop___at___00testStringChars_spec__0(tail_49_3, arrayOf<Any?>(1, v_y_54_4, p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_testStringChars(s: String): String {
+    val v_x_76_1 = f_List_mapTR_loop___at___00testStringChars_spec__0((s).codePoints().toArray().foldRight(arrayOf<Any?>(0) as Any?) { cp, acc -> arrayOf<Any?>(1, cp.toUInt(), acc) }, arrayOf<Any?>(0))
+    return buildString { var cur: Any? = v_x_76_1; while (((cur as Array<*>)[0] as Int) == 1) { appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }
+}
+
+@PublishedApi internal fun f_testStringExtract(s: String): String {
+    return (run { val bs = (s).encodeToByteArray(); val start = (0).coerceIn(0, bs.size); val stop = (5).coerceIn(start, bs.size); bs.decodeToString(start, stop) })
+}
+
+@PublishedApi internal fun f_testStringExtract___boxed(s: Any?): Any? {
+    return f_testStringExtract((s as String))
+}
+
+@PublishedApi internal fun f_testCharOps___closed__0(): String {
+    return ""
+}
+
+@PublishedApi internal fun f_testCharOps(n: Any?): Any? {
+    val c_86_1 = (run { val cp = ((n as Int)).toUInt(); if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
+    val v_x_89_2 = (((c_86_1).toInt()).toInt() + (run { val cp = c_86_1; if (cp <= 0x7Fu) 1 else if (cp <= 0x7FFu) 2 else if (cp <= 0xFFFFu) 3 else 4 }))
+    val v_x_90_3 = ""
+    return ((v_x_89_2 as Int) + ((v_x_90_3 + Character.toString((c_86_1).toInt()))).encodeToByteArray().size)
+}
+
+@PublishedApi internal fun f_testCharOps___boxed(n: Any?): Any? {
+    return f_testCharOps(n)
+}
+
+private fun f_List_reverse___redArg(p_0: Any?): Any? {
+    return f_List_reverseAux___redArg(p_0, arrayOf<Any?>(0))
+}
+
+private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_reverseAux___redArg((p_0 as Array<*>)[2], arrayOf<Any?>(1, (p_0 as Array<*>)[1], p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+

@@ -531,11 +531,11 @@
     return res_376_2
 }
 
-@PublishedApi internal fun f_List_reverse___redArg(p_0: Any?): Any? {
+private fun f_List_reverse___redArg(p_0: Any?): Any? {
     return f_List_reverseAux___redArg(p_0, arrayOf<Any?>(0))
 }
 
-@PublishedApi internal tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
+private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
             return p_1
@@ -547,11 +547,11 @@
     }
 }
 
-@PublishedApi internal fun f_List_lengthTR___redArg(p_0: Any?): Any? {
+private fun f_List_lengthTR___redArg(p_0: Any?): Any? {
     return f_List_lengthTRAux___redArg(p_0, 0)
 }
 
-@PublishedApi internal tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: Any?): Any? {
+private tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: Any?): Any? {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
             return p_1
@@ -563,7 +563,7 @@
     }
 }
 
-@PublishedApi internal fun f_List_appendTR___redArg(p_0: Any?, bs: Any?): Any? {
+private fun f_List_appendTR___redArg(p_0: Any?, bs: Any?): Any? {
     val v_x_398_1 = f_List_reverse___redArg(p_0)
     return f_List_reverseAux___redArg(v_x_398_1, bs)
 }

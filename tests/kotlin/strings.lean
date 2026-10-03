@@ -16,3 +16,16 @@ def testStringMetrics (s : String) : Nat :=
 
 def testStringCompare (a b : String) : Bool :=
   a == b || a < b
+
+def testStringInterp (name : String) (n : Nat) (i : Int) : String :=
+  s!"{name}: nat={n}, int={i}"
+
+def testStringChars (s : String) : String :=
+  String.ofList (s.toList.map Char.toUpper)
+
+def testStringExtract (s : String) : String :=
+  String.Pos.Raw.extract s ⟨0⟩ ⟨5⟩
+
+def testCharOps (n : Nat) : Nat :=
+  let c := Char.ofNat n
+  c.toNat + c.utf8Size + (String.singleton c).utf8ByteSize
