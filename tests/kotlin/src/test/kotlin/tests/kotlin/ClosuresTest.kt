@@ -47,16 +47,16 @@ class ClosuresTest {
 
     @Test
     fun testThunk() {
-        assertEquals(42, f_testThunkEval(5))
-        assertEquals(15, f_testThunkPure(10))
-        assertEquals(18, f_testThunkBind(5))
+        assertEquals(42.toBigInteger(), f_testThunkEval(5.toBigInteger()))
+        assertEquals(15.toBigInteger(), f_testThunkPure(10.toBigInteger()))
+        assertEquals(18.toBigInteger(), f_testThunkBind(5.toBigInteger()))
     }
 
     @Test
     fun testSTRef() {
         // initVal = 5 -> v0 = 5 -> set 15 -> modify (*2) = 30 -> swap 99 returns old=30, v1=99 -> 129
-        assertEquals(129, f_testSTRefBasic(5))
-        assertEquals(Pair<Any?, Any?>(8, 21), f_testSTRefModifyGet(7))
-        assertEquals(Pair(true, false), f_testSTRefPtrEq(42))
+        assertEquals(129.toBigInteger(), f_testSTRefBasic(5.toBigInteger()))
+        assertEquals(Pair(8.toBigInteger(), 21.toBigInteger()), f_testSTRefModifyGet(7.toBigInteger()))
+        assertEquals(Pair(true, false), f_testSTRefPtrEq(42.toBigInteger()))
     }
 }

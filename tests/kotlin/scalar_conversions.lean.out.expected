@@ -1,18 +1,18 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
-@PublishedApi internal fun f_testConversions(n: Any?, i: Any?, u64: ULong, i64: Long): Any? {
-    return ((((((((((((n).toUByte()).toInt()).toInt() + (((n).toUShort()).toInt()).toInt()) as Int) + (((n).toUInt()).toInt()).toInt()) as Int) + ((u64).toInt()).toInt()) as Int) + (((i).toByte()).toInt()).toInt()) as Int) + ((i64).toInt()).toInt())
+@PublishedApi internal fun f_testConversions(n: java.math.BigInteger, i: Any?, u64: ULong, i64: Long): java.math.BigInteger {
+    return (((((java.math.BigInteger.valueOf(((n).toByte().toUByte()).toLong()).add(java.math.BigInteger.valueOf(((n).toShort().toUShort()).toLong()))).add(java.math.BigInteger.valueOf(((n).toInt().toUInt()).toLong()))).add((run { val l = (u64).toLong(); if (l >= 0L) java.math.BigInteger.valueOf(l) else java.math.BigInteger.valueOf(l and Long.MAX_VALUE).setBit(63) }))).add(java.math.BigInteger.valueOf(maxOf(0, ((i).toByte()).toInt()).toLong()))).add(java.math.BigInteger.valueOf(maxOf(0, (i64).toInt()).toLong())))
 }
 
 @PublishedApi internal fun f_testConversions___boxed(n: Any?, i: Any?, u64: Any?, i64: Any?): Any? {
     val u64_boxed_26_1 = (u64 as ULong)
     val i64_boxed_27_2 = (i64 as Long)
-    return f_testConversions(n, i, u64_boxed_26_1, i64_boxed_27_2)
+    return f_testConversions((n as java.math.BigInteger), i, u64_boxed_26_1, i64_boxed_27_2)
 }
 
 @PublishedApi internal fun f_testDirectCast(a: UInt, b: Int): ULong {
-    return ((a).toULong() + (b).toULong())
+    return ((a).toULong() + (java.math.BigInteger.valueOf(maxOf(0, b).toLong())).toLong().toULong())
 }
 
 @PublishedApi internal fun f_testDirectCast___boxed(a: Any?, b: Any?): Any? {

@@ -1,16 +1,16 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
-@PublishedApi internal fun f_Color_ctorIdx(x: UByte): Any? {
+@PublishedApi internal fun f_Color_ctorIdx(x: UByte): java.math.BigInteger {
     when ((x).toInt())     {
         0 ->         {
-            return 0
+            return java.math.BigInteger.ZERO
         }
         1 ->         {
-            return 1
+            return java.math.BigInteger.ONE
         }
         2 ->         {
-            return 2
+            return java.math.BigInteger.TWO
         }
         else ->         { error("unreachable") }
     }
@@ -29,13 +29,13 @@
     return f_Color_ctorElim___redArg(k)
 }
 
-@PublishedApi internal fun f_Color_ctorElim(motive: Any?, ctorIdx: Any?, t: UByte, h: Any?, k: Any?): Any? {
+@PublishedApi internal fun f_Color_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: UByte, h: Any?, k: Any?): Any? {
     return k
 }
 
 @PublishedApi internal fun f_Color_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
     val t_boxed_21_1 = (t as UByte)
-    return f_Color_ctorElim(motive, ctorIdx, t_boxed_21_1, h, k)
+    return f_Color_ctorElim(motive, (ctorIdx as java.math.BigInteger), t_boxed_21_1, h, k)
 }
 
 @PublishedApi internal fun f_Color_red_elim___redArg(red: Any?): Any? {
@@ -314,16 +314,16 @@
     return res_212_1
 }
 
-@PublishedApi internal fun f_ExprTree_ctorIdx(x: Any?): Any? {
+@PublishedApi internal fun f_ExprTree_ctorIdx(x: Any?): java.math.BigInteger {
     when (((x as Array<*>)[0] as Int))     {
         0 ->         {
-            return 0
+            return java.math.BigInteger.ZERO
         }
         1 ->         {
-            return 1
+            return java.math.BigInteger.ONE
         }
         2 ->         {
-            return 2
+            return java.math.BigInteger.TWO
         }
         else ->         { error("unreachable") }
     }
@@ -352,12 +352,12 @@
     }
 }
 
-@PublishedApi internal fun f_ExprTree_ctorElim(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+@PublishedApi internal fun f_ExprTree_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
     return f_ExprTree_ctorElim___redArg(t, k)
 }
 
 @PublishedApi internal fun f_ExprTree_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
-    return f_ExprTree_ctorElim(motive, ctorIdx, t, h, k)
+    return f_ExprTree_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
 }
 
 @PublishedApi internal fun f_ExprTree_lit_elim___redArg(t: Any?, lit: (Int) -> Any?): Any? {
@@ -426,7 +426,7 @@
     return f_List_appendTR___redArg(xs, ys)
 }
 
-@PublishedApi internal fun f_listLength(xs: Any?): Any? {
+@PublishedApi internal fun f_listLength(xs: Any?): java.math.BigInteger {
     return f_List_lengthTR___redArg(xs)
 }
 
@@ -547,17 +547,17 @@ private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
     }
 }
 
-private fun f_List_lengthTR___redArg(p_0: Any?): Any? {
-    return f_List_lengthTRAux___redArg(p_0, 0)
+private fun f_List_lengthTR___redArg(p_0: Any?): java.math.BigInteger {
+    return f_List_lengthTRAux___redArg(p_0, java.math.BigInteger.ZERO)
 }
 
-private tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: Any?): Any? {
+private tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: java.math.BigInteger): java.math.BigInteger {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
             return p_1
         }
         1 ->         {
-            return f_List_lengthTRAux___redArg((p_0 as Array<*>)[2], ((p_1 as Int) + 1))
+            return f_List_lengthTRAux___redArg((p_0 as Array<*>)[2], (p_1.add(java.math.BigInteger.ONE)))
         }
         else ->         { error("unreachable") }
     }

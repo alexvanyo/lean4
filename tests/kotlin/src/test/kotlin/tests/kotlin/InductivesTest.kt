@@ -62,17 +62,17 @@ class InductivesTest {
     @Test
     fun testStdListOps() {
         val xs = f_makeList3(10u, 20u, 30u)
-        assertEquals(3, f_listLength(xs))
+        assertEquals(3.toBigInteger(), f_listLength(xs))
         val rev = f_reverseList(xs)
         assertEquals(60u, f_sumList(rev))
         val ys = f_makeList3(1u, 2u, 3u)
         val combined = f_appendLists(xs, ys)
-        assertEquals(6, f_listLength(combined))
+        assertEquals(6.toBigInteger(), f_listLength(combined))
         assertEquals(66u, f_sumList(combined))
         val mapped = f_mapListInc(xs)
         assertEquals(63u, f_sumList(mapped))
         val filtered = f_filterListGt(xs, 15u)
-        assertEquals(2, f_listLength(filtered))
+        assertEquals(2.toBigInteger(), f_listLength(filtered))
         assertEquals(50u, f_foldlListSum(filtered))
     }
 

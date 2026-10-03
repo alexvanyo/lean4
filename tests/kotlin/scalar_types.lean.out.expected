@@ -240,43 +240,66 @@
     val eq_224_7 = (if ((b as Int) == 0) 0 else if ((b as Int) > 0) Math.floorDiv((a as Int), (b as Int)) else -Math.floorDiv((a as Int), -(b as Int)))
     val er_225_8 = (if ((b as Int) == 0) (a as Int) else Math.floorMod((a as Int), kotlin.math.abs((b as Int))))
     val neg_226_9 = (-(prod_221_5 / (v_x_218_2 as Int)))
+    val absVal_228_10 = (java.math.BigInteger.valueOf(kotlin.math.abs(((a as Int)).toLong()))).toInt()
     if (!((a as Int) == (b as Int)))     {
         if (!((a as Int) < (b as Int)))         {
             if (!((a as Int) <= (b as Int)))             {
-                return ((neg_226_9 - r_223_6) + kotlin.math.abs((a as Int)))
+                return ((neg_226_9 - r_223_6) + absVal_228_10)
             }
         }
     }
-    return ((((neg_226_9 + r_223_6) + eq_224_7) + er_225_8) + kotlin.math.abs((a as Int)))
+    return ((((neg_226_9 + r_223_6) + eq_224_7) + er_225_8) + absVal_228_10)
 }
 
 @PublishedApi internal fun f_testLeanInts___boxed(a: Any?, b: Any?): Any? {
     return f_testLeanInts(a, b)
 }
 
-@PublishedApi internal fun f_testNatOps(a: Any?, b: Any?): Any? {
-    val bit_251_1 = ((((((((a as Int) and (b as Int)) as Int) + (((a as Int) or (b as Int)) as Int)) as Int) + (((a as Int) xor (b as Int)) as Int)) as Int) + (((a as Int) ushr 1) as Int))
-    val p_253_2 = Math.pow(((a as Int)).toDouble(), (2).toDouble()).toInt()
-    val g_254_3 = java.math.BigInteger.valueOf(((a as Int)).toLong()).gcd(java.math.BigInteger.valueOf(((b as Int)).toLong())).toInt()
-    val lg_255_4 = (if ((a as Int) <= 1) 0 else 31 - ((a as Int)).countLeadingZeroBits())
-    val pr_256_5 = (maxOf(0, (a as Int) - 1))
+@PublishedApi internal fun f_testNatOps(a: java.math.BigInteger, b: java.math.BigInteger): java.math.BigInteger {
+    val bit_251_1 = ((((a.and(b)).add((a.or(b)))).add((a.xor(b)))).add((a.shiftRight(1))))
+    val p_253_2 = (a.pow(2))
+    val g_254_3 = (a.gcd(b))
+    val lg_255_4 = java.math.BigInteger.valueOf(maxOf(0, (a).bitLength() - 1).toLong())
+    val pr_256_5 = (a.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO))
     val v_y_263_6: Boolean
-    if (!((a as Int) < (b as Int)))     {
-        val v_x_266_7 = ((a as Int) <= (b as Int))
+    if (!(a < b))     {
+        val v_x_266_7 = (a <= b)
         v_y_263_6 = v_x_266_7
     } else     {
         v_y_263_6 = true
     }
     if (!v_y_263_6)     {
-        if (!((a as Int) == (b as Int)))         {
+        if (!(a == b))         {
             return bit_251_1
         }
     }
-    return ((((((((bit_251_1 as Int) + (p_253_2 as Int)) as Int) + (g_254_3 as Int)) as Int) + (lg_255_4 as Int)) as Int) + (pr_256_5 as Int))
+    return ((((bit_251_1.add(p_253_2)).add(g_254_3)).add(lg_255_4)).add(pr_256_5))
 }
 
 @PublishedApi internal fun f_testNatOps___boxed(a: Any?, b: Any?): Any? {
-    return f_testNatOps(a, b)
+    return f_testNatOps((a as java.math.BigInteger), (b as java.math.BigInteger))
+}
+
+@PublishedApi internal fun f_testLargeNat___closed__0(): java.math.BigInteger {
+    return java.math.BigInteger("1000000000000000000000000000000")
+}
+
+@PublishedApi internal fun f_testLargeNat(n: java.math.BigInteger): java.math.BigInteger {
+    return (((n.pow(100)).add(java.math.BigInteger("1000000000000000000000000000000"))).subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO))
+}
+
+@PublishedApi internal fun f_testLargeNat___boxed(n: Any?): Any? {
+    return f_testLargeNat((n as java.math.BigInteger))
+}
+
+@PublishedApi internal fun f_testBitVec64(a: java.math.BigInteger, b: java.math.BigInteger): java.math.BigInteger {
+    val v_x_283_1 = f_BitVec_add(java.math.BigInteger.valueOf(64L), a, b)
+    val v_x_285_2 = f_BitVec_shiftLeft(java.math.BigInteger.valueOf(64L), a, java.math.BigInteger.valueOf(3L))
+    return (v_x_283_1.xor(v_x_285_2))
+}
+
+@PublishedApi internal fun f_testBitVec64___boxed(a: Any?, b: Any?): Any? {
+    return f_testBitVec64((a as java.math.BigInteger), (b as java.math.BigInteger))
 }
 
 @PublishedApi internal fun f_testPanicOpt___closed__0(): String {
@@ -292,20 +315,20 @@
 }
 
 @PublishedApi internal fun f_testPanicOpt___closed__3(): String {
-    val v_x_273_1 = "value is none"
-    val v_x_276_2 = "Option.get!"
-    val v_x_277_3 = "Init.Data.Option.BasicAux"
-    return ("PANIC at " + v_x_276_2 + " " + v_x_277_3 + ":" + (22).toString() + ":" + (14).toString() + ": " + v_x_273_1)
+    val v_x_293_1 = "value is none"
+    val v_x_296_2 = "Option.get!"
+    val v_x_297_3 = "Init.Data.Option.BasicAux"
+    return ("PANIC at " + v_x_296_2 + " " + v_x_297_3 + ":" + (java.math.BigInteger.valueOf(22L)).toString() + ":" + (java.math.BigInteger.valueOf(14L)).toString() + ": " + v_x_293_1)
 }
 
-@PublishedApi internal fun f_testPanicOpt(x: Any?): Any? {
+@PublishedApi internal fun f_testPanicOpt(x: Any?): java.math.BigInteger {
     when (((x as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_x_280_1 = f_testPanicOpt___closed__3()
-            return error(v_x_280_1)
+            val v_x_300_1 = f_testPanicOpt___closed__3()
+            return error(v_x_300_1)
         }
         1 ->         {
-            return (x as Array<*>)[1]
+            return ((x as Array<*>)[1] as java.math.BigInteger)
         }
         else ->         { error("unreachable") }
     }
@@ -313,5 +336,32 @@
 
 @PublishedApi internal fun f_testPanicOpt___boxed(x: Any?): Any? {
     return f_testPanicOpt(x)
+}
+
+/**
+ * Shifts a bitvector to the left. The low bits are filled with zeros. As a numeric operation, this is
+ * equivalent to `x * 2^s`, modulo `2^n`.
+ *
+ * SMT-LIB name: `bvshl` except this operator uses a `Nat` shift value.
+ */
+private fun f_BitVec_shiftLeft(n: java.math.BigInteger, x: java.math.BigInteger, s: java.math.BigInteger): java.math.BigInteger {
+    return f_BitVec_ofNat(n, (x.shiftLeft((s).toInt())))
+}
+
+/**
+ * The bitvector with value `i mod 2^n`.
+ */
+private fun f_BitVec_ofNat(n: java.math.BigInteger, i: java.math.BigInteger): java.math.BigInteger {
+    return (if ((java.math.BigInteger.TWO.pow((n).toInt())) == java.math.BigInteger.ZERO) i else (i).remainder((java.math.BigInteger.TWO.pow((n).toInt()))))
+}
+
+/**
+ * Adds two bitvectors. This can be interpreted as either signed or unsigned addition modulo `2^n`.
+ * Usually accessed via the `+` operator.
+ *
+ * SMT-LIB name: `bvadd`.
+ */
+private fun f_BitVec_add(n: java.math.BigInteger, x: java.math.BigInteger, y: java.math.BigInteger): java.math.BigInteger {
+    return f_BitVec_ofNat(n, (x.add(y)))
 }
 

@@ -7,8 +7,8 @@ class TypedArraysTest {
     @OptIn(ExperimentalUnsignedTypes::class)
     @Test
     fun testU64Array() {
-        val arr = f_makeU64Array(5)
-        assertEquals(5, f_getArraySize(arr))
+        val arr = f_makeU64Array(5.toBigInteger())
+        assertEquals(5.toBigInteger(), f_getArraySize(arr))
         assertEquals(0uL, f_readArrayU64(arr, 0, null))
         assertEquals(0uL, f_readArrayU64(arr, 4, null))
     }
@@ -16,7 +16,7 @@ class TypedArraysTest {
     @OptIn(ExperimentalUnsignedTypes::class)
     @Test
     fun testU32Array() {
-        val arr = f_makeU32Array(3, 42u)
+        val arr = f_makeU32Array(3.toBigInteger(), 42u)
         assertEquals(3, arr.size)
         assertEquals(42u, arr[0])
         assertEquals(42u, arr[1])
@@ -25,7 +25,7 @@ class TypedArraysTest {
 
     @Test
     fun testBoolArray() {
-        val arr = f_makeBoolArray(4)
+        val arr = f_makeBoolArray(4.toBigInteger())
         assertEquals(4, arr.size)
         assertEquals(false, arr[0])
     }
@@ -39,17 +39,17 @@ class TypedArraysTest {
         assertEquals(20u, arr[1])
         assertEquals(30u, arr[2])
 
-        f_swapArrayU32(arr, 0, 2, null, null)
+        f_swapArrayU32(arr, 0.toBigInteger(), 2.toBigInteger(), null, null)
         assertEquals(30u, arr[0])
         assertEquals(20u, arr[1])
         assertEquals(10u, arr[2])
 
-        f_swapIfInBoundsU32(arr, 0, 1)
+        f_swapIfInBoundsU32(arr, 0.toBigInteger(), 1.toBigInteger())
         assertEquals(20u, arr[0])
         assertEquals(30u, arr[1])
 
         // Out-of-bounds swapIfInBounds is a no-op
-        f_swapIfInBoundsU32(arr, 0, 99)
+        f_swapIfInBoundsU32(arr, 0.toBigInteger(), 99.toBigInteger())
         assertEquals(20u, arr[0])
         assertEquals(30u, arr[1])
     }
@@ -65,13 +65,13 @@ class TypedArraysTest {
         val combined = f_appendU32(pushedPopped, other)
         assertEquals(listOf(1u, 2u, 3u, 4u, 10u, 20u, 30u), combined.toList())
 
-        val sliced = f_sliceU32(combined, 2, 5)
+        val sliced = f_sliceU32(combined, 2.toBigInteger(), 5.toBigInteger())
         assertEquals(listOf(3u, 4u, 10u), sliced.toList())
 
-        val clamped = f_sliceU32(combined, 5, 100)
+        val clamped = f_sliceU32(combined, 5.toBigInteger(), 100.toBigInteger())
         assertEquals(listOf(20u, 30u), clamped.toList())
 
-        val emptySlice = f_sliceU32(combined, 4, 2)
+        val emptySlice = f_sliceU32(combined, 4.toBigInteger(), 2.toBigInteger())
         assertEquals(emptyList(), emptySlice.toList())
 
         val strArr = f_makeLiteralStr("hello", "world")
@@ -82,15 +82,15 @@ class TypedArraysTest {
     @Test
     fun testPolyArrayAndListConversions() {
         val strArr = f_makeLiteralStr("a", "b")
-        val natArr: Array<Any?> = arrayOf(1, 5, 2, 8, 3)
-        assertEquals(19, f_sumNatArray(natArr))
+        val natArr: Array<Any?> = arrayOf(1.toBigInteger(), 5.toBigInteger(), 2.toBigInteger(), 8.toBigInteger(), 3.toBigInteger())
+        assertEquals(19.toBigInteger(), f_sumNatArray(natArr))
 
-        val filtered = f_filterNatArray(natArr, 4)
-        assertEquals(listOf<Any?>(5, 8), filtered.toList())
+        val filtered = f_filterNatArray(natArr, 4.toBigInteger())
+        assertEquals(listOf<Any?>(5.toBigInteger(), 8.toBigInteger()), filtered.toList())
 
         val natList = f_arrayToListNat(filtered)
         val roundTripNat = f_listToArrayNat(natList)
-        assertEquals(listOf<Any?>(5, 8), roundTripNat.toList())
+        assertEquals(listOf<Any?>(5.toBigInteger(), 8.toBigInteger()), roundTripNat.toList())
 
         val u32Arr = f_makeLiteralU32(10u, 20u, 30u)
         val u32List = f_arrayToListU32(u32Arr)
@@ -102,18 +102,18 @@ class TypedArraysTest {
     @Test
     fun testByteArray() {
         val bs = f_makeByteArray(10u, 20u, 30u)
-        assertEquals(3, f_byteArraySize(bs))
-        assertEquals((10u).toUByte(), f_byteArrayGet_x21(bs, 0))
-        assertEquals((20u).toUByte(), f_byteArrayGet_x21(bs, 1))
-        assertEquals((30u).toUByte(), f_byteArrayGet_x21(bs, 2))
+        assertEquals(3.toBigInteger(), f_byteArraySize(bs))
+        assertEquals((10u).toUByte(), f_byteArrayGet_x21(bs, 0.toBigInteger()))
+        assertEquals((20u).toUByte(), f_byteArrayGet_x21(bs, 1.toBigInteger()))
+        assertEquals((30u).toUByte(), f_byteArrayGet_x21(bs, 2.toBigInteger()))
 
-        val bs2 = f_byteArraySet_x21(bs, 1, 99u)
-        assertEquals((20u).toUByte(), f_byteArrayGet_x21(bs, 1))
-        assertEquals((99u).toUByte(), f_byteArrayGet_x21(bs2, 1))
+        val bs2 = f_byteArraySet_x21(bs, 1.toBigInteger(), 99u)
+        assertEquals((20u).toUByte(), f_byteArrayGet_x21(bs, 1.toBigInteger()))
+        assertEquals((99u).toUByte(), f_byteArrayGet_x21(bs2, 1.toBigInteger()))
 
         val combined = f_byteArrayAppend(bs, bs2)
-        assertEquals(6, f_byteArraySize(combined))
-        assertEquals(true, f_byteArrayEq(bs, f_byteArrayExtract(combined, 0, 3)))
+        assertEquals(6.toBigInteger(), f_byteArraySize(combined))
+        assertEquals(true, f_byteArrayEq(bs, f_byteArrayExtract(combined, 0.toBigInteger(), 3.toBigInteger())))
         assertEquals(false, f_byteArrayEq(bs, bs2))
 
         assertEquals("hello λ!", f_stringUTF8RoundTrip("hello λ!"))
@@ -124,15 +124,15 @@ class TypedArraysTest {
     @Test
     fun testFloatArray() {
         val ds = f_makeFloatArray(1.5, 2.5, 3.0)
-        assertEquals(3, f_floatArraySize(ds))
-        assertEquals(1.5, f_floatArrayGet_x21(ds, 0))
-        assertEquals(2.5, f_floatArrayGet_x21(ds, 1))
-        assertEquals(3.0, f_floatArrayGet_x21(ds, 2))
+        assertEquals(3.toBigInteger(), f_floatArraySize(ds))
+        assertEquals(1.5, f_floatArrayGet_x21(ds, 0.toBigInteger()))
+        assertEquals(2.5, f_floatArrayGet_x21(ds, 1.toBigInteger()))
+        assertEquals(3.0, f_floatArrayGet_x21(ds, 2.toBigInteger()))
         assertEquals(7.0, f_sumFloatArray(ds))
 
-        val ds2 = f_floatArraySet_x21(ds, 1, 10.5)
-        assertEquals(2.5, f_floatArrayGet_x21(ds, 1))
-        assertEquals(10.5, f_floatArrayGet_x21(ds2, 1))
+        val ds2 = f_floatArraySet_x21(ds, 1.toBigInteger(), 10.5)
+        assertEquals(2.5, f_floatArrayGet_x21(ds, 1.toBigInteger()))
+        assertEquals(10.5, f_floatArrayGet_x21(ds2, 1.toBigInteger()))
         assertEquals(15.0, f_sumFloatArray(ds2))
     }
 }

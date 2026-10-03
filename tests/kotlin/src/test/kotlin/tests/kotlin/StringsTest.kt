@@ -20,9 +20,9 @@ class StringsTest {
 
     @Test
     fun testStringMetrics() {
-        assertEquals(0, (f_testStringMetrics("") as Number).toInt())
+        assertEquals(0.toBigInteger(), f_testStringMetrics(""))
         // "abc" -> length 3, utf8ByteSize 3 -> 6
-        assertEquals(6, (f_testStringMetrics("abc") as Number).toInt())
+        assertEquals(6.toBigInteger(), f_testStringMetrics("abc"))
     }
 
     @Test
@@ -34,7 +34,7 @@ class StringsTest {
 
     @Test
     fun testStringInterp() {
-        assertEquals("score: nat=42, int=-7", f_testStringInterp("score", 42, -7))
+        assertEquals("score: nat=42, int=-7", f_testStringInterp("score", 42.toBigInteger(), -7))
     }
 
     @Test
@@ -50,8 +50,8 @@ class StringsTest {
     @Test
     fun testCharOps() {
         // 'A' (65) -> toNat = 65, utf8Size = 1, singleton.utf8ByteSize = 1 -> 67
-        assertEquals(67, (f_testCharOps(65) as Number).toInt())
+        assertEquals(67.toBigInteger(), f_testCharOps(65.toBigInteger()))
         // '∃' (8707) -> toNat = 8707, utf8Size = 3, singleton.utf8ByteSize = 3 -> 8713
-        assertEquals(8713, (f_testCharOps(8707) as Number).toInt())
+        assertEquals(8713.toBigInteger(), f_testCharOps(8707.toBigInteger()))
     }
 }
