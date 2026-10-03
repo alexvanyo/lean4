@@ -116,3 +116,124 @@
     return res_100_2
 }
 
+@PublishedApi internal fun f_testThunkEval___lam__0(x: Any?, p_1: Any?): Any? {
+    return ((((x as Int) * 2) as Int) + 1)
+}
+
+@PublishedApi internal fun f_testThunkEval___lam__0___boxed(x: Any?, p_1: Any?): Any? {
+    return f_testThunkEval___lam__0(x, p_1)
+}
+
+@PublishedApi internal fun f_testThunkEval___lam__1(t: Any?, p_1: Any?): Any? {
+    val v_x_113_1 = (t as Lazy<Any?>).value
+    return ((v_x_113_1 as Int) + 10)
+}
+
+@PublishedApi internal fun f_testThunkEval___lam__1___boxed(t: Any?, p_1: Any?): Any? {
+    return f_testThunkEval___lam__1(t, p_1)
+}
+
+@PublishedApi internal fun f_testThunkEval(x: Any?): Any? {
+    val t_121_1 = lazy { f_testThunkEval___lam__0(x, Unit) }
+    val t2_123_2 = lazy { f_testThunkEval___lam__1(t_121_1, Unit) }
+    val v_x_124_3 = t2_123_2.value
+    return ((v_x_124_3 as Int) + (v_x_124_3 as Int))
+}
+
+@PublishedApi internal fun f_testThunkPure(x: Any?): Any? {
+    val t_129_1 = lazyOf(((x as Int) + 5))
+    return t_129_1.value
+}
+
+@PublishedApi internal fun f_testThunkPure___boxed(x: Any?): Any? {
+    return f_testThunkPure(x)
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__0(x: Any?, p_1: Any?): Any? {
+    return ((x as Int) + 1)
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__0___boxed(x: Any?, p_1: Any?): Any? {
+    return f_testThunkBind___lam__0(x, p_1)
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__1(p_0: Any?, p_1: Any?): Any? {
+    return ((p_0 as Int) * 3)
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__1___boxed(p_0: Any?, p_1: Any?): Any? {
+    return f_testThunkBind___lam__1(p_0, p_1)
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__2(t: Any?, p_1: Any?): Any? {
+    val v_x_149_1 = (t as Lazy<Any?>).value
+    val v_x_151_2 = lazy { f_testThunkBind___lam__1(v_x_149_1, Unit) }
+    return v_x_151_2.value
+}
+
+@PublishedApi internal fun f_testThunkBind___lam__2___boxed(t: Any?, p_1: Any?): Any? {
+    return f_testThunkBind___lam__2(t, p_1)
+}
+
+@PublishedApi internal fun f_testThunkBind(x: Any?): Any? {
+    val t_158_1 = lazy { f_testThunkBind___lam__0(x, Unit) }
+    val t2_160_2 = lazy { f_testThunkBind___lam__2(t_158_1, Unit) }
+    return t2_160_2.value
+}
+
+@PublishedApi internal fun f_testSTRefBasic___lam__0(initVal: Any?, p_1: Any?, p_2: Any?): Any? {
+    val v_x_165_1 = arrayOf<Any?>(initVal)
+    val v_x_166_2 = v_x_165_1[0]
+    v_x_165_1[0] = ((v_x_166_2 as Int) + 10)
+    val v_x_170_3 = v_x_165_1[0]
+    v_x_165_1[0] = ((v_x_170_3 as Int) * 2)
+    val v_x_175_4 = (run { val old = v_x_165_1[0]; v_x_165_1[0] = 99; old })
+    val v_x_176_5 = v_x_165_1[0]
+    return ((v_x_175_4 as Int) + (v_x_176_5 as Int))
+}
+
+@PublishedApi internal fun f_testSTRefBasic___lam__0___boxed(initVal: Any?, p_1: Any?, p_2: Any?): Any? {
+    return f_testSTRefBasic___lam__0(initVal, p_1, p_2)
+}
+
+@PublishedApi internal fun f_testSTRefBasic(initVal: Any?): Any? {
+    return f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefBasic___lam__0(initVal, p_0, p_1) })
+}
+
+@PublishedApi internal fun f_testSTRefModifyGet___lam__0(n: Any?, p_1: Any?, p_2: Any?): Any? {
+    val v_x_188_1 = arrayOf<Any?>(n)
+    val v_x_189_2 = v_x_188_1[0]
+    val v_x_191_3 = ((v_x_189_2 as Int) + 1)
+    v_x_188_1[0] = ((v_x_189_2 as Int) * 3)
+    val v_x_195_4 = v_x_188_1[0]
+    return Pair(v_x_191_3, v_x_195_4)
+}
+
+@PublishedApi internal fun f_testSTRefModifyGet___lam__0___boxed(n: Any?, p_1: Any?, p_2: Any?): Any? {
+    return f_testSTRefModifyGet___lam__0(n, p_1, p_2)
+}
+
+@PublishedApi internal fun f_testSTRefModifyGet(n: Any?): Pair<Any?, Any?> {
+    return (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefModifyGet___lam__0(n, p_0, p_1) }) as Pair<Any?, Any?>)
+}
+
+@PublishedApi internal fun f_testSTRefPtrEq___lam__0(x: Any?, p_1: Any?, p_2: Any?): Any? {
+    val v_x_207_1 = arrayOf<Any?>(x)
+    val v_x_208_2 = arrayOf<Any?>(x)
+    val v_x_209_3 = (v_x_207_1 === v_x_207_1)
+    val v_x_210_4 = (v_x_207_1 === v_x_208_2)
+    return Pair(v_x_209_3, v_x_210_4)
+}
+
+@PublishedApi internal fun f_testSTRefPtrEq___lam__0___boxed(x: Any?, p_1: Any?, p_2: Any?): Any? {
+    return f_testSTRefPtrEq___lam__0(x, p_1, p_2)
+}
+
+@PublishedApi internal fun f_testSTRefPtrEq(x: Any?): Pair<Boolean, Boolean> {
+    return (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefPtrEq___lam__0(x, p_0, p_1) }) as Pair<Boolean, Boolean>)
+}
+
+private fun f_runST___redArg(x: (Any?, Any?) -> Any?): Any? {
+    return x(null, null)
+}
+

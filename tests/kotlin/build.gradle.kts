@@ -23,6 +23,10 @@ val generateLean by tasks.registering {
     })
     if (File(leanBin).exists()) {
         inputs.file(leanBin)
+        val leanShared = File(File(leanBin).parentFile, "../lib/lean/libleanshared.so")
+        if (leanShared.exists()) {
+            inputs.file(leanShared)
+        }
     }
     outputs.dir(generatedKotlinDir)
 
