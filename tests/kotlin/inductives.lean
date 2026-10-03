@@ -89,3 +89,23 @@ def evalTree (t : ExprTree) : Int32 :=
 def sampleTree (x y : Int32) : ExprTree :=
   .add (.lit x) (.neg (.lit y))
 
+def reverseList (xs : List UInt32) : List UInt32 :=
+  xs.reverse
+
+def appendLists (xs ys : List UInt32) : List UInt32 :=
+  xs ++ ys
+
+def listLength (xs : List UInt32) : Nat :=
+  xs.length
+
+def mapListInc (xs : List UInt32) : List UInt32 :=
+  xs.map (fun x => x + 1)
+
+def filterListGt (xs : List UInt32) (threshold : UInt32) : List UInt32 :=
+  xs.filter (fun x => x > threshold)
+
+def foldlListSum (xs : List UInt32) : UInt32 :=
+  xs.foldl (fun acc x => acc + x) 0
+
+def stdOptionMapGetD (o : Option UInt32) (defaultVal : UInt32) : UInt32 :=
+  (o.map (fun x => x * 2)).getD defaultVal

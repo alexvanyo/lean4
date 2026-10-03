@@ -336,15 +336,17 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
     visitCode st decl.value
   | .cases cs =>
     if st.knownFalse.contains cs.discr then
+      let has0 := cs.alts.any fun | .ctorAlt info _ => info.cidx == 0 | .default _ => false
       for alt in cs.alts do
         match alt with
         | .ctorAlt info c => if info.cidx == 0 then visitCode st c
-        | .default c => visitCode st c
+        | .default c => unless has0 do visitCode st c
     else if st.knownTrue.contains cs.discr then
+      let has1 := cs.alts.any fun | .ctorAlt info _ => info.cidx == 1 | .default _ => false
       for alt in cs.alts do
         match alt with
         | .ctorAlt info c => if info.cidx == 1 then visitCode st c
-        | .default c => visitCode st c
+        | .default c => unless has1 do visitCode st c
     else
       for alt in cs.alts do visitCode st alt.getCode
   | .return x => visitReturn st x
