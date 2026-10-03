@@ -226,7 +226,6 @@ partial def toKotlinType (ty : Expr) : String :=
   | ImpureType.isize => "Int"
   | ImpureType.float => "Double"
   | ImpureType.float32 => "Float"
-  | ImpureType.void => "Unit"
   | .const ``Bool _ | .const ``Decidable _ => "Boolean"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
   | .const ``String _ => "String"
@@ -471,6 +470,53 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some "error(\"panic\")"
     let msg ← toKotlinArg args.back!
     return some s!"error({msg})"
+  if (fn == ``Thunk.mk || fn == `Thunk.mk._redArg) && !args.isEmpty then
+    let fStr ← toKotlinArg args.back!
+    let pTy? := match ((← get).varTypes[fStr]?).bind parseKotlinFnType? with
+      | some (#[pTy], _) => some pTy
+      | _ => none
+    let unitArg := if pTy? == some "Unit" then "Unit" else "null"
+    let callExpr := Id.run do
+      if let some pTy := pTy? then
+        let pfx := s!"\{ p_0: {pTy} -> "
+        if fStr.startsWith pfx then
+          if fStr.endsWith ", p_0) }" then
+            let inner := ((fStr.drop pfx.length).take (fStr.length - pfx.length - 8)).toString
+            return s!"{inner}, {unitArg})"
+          if fStr.endsWith "(p_0) }" then
+            let inner := ((fStr.drop pfx.length).take (fStr.length - pfx.length - 7)).toString
+            return s!"{inner}({unitArg})"
+        return s!"({fStr})({unitArg})"
+      return s!"({fStr} as (Any?) -> Any?)(null)"
+    return some s!"lazy \{ {callExpr} }"
+  if (fn == ``Thunk.pure || fn == `Thunk.pure._redArg) && !args.isEmpty then
+    let a ← toKotlinArg args.back!
+    return some s!"lazyOf({a})"
+  if (fn == ``Thunk.get || fn == `Thunk.get._redArg) && !args.isEmpty then
+    let t ← toKotlinArg args.back!
+    return some s!"{← castIfNeeded t "Lazy<Any?>"}.value"
+  if (fn == `Void.mk || fn == `Void.mk._redArg) && !args.isEmpty then
+    return some "null"
+  if (fn == `ST.Prim.mkRef || fn == `ST.Prim.mkRef._redArg) && args.size >= 2 then
+    let a ← toKotlinArg args[args.size - 2]!
+    return some s!"arrayOf<Any?>({a})"
+  if (fn == `ST.Prim.Ref.get || fn == `ST.Prim.Ref.get._redArg ||
+      fn == `ST.Prim.Ref.take || fn == `ST.Prim.Ref.take._redArg) && args.size >= 2 then
+    let r ← castIfNeeded (← toKotlinArg args[args.size - 2]!) "Array<Any?>"
+    return some s!"{r}[0]"
+  if (fn == `ST.Prim.Ref.put || fn == `ST.Prim.Ref.put._redArg ||
+      fn == `ST.Prim.Ref.set || fn == `ST.Prim.Ref.set._redArg) && args.size >= 3 then
+    let r ← castIfNeeded (← toKotlinArg args[args.size - 3]!) "Array<Any?>"
+    let a ← toKotlinArg args[args.size - 2]!
+    return some s!"run \{ {r}[0] = {a} }"
+  if (fn == `ST.Prim.Ref.swap || fn == `ST.Prim.Ref.swap._redArg) && args.size >= 3 then
+    let r ← castIfNeeded (← toKotlinArg args[args.size - 3]!) "Array<Any?>"
+    let a ← toKotlinArg args[args.size - 2]!
+    return some s!"(run \{ val old = {r}[0]; {r}[0] = {a}; old })"
+  if (fn == `ST.Prim.Ref.ptrEq || fn == `ST.Prim.Ref.ptrEq._redArg) && args.size >= 3 then
+    let r1 ← toKotlinArg args[args.size - 3]!
+    let r2 ← toKotlinArg args[args.size - 2]!
+    return some s!"({r1} === {r2})"
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
@@ -2519,6 +2565,16 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
        fnStr.startsWith "panic._at_." || fnStr.startsWith "panicWithPos._at_." ||
        fnStr.startsWith "panicWithPosWithDecl._at_." then
       return "Nothing"
+    if baseFn == ``Thunk.mk || baseFn == `Thunk.mk._redArg ||
+       baseFn == ``Thunk.pure || baseFn == `Thunk.pure._redArg then
+      return "Lazy<Any?>"
+    if baseFn == `ST.Prim.Ref.put || baseFn == `ST.Prim.Ref.put._redArg ||
+       baseFn == `ST.Prim.Ref.set || baseFn == `ST.Prim.Ref.set._redArg then
+      return "Unit"
+    if baseFn == `ST.Prim.mkRef || baseFn == `ST.Prim.mkRef._redArg then
+      return "Array<Any?>"
+    if baseFn == `ST.Prim.Ref.ptrEq || baseFn == `ST.Prim.Ref.ptrEq._redArg then
+      return "Boolean"
     let p := baseFn.getPrefix
     let s := match baseFn with | .str _ str => str | _ => ""
     if s == "toInt64" then return "Long"
@@ -2692,6 +2748,9 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       return true
     return false
   | .fap fn args =>
+    if fn == `Void.mk || fn == `Void.mk._redArg then
+      setParamVarName x "null"
+      return true
     if args.isEmpty then
       if let some d := (← read).declMap[fn]? then
         if let some d0 := isInlinedConstDecl? d then
@@ -3300,28 +3359,37 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             emitLn s!"val {n} = {call}"
             registerDropped x shape args n
         else
-          let rhs ← emitLetValue decl
-          let ty ← inferLetKotlinType decl
-          let isAdtRes ← match (← getMonoDecl? fn).bind monoResultType? with
-            | some r => pure (isAdtMonoType r)
-            | none => pure false
-          if !(← isUsed x) then
-            if ty == "Unit" then
-              emitLn rhs
-            else if ← isPureConstantLet decl then
-              pure ()
+          let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+          if !(← isUsed x) && (baseFn == `ST.Prim.Ref.swap || baseFn == `ST.Prim.Ref.swap._redArg) && args.size >= 3 then
+            let r ← castIfNeeded (← toKotlinArg args[args.size - 3]!) "Array<Any?>"
+            let a ← toKotlinArg args[args.size - 2]!
+            emitLn s!"{r}[0] = {a}"
+          else
+            let rhs ← emitLetValue decl
+            let ty ← inferLetKotlinType decl
+            let isAdtRes ← match (← getMonoDecl? fn).bind monoResultType? with
+              | some r => pure (isAdtMonoType r)
+              | none => pure false
+            if !(← isUsed x) then
+              if ty == "Unit" then
+                let stmt := if rhs.startsWith "run { " && rhs.endsWith " }" then
+                  ((rhs.drop 6).take (rhs.length - 8)).toString
+                else rhs
+                emitLn stmt
+              else if ← isPureConstantLet decl then
+                pure ()
+              else
+                let n ← getVarName x
+                recordVarType n ty
+                if isAdtRes then modify fun st => { st with adtVars := st.adtVars.insert n }
+                recordIntSource n rhs decl
+                emitLn s!"val {n} = {rhs}"
             else
               let n ← getVarName x
               recordVarType n ty
               if isAdtRes then modify fun st => { st with adtVars := st.adtVars.insert n }
               recordIntSource n rhs decl
               emitLn s!"val {n} = {rhs}"
-          else
-            let n ← getVarName x
-            recordVarType n ty
-            if isAdtRes then modify fun st => { st with adtVars := st.adtVars.insert n }
-            recordIntSource n rhs decl
-            emitLn s!"val {n} = {rhs}"
     | _ =>
       if !(← isUsed x) && (← isPureConstantLet decl) then
         pure ()
@@ -3914,7 +3982,7 @@ def isBuiltinFap (fn : Name) (arity : Nat) : CoreM Bool := do
 
 def isBuiltinPap (fn : Name) : CoreM Bool := do
   let targetFn := match fn with | .str p "_boxed" => p | _ => fn
-  for arity in [1, 2, 3] do
+  for arity in [1, 2, 3, 4, 5] do
     if ← isBuiltinFap targetFn arity then return true
   return false
 

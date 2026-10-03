@@ -44,4 +44,19 @@ class ClosuresTest {
         val erasedFn: Any? = { x: UInt -> x + 7u }
         assertEquals(17u, f_applyErased(erasedFn, 10u))
     }
+
+    @Test
+    fun testThunk() {
+        assertEquals(42, f_testThunkEval(5))
+        assertEquals(15, f_testThunkPure(10))
+        assertEquals(18, f_testThunkBind(5))
+    }
+
+    @Test
+    fun testSTRef() {
+        // initVal = 5 -> v0 = 5 -> set 15 -> modify (*2) = 30 -> swap 99 returns old=30, v1=99 -> 129
+        assertEquals(129, f_testSTRefBasic(5))
+        assertEquals(Pair<Any?, Any?>(8, 21), f_testSTRefModifyGet(7))
+        assertEquals(Pair(true, false), f_testSTRefPtrEq(42))
+    }
 }
