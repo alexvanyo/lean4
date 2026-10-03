@@ -68,5 +68,13 @@ def testNatOps (a b : Nat) : Nat :=
   else
     bit
 
+def testLargeNat (n : Nat) : Nat :=
+  let big := 1000000000000000000000000000000
+  (n ^ 100) + big - 1
+
+def testBitVec64 (a b : BitVec 64) : BitVec 64 :=
+  (a + b) ^^^ (a <<< 3)
+
 def testPanicOpt (x : Option Nat) : Nat :=
   x.get!
+

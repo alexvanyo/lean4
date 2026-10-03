@@ -67,6 +67,8 @@ structure Obj where
   parent? : Option Nat := none
   /-- Whether this object is an instance of a `@[mutable_kotlin_class]` structure. -/
   isMutableClass : Bool := false
+  /-- Whether the initial persistent reference of a 0-arg closed constant has been consumed. -/
+  persistentUsed : Bool := false
   deriving Inhabited
 
 /-- Shape of the results of a declaration, joined over its `return`s. -/
@@ -82,14 +84,25 @@ inductive RetShape where
   | unknown
   deriving Inhabited, BEq, Repr
 
-def RetShape.join : RetShape → RetShape → RetShape
+def RetShape.isFreshOrExclusiveParam (exclusive : Array Bool) : RetShape → Bool
+  | .fresh => true
+  | .param i => exclusive[i]?.getD false
+  | _ => false
+
+def RetShape.join (exclusive : Array Bool) (s1 s2 : RetShape) : RetShape :=
+  match s1, s2 with
   | .none, s | s, .none => s
   | .fresh, .fresh => .fresh
-  | .param i, .param j => if i == j then .param i else .unknown
+  | .param i, .param j =>
+    if i == j then .param i
+    else if (exclusive[i]?.getD false) && (exclusive[j]?.getD false) then .fresh
+    else .unknown
   | .prod a, .prod b =>
     if a.size == b.size then .prod (a.zipWith (fun x y => if x == y then x else Option.none) b)
     else .unknown
-  | _, _ => .unknown
+  | a, b =>
+    if a.isFreshOrExclusiveParam exclusive && b.isFreshOrExclusiveParam exclusive then .fresh
+    else .unknown
 
 /-- Parameter `j` identical to the `i`-th component (`none`: the whole result) of the result. -/
 def RetShape.identities : RetShape → Array (Option Nat × Nat)
@@ -209,6 +222,7 @@ def isArrayAlloc (fn : Name) : Bool :=
     fn == ``Array.append || fn == `Array.append._redArg ||
     fn == ``Array.appendCore || fn == `Array.appendCore._redArg ||
     fn == ``Array.extract || fn == `Array.extract._redArg ||
+    fn == `Array.markLinear || fn == `Array.markLinear._redArg ||
     fn == ``Array.mkArray0 || fn == ``Array.mkArray1 || fn == ``Array.mkArray2 ||
     fn == ``Array.mkArray3 || fn == ``Array.mkArray4 || fn == ``Array.mkArray5 ||
     fn == ``Array.mkArray6 || fn == ``Array.mkArray7 || fn == ``Array.mkArray8 ||
@@ -220,6 +234,23 @@ def isArrayAlloc (fn : Name) : Bool :=
     fn == `FloatArray.emptyWithCapacity || fn == `FloatArray.empty ||
     fn == `FloatArray.mk || fn == `FloatArray.data || fn == `FloatArray.push ||
     fn == `FloatArray.markLinear
+
+def isPropagateMark (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
+  fn == ``Array.propagateMark || fn == `Array.propagateMark._redArg ||
+    fn == `ByteArray.propagateMark || fn == `FloatArray.propagateMark ||
+    fn == `String.propagateMark
+
+def isImmutablePrimOp (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
+  let fn := match fn with | .str p "_redArg" => p | _ => fn
+  let p := fn.getPrefix
+  p == ``Nat || p == ``Int || p == ``String || p == ``String.Slice ||
+    p == ``Char || p == ``Bool ||
+    p == ``UInt8 || p == ``UInt16 || p == ``UInt32 || p == ``UInt64 || p == ``USize ||
+    p == ``Int8 || p == ``Int16 || p == ``Int32 || p == ``Int64 || p == ``ISize ||
+    p == `Float || p == `Float32 ||
+    fn == ``mixHash
 
 /--
 `@[extern "kotlin_inplace:<template>"]`: a Kotlin statement that updates its first argument, which
@@ -323,10 +354,18 @@ mutual
 partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
   match code with
   | .let decl k => visitCode (← visitLet st decl k) k
-  | .inc x n _ _ k =>
+  | .inc x n _ persistent k =>
     let (st, i) := objOf st x
     -- A pristine object stays pristine: its count is unknown until its parameter is exclusive.
-    visitCode (modifyObj st i fun o => { o with rc := o.rc.add n }) k
+    -- For a 0-arg closed constant (`ExplicitRC` marks it borrowed and emits `inc[persistent]`
+    -- before each owned consumption without a matching `dec`), the first `inc[persistent]` with
+    -- `n == 1` transfers ownership of the freshly created constant without bumping `rc` to 2.
+    let st := modifyObj st i fun o =>
+      if persistent && !o.persistentUsed && n == 1 then
+        { o with persistentUsed := true }
+      else
+        { o with rc := o.rc.add n, persistentUsed := o.persistentUsed || persistent }
+    visitCode st k
   | .dec x _ _ _ _ k =>
     let (st, i) := objOf st x
     visitCode (decObj st i) k
@@ -429,6 +468,10 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
     else
       return { st with knownTrue := st.knownTrue.insert x }
   | .fap fn args =>
+    if isPropagateMark fn then
+      if let some (.fvar a) := args.back? then
+        let (st, i) := objOf st a
+        return bind st x i
     if let some ai := inplaceArg? (← getEnv) fn args then
       if let some (Arg.fvar a) := args[ai]? then
         let (st, i) := objOf st a
@@ -442,6 +485,9 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
     if let some summary := (← read).summaries[fn]? then
       return ← visitCall st x fn args summary isMut
     let st ← consumeArgs st (some fn) args
+    if isImmutablePrimOp fn then
+      let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
+      return bind st x i
     let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st x i
   | .pap _ args | .fvar _ args =>
@@ -451,6 +497,9 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
   | .sproj _ _ y | .uproj _ y =>
     let (st, p) := objOf st y
     let (st, i) := newObj st { rc := .top, parent? := some p, isMutableClass := isMut }
+    return bind st x i
+  | .lit _ | .box _ _ =>
+    let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
     return bind st x i
   | _ =>
     let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
@@ -536,7 +585,7 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
         | none => i
         | some c => ((o.children.find? (·.1 == c)).map (·.2)).getD i
       discard <| claim st obj true m!"returning parameter {j + 1}"
-  modify fun out => { out with ret := out.ret.join shape }
+  modify fun out => { out with ret := out.ret.join summary.exclusive shape }
 
 end
 

@@ -6,16 +6,16 @@
     return 0uL
 }
 
-@PublishedApi internal fun f_makeU64Array(n: Any?): ULongArray {
-    return ULongArray((n as Int))
+@PublishedApi internal fun f_makeU64Array(n: java.math.BigInteger): ULongArray {
+    return ULongArray((n).toInt())
 }
 
-@PublishedApi internal fun f_makeU32Array(n: Any?, initVal: UInt): UIntArray {
-    return UIntArray((n as Int)).apply { fill(initVal) }
+@PublishedApi internal fun f_makeU32Array(n: java.math.BigInteger, initVal: UInt): UIntArray {
+    return UIntArray((n).toInt()).apply { fill(initVal) }
 }
 
-@PublishedApi internal fun f_makeBoolArray(n: Any?): BooleanArray {
-    return BooleanArray((n as Int))
+@PublishedApi internal fun f_makeBoolArray(n: java.math.BigInteger): BooleanArray {
+    return BooleanArray((n).toInt())
 }
 
 @PublishedApi internal fun f_readArrayU64___redArg(a: ULongArray, i: Int): ULong {
@@ -26,26 +26,26 @@
     return a[i]
 }
 
-@PublishedApi internal fun f_getArraySize(a: ULongArray): Any? {
-    return a.size
+@PublishedApi internal fun f_getArraySize(a: ULongArray): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(a.size.toLong())
 }
 
-@PublishedApi internal fun f_swapArrayU32___redArg(a: UIntArray, i: Any?, j: Any?): Unit {
-    val tmp_1 = a[(i as Int)]
-    a[(i as Int)] = a[(j as Int)]
-    a[(j as Int)] = tmp_1
+@PublishedApi internal fun f_swapArrayU32___redArg(a: UIntArray, i: java.math.BigInteger, j: java.math.BigInteger): Unit {
+    val tmp_1 = a[(i).toInt()]
+    a[(i).toInt()] = a[(j).toInt()]
+    a[(j).toInt()] = tmp_1
     return
 }
 
-@PublishedApi internal fun f_swapArrayU32(a: UIntArray, i: Any?, j: Any?, hi: Any?, hj: Any?): Unit {
-    val tmp_1 = a[(i as Int)]
-    a[(i as Int)] = a[(j as Int)]
-    a[(j as Int)] = tmp_1
+@PublishedApi internal fun f_swapArrayU32(a: UIntArray, i: java.math.BigInteger, j: java.math.BigInteger, hi: Any?, hj: Any?): Unit {
+    val tmp_1 = a[(i).toInt()]
+    a[(i).toInt()] = a[(j).toInt()]
+    a[(j).toInt()] = tmp_1
     return
 }
 
-@PublishedApi internal fun f_swapIfInBoundsU32(a: UIntArray, i: Any?, j: Any?): Unit {
-    if ((i as Int) >= 0 && (i as Int) < a.size && (j as Int) >= 0 && (j as Int) < a.size) { val tmp_1 = a[(i as Int)]; a[(i as Int)] = a[(j as Int)]; a[(j as Int)] = tmp_1 }
+@PublishedApi internal fun f_swapIfInBoundsU32(a: UIntArray, i: java.math.BigInteger, j: java.math.BigInteger): Unit {
+    if ((i).toInt() >= 0 && (i).toInt() < a.size && (j).toInt() >= 0 && (j).toInt() < a.size) { val tmp_1 = a[(i).toInt()]; a[(i).toInt()] = a[(j).toInt()]; a[(j).toInt()] = tmp_1 }
     return
 }
 
@@ -66,8 +66,8 @@
     return (a + b)
 }
 
-@PublishedApi internal fun f_sliceU32(a: UIntArray, start: Any?, stop: Any?): UIntArray {
-    return a.copyOfRange(((start as Int)).coerceIn(0, a.size), ((stop as Int)).coerceIn(((start as Int)).coerceIn(0, a.size), a.size))
+@PublishedApi internal fun f_sliceU32(a: UIntArray, start: java.math.BigInteger, stop: java.math.BigInteger): UIntArray {
+    return a.copyOfRange(((start).toInt()).coerceIn(0, a.size), ((stop).toInt()).coerceIn(((start).toInt()).coerceIn(0, a.size), a.size))
 }
 
 @PublishedApi internal fun f_makeLiteralStr(a: String, b: String): Array<Any?> {
@@ -92,11 +92,11 @@
     return (xs).foldRight(arrayOf<Any?>(0) as Any?) { elem, acc -> arrayOf<Any?>(1, elem, acc) }
 }
 
-@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal: Any?, p_1: Array<Any?>, i: Int, stop: Int, b: Array<Any?>): Array<Any?> {
+@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal: java.math.BigInteger, p_1: Array<Any?>, i: Int, stop: Int, b: Array<Any?>): Array<Any?> {
     val v_y_85_1: Array<Any?>
     if (!(i == stop))     {
         val v_x_90_2 = p_1[i]
-        if (!((minVal as Int) <= (v_x_90_2 as Int)))         {
+        if (!(minVal <= (v_x_90_2 as java.math.BigInteger)))         {
             v_y_85_1 = b
         } else         {
             val v_x_92_3 = (b.copyOf(b.size + 1).also { it[b.size] = v_x_90_2 })
@@ -112,37 +112,37 @@
     return arrayOfNulls<Any?>(0)
 }
 
-@PublishedApi internal fun f_filterNatArray(xs: Array<Any?>, minVal: Any?): Array<Any?> {
-    val v_x_98_1 = xs.size
+@PublishedApi internal fun f_filterNatArray(xs: Array<Any?>, minVal: java.math.BigInteger): Array<Any?> {
+    val v_x_98_1 = java.math.BigInteger.valueOf(xs.size.toLong())
     val v_x_99_2 = f_filterNatArray___closed__0()
-    if (!(0 < v_x_98_1))     {
+    if (!(java.math.BigInteger.ZERO < v_x_98_1))     {
         return v_x_99_2
     } else     {
         if (!(v_x_98_1 <= v_x_98_1))         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, v_x_98_1, v_x_99_2)
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, (v_x_98_1).toInt(), v_x_99_2)
         } else         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, v_x_98_1, v_x_99_2)
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, (v_x_98_1).toInt(), v_x_99_2)
         }
     }
 }
 
-@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0: Array<Any?>, i: Int, stop: Int, b: Any?): Any? {
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0: Array<Any?>, i: Int, stop: Int, b: java.math.BigInteger): java.math.BigInteger {
     if (!(i == stop))     {
-        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0, (i + 1), stop, ((b as Int) + (p_0[i] as Int)))
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0, (i + 1), stop, (b.add((p_0[i] as java.math.BigInteger))))
     } else     {
         return b
     }
 }
 
-@PublishedApi internal fun f_sumNatArray(xs: Array<Any?>): Any? {
-    val v_x_120_1 = xs.size
-    if (!(0 < v_x_120_1))     {
-        return 0
+@PublishedApi internal fun f_sumNatArray(xs: Array<Any?>): java.math.BigInteger {
+    val v_x_120_1 = java.math.BigInteger.valueOf(xs.size.toLong())
+    if (!(java.math.BigInteger.ZERO < v_x_120_1))     {
+        return java.math.BigInteger.ZERO
     } else     {
         if (!(v_x_120_1 <= v_x_120_1))         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, v_x_120_1, 0)
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, (v_x_120_1).toInt(), java.math.BigInteger.ZERO)
         } else         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, v_x_120_1, 0)
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, (v_x_120_1).toInt(), java.math.BigInteger.ZERO)
         }
     }
 }
@@ -154,17 +154,17 @@
     return (v_x_134_3 + (c).toByte())
 }
 
-@PublishedApi internal fun f_byteArraySize(bs: ByteArray): Any? {
-    return (bs).size
+@PublishedApi internal fun f_byteArraySize(bs: ByteArray): java.math.BigInteger {
+    return java.math.BigInteger.valueOf((bs).size.toLong())
 }
 
-@PublishedApi internal fun f_byteArrayGet_x21(bs: ByteArray, i: Any?): UByte {
-    return ((bs)[(i as Int)]).toUByte()
+@PublishedApi internal fun f_byteArrayGet_x21(bs: ByteArray, i: java.math.BigInteger): UByte {
+    return ((bs)[(i).toInt()]).toUByte()
 }
 
-@PublishedApi internal fun f_byteArraySet_x21(bs: ByteArray, i: Any?, v: UByte): ByteArray {
+@PublishedApi internal fun f_byteArraySet_x21(bs: ByteArray, i: java.math.BigInteger, v: UByte): ByteArray {
     val v_x_144_1 = (bs).copyOf()
-    if ((i as Int) >= 0 && (i as Int) < v_x_144_1.size) v_x_144_1[(i as Int)] = (v).toByte()
+    if ((i).toInt() >= 0 && (i).toInt() < v_x_144_1.size) v_x_144_1[(i).toInt()] = (v).toByte()
     return v_x_144_1
 }
 
@@ -172,8 +172,8 @@
     return (run { val s = b; val d = a; val sOff = 0; if (sOff < 0 || sOff > s.size) d.copyOf() else { val l = minOf(maxOf(0, (b).size), s.size - sOff); val dOff = ((a).size).coerceIn(0, d.size); val r = d.copyOf(maxOf(d.size, dOff + l)); s.copyInto(r, dOff, sOff, sOff + l); r } })
 }
 
-@PublishedApi internal fun f_byteArrayExtract(bs: ByteArray, start: Any?, stop: Any?): ByteArray {
-    return (run { val bs = bs; val start = ((start as Int)).coerceIn(0, bs.size); val stop = ((stop as Int)).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
+@PublishedApi internal fun f_byteArrayExtract(bs: ByteArray, start: java.math.BigInteger, stop: java.math.BigInteger): ByteArray {
+    return (run { val bs = bs; val start = ((start).toInt()).coerceIn(0, bs.size); val stop = ((stop).toInt()).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
 }
 
 @PublishedApi internal fun f_byteArrayEq(a: ByteArray, b: ByteArray): Boolean {
@@ -196,7 +196,7 @@
     val v_x_163_1 = "invalid UTF-8 string"
     val v_x_166_2 = "String.fromUTF8!"
     val v_x_167_3 = "Init.Data.String.Basic"
-    return ("PANIC at " + v_x_166_2 + " " + v_x_167_3 + ":" + (193).toString() + ":" + (46).toString() + ": " + v_x_163_1)
+    return ("PANIC at " + v_x_166_2 + " " + v_x_167_3 + ":" + (java.math.BigInteger.valueOf(193L)).toString() + ":" + (java.math.BigInteger.valueOf(46L)).toString() + ": " + v_x_163_1)
 }
 
 @PublishedApi internal fun f_stringUTF8RoundTrip(s: String): String {
@@ -224,17 +224,17 @@
     return (v_x_184_3 + c)
 }
 
-@PublishedApi internal fun f_floatArraySize(ds: DoubleArray): Any? {
-    return (ds).size
+@PublishedApi internal fun f_floatArraySize(ds: DoubleArray): java.math.BigInteger {
+    return java.math.BigInteger.valueOf((ds).size.toLong())
 }
 
-@PublishedApi internal fun f_floatArrayGet_x21(ds: DoubleArray, i: Any?): Double {
-    return (ds)[(i as Int)]
+@PublishedApi internal fun f_floatArrayGet_x21(ds: DoubleArray, i: java.math.BigInteger): Double {
+    return (ds)[(i).toInt()]
 }
 
-@PublishedApi internal fun f_floatArraySet_x21(ds: DoubleArray, i: Any?, v: Double): DoubleArray {
+@PublishedApi internal fun f_floatArraySet_x21(ds: DoubleArray, i: java.math.BigInteger, v: Double): DoubleArray {
     val v_x_194_1 = (ds).copyOf()
-    if ((i as Int) >= 0 && (i as Int) < v_x_194_1.size) v_x_194_1[(i as Int)] = v
+    if ((i).toInt() >= 0 && (i).toInt() < v_x_194_1.size) v_x_194_1[(i).toInt()] = v
     return v_x_194_1
 }
 
@@ -252,14 +252,14 @@
 
 @PublishedApi internal fun f_sumFloatArray(ds: DoubleArray): Double {
     val v_x_212_1 = f_sumFloatArray___closed__0()
-    val v_x_213_2 = (ds).size
-    if (!(0 < v_x_213_2))     {
+    val v_x_213_2 = java.math.BigInteger.valueOf((ds).size.toLong())
+    if (!(java.math.BigInteger.ZERO < v_x_213_2))     {
         return v_x_212_1
     } else     {
         if (!(v_x_213_2 <= v_x_213_2))         {
-            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, v_x_213_2, v_x_212_1)
+            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, (v_x_213_2).toInt(), v_x_212_1)
         } else         {
-            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, v_x_213_2, v_x_212_1)
+            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, (v_x_213_2).toInt(), v_x_212_1)
         }
     }
 }

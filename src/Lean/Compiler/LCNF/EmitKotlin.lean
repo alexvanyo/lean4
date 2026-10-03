@@ -227,6 +227,7 @@ partial def toKotlinType (ty : Expr) : String :=
   | ImpureType.float => "Double"
   | ImpureType.float32 => "Float"
   | .const ``Bool _ | .const ``Decidable _ => "Boolean"
+  | .const ``Nat _ => "java.math.BigInteger"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
   | .const ``String _ => "String"
   | .const ``ByteArray _ => "ByteArray"
@@ -250,12 +251,13 @@ partial def toKotlinType (ty : Expr) : String :=
   | _ => "Any?"
 
 def isRichMonoType (e : Expr) : Bool :=
-  e.isForall || e.isConstOf ``String || e.isConstOf ``ByteArray || e.isConstOf ``FloatArray || e.isAppOfArity ``Prod 2
+  e.isForall || e.isConstOf ``Nat || e.isConstOf ``String || e.isConstOf ``ByteArray || e.isConstOf ``FloatArray || e.isAppOfArity ``Prod 2
 
 def isAdtMonoType (e : Expr) : Bool :=
   let fn := e.getAppFn
   fn.isConst && !fn.isConstOf ``lcAny && !fn.isConstOf ``lcErased && !fn.isConstOf ``Prod &&
-    !fn.isConstOf ``Array && !fn.isConstOf ``ByteArray && !fn.isConstOf ``FloatArray && !fn.isConstOf ``String
+    !fn.isConstOf ``Array && !fn.isConstOf ``ByteArray && !fn.isConstOf ``FloatArray &&
+    !fn.isConstOf ``String && !fn.isConstOf ``Nat && !fn.isConstOf ``Int
 
 /-- Parse `Pair<A, B>` into `(A, B)`. -/
 partial def parseKotlinPairType? (s : String) : Option (String × String) :=
@@ -317,6 +319,7 @@ def defaultKotlinVal (ty : String) : String :=
   | "Double" => "0.0"
   | "Float" => "0.0f"
   | "String" => "\"\""
+  | "java.math.BigInteger" | "BigInteger" => "java.math.BigInteger.ZERO"
   | "ByteArray" => "ByteArray(0)"
   | "DoubleArray" => "DoubleArray(0)"
   | "Unit" => "Unit"
@@ -329,6 +332,28 @@ def recordVarType (name : String) (ty : String) : EmitM Unit := do
 def isKotlinIntType (ty : String) : Bool :=
   ty == "Byte" || ty == "Short" || ty == "Int" || ty == "Long" ||
   ty == "UByte" || ty == "UShort" || ty == "UInt" || ty == "ULong"
+
+def isBigIntType (ty : String) : Bool :=
+  ty == "java.math.BigInteger" || ty == "BigInteger"
+
+def extractNatLiteralDigits? (s : String) : Option String :=
+  if s == "java.math.BigInteger.ZERO" then some "0"
+  else if s == "java.math.BigInteger.ONE" then some "1"
+  else if s == "java.math.BigInteger.TWO" then some "2"
+  else if s == "java.math.BigInteger.TEN" then some "10"
+  else if s.startsWith "java.math.BigInteger.valueOf(" && s.endsWith "L)" then
+    let d := ((s.drop 29).take (s.length - 31)).toString
+    if !d.isEmpty && d.all Char.isDigit then some d else none
+  else if s.startsWith "java.math.BigInteger(\"" && s.endsWith "\")" then
+    let d := ((s.drop 22).take (s.length - 24)).toString
+    if !d.isEmpty && d.all Char.isDigit then some d else none
+  else if !s.isEmpty && s.all Char.isDigit then some s
+  else none
+
+def stripBigIntSizeToInt? (s : String) : Option String :=
+  if s.startsWith "java.math.BigInteger.valueOf(" && (s.endsWith ".size.toLong())" || s.endsWith ".length.toLong())") then
+    some ((s.drop 29).take (s.length - 39)).toString
+  else none
 
 def kotlinIntConversionMethod (targetTy : String) : Option String :=
   match targetTy with
@@ -351,10 +376,44 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
     | none => vt[s]?
   if actualTy? == some targetTy || actualTy? == some "Nothing" || (actualTy?.map (s!"{·}?") == some targetTy) then
     return s
+  if isKotlinIntType targetTy then
+    if let some d := extractNatLiteralDigits? s then
+      if d.length <= 9 then
+        match targetTy with
+        | "Int" => return d
+        | "Long" => return s!"{d}L"
+        | "UInt" => return s!"{d}u"
+        | "ULong" => return s!"{d}uL"
+        | "Byte" => return s!"({d}).toByte()"
+        | "Short" => return s!"({d}).toShort()"
+        | "UByte" => return s!"({d}u).toUByte()"
+        | "UShort" => return s!"({d}u).toUShort()"
+        | _ => pure ()
+    if targetTy == "Int" then
+      if let some inner := stripBigIntSizeToInt? s then
+        return inner
   if let some actualTy := actualTy? then
     if isKotlinIntType actualTy then
       if let some conv := kotlinIntConversionMethod targetTy then
         return s!"({s}).{conv}"
+      if isBigIntType targetTy then
+        if actualTy == "ULong" then
+          return s!"(run \{ val l = ({s}).toLong(); if (l >= 0L) java.math.BigInteger.valueOf(l) else java.math.BigInteger.valueOf(l and Long.MAX_VALUE).setBit(63) })"
+        else
+          return s!"java.math.BigInteger.valueOf(({s}).toLong())"
+    if isBigIntType actualTy then
+      match targetTy with
+      | "Byte" => return s!"({s}).toByte()"
+      | "Short" => return s!"({s}).toShort()"
+      | "Int" => return s!"({s}).toInt()"
+      | "Long" => return s!"({s}).toLong()"
+      | "UByte" => return s!"({s}).toByte().toUByte()"
+      | "UShort" => return s!"({s}).toShort().toUShort()"
+      | "UInt" => return s!"({s}).toInt().toUInt()"
+      | "ULong" => return s!"({s}).toLong().toULong()"
+      | "Double" => return s!"({s}).toDouble()"
+      | "Float" => return s!"({s}).toFloat()"
+      | _ => pure ()
   return s!"({s} as {targetTy})"
 
 def isKotlinKeyword (s : String) : Bool :=
@@ -456,6 +515,28 @@ def stripToLong? (s : String) : Option String :=
   else
     none
 
+def fromNatTo (s : String) (targetTy : String) : EmitM String := do
+  if isKotlinIntType targetTy then
+    if let some d := extractNatLiteralDigits? s then
+      if d.length <= 9 then
+        return ← castIfNeeded s targetTy
+    if targetTy == "Int" then
+      if let some inner := stripBigIntSizeToInt? s then
+        return inner
+  if let some ty := (← get).varTypes[s]? then
+    if isKotlinIntType ty || isBigIntType ty then
+      return ← castIfNeeded s targetTy (some ty)
+  let b ← castIfNeeded s "java.math.BigInteger"
+  castIfNeeded b targetTy (some "java.math.BigInteger")
+
+def formatNatLit (n : Nat) : String :=
+  if n == 0 then "java.math.BigInteger.ZERO"
+  else if n == 1 then "java.math.BigInteger.ONE"
+  else if n == 2 then "java.math.BigInteger.TWO"
+  else if n == 10 then "java.math.BigInteger.TEN"
+  else if n <= 9223372036854775807 then s!"java.math.BigInteger.valueOf({n}L)"
+  else s!"java.math.BigInteger(\"{n}\")"
+
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   let fn := match fn with | .str p "_boxed" => p | _ => fn
   if fn == `lcUnreachable || fn == `lcUnreachable._redArg then
@@ -517,100 +598,220 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     let r1 ← toKotlinArg args[args.size - 3]!
     let r2 ← toKotlinArg args[args.size - 2]!
     return some s!"({r1} === {r2})"
+  if (fn == ``UInt8.ofNatLT || fn == `UInt8.ofNatLT._redArg) && !args.isEmpty then
+    return some (← fromNatTo (← toKotlinArg args[0]!) "UByte")
+  if (fn == ``UInt16.ofNatLT || fn == `UInt16.ofNatLT._redArg) && !args.isEmpty then
+    return some (← fromNatTo (← toKotlinArg args[0]!) "UShort")
+  if (fn == ``UInt32.ofNatLT || fn == `UInt32.ofNatLT._redArg) && !args.isEmpty then
+    return some (← fromNatTo (← toKotlinArg args[0]!) "UInt")
+  if (fn == ``UInt64.ofNatLT || fn == `UInt64.ofNatLT._redArg) && !args.isEmpty then
+    return some (← fromNatTo (← toKotlinArg args[0]!) "ULong")
+  if (fn == ``USize.ofNatLT || fn == `USize.ofNatLT._redArg) && !args.isEmpty then
+    return some (← fromNatTo (← toKotlinArg args[0]!) "Int")
+  if (fn == `Int.divExact || fn == `Int.divExact._redArg) && args.size >= 2 then
+    return some s!"({← castIfNeeded (← toKotlinArg args[0]!) "Int"} / {← castIfNeeded (← toKotlinArg args[1]!) "Int"})"
+  if (fn == `Nat.divExact || fn == `Nat.divExact._redArg) && args.size >= 2 then
+    let x ← castIfNeeded (← toKotlinArg args[0]!) "java.math.BigInteger"
+    let y ← castIfNeeded (← toKotlinArg args[1]!) "java.math.BigInteger"
+    return some s!"(if ({y} == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ({x}).divide({y}))"
+  if (fn == `dbgTrace || fn == `dbgTrace._redArg) && args.size >= 2 then
+    let s ← castIfNeeded (← toKotlinArg args[args.size - 2]!) "String"
+    let f ← toKotlinArg args.back!
+    return some s!"(run \{ System.err.println({s}); ({f} as (Any?) -> Any?)(null) })"
+  if (fn == `dbgTraceIfShared || fn == `dbgTraceIfShared._redArg) && !args.isEmpty then
+    return some (← toKotlinArg args.back!)
+  if (fn == `dbgStackTrace || fn == `dbgStackTrace._redArg) && !args.isEmpty then
+    let f ← toKotlinArg args.back!
+    return some s!"(run \{ Throwable().printStackTrace(System.err); ({f} as (Any?) -> Any?)(null) })"
+  if (fn == `dbgSleep || fn == `dbgSleep._redArg) && args.size >= 2 then
+    let ms ← castIfNeeded (← toKotlinArg args[args.size - 2]!) "UInt"
+    let f ← toKotlinArg args.back!
+    return some s!"(run \{ Thread.sleep(({ms}).toLong()); ({f} as (Any?) -> Any?)(null) })"
+  if (fn == `isExclusiveUnsafe || fn == `isExclusiveUnsafe._redArg) && !args.isEmpty then
+    return some "true"
+  if (fn == `ptrAddrUnsafe || fn == `ptrAddrUnsafe._redArg) && !args.isEmpty then
+    let a ← toKotlinArg args.back!
+    return some s!"System.identityHashCode({a})"
+  if fn == `System.Platform.getNumBits then
+    return some "java.math.BigInteger.valueOf(32L)"
+  if fn == `IO.initializing || fn == `IO.checkCanceled then
+    return some "false"
+  if fn == `IO.monoMsNow then
+    return some "java.math.BigInteger.valueOf(System.nanoTime() / 1_000_000L)"
+  if fn == `IO.monoNanosNow then
+    return some "java.math.BigInteger.valueOf(System.nanoTime())"
+  if fn == `IO.getNumHeartbeats then
+    return some "java.math.BigInteger.ZERO"
+  if fn == `IO.setNumHeartbeats || fn == `Runtime.forget || fn == `Runtime.forget._redArg ||
+     fn == `Runtime.hold || fn == `Runtime.hold._redArg then
+    return some "Unit"
+  if (fn == `Runtime.markMultiThreaded || fn == `Runtime.markMultiThreaded._redArg ||
+      fn == `Runtime.markPersistent || fn == `Runtime.markPersistent._redArg) && !args.isEmpty then
+    let idx := if args.size >= 2 then args.size - 2 else 0
+    return some (← toKotlinArg args[idx]!)
+  if fn == `IO.getTID then
+    return some "Thread.currentThread().id.toULong()"
+  if fn == `IO.Process.getPID then
+    return some "ProcessHandle.current().pid().toUInt()"
+  if fn == `IO.getEnv && !args.isEmpty then
+    let a0 ← castIfNeeded (← toKotlinArg args[0]!) "String"
+    return some s!"(run \{ val v = System.getenv({a0}); if (v == null) arrayOf<Any?>(0) else arrayOf<Any?>(1, v) })"
+  let defaultStdout := "arrayOf<Any?>(0, { _: Any? -> System.out.flush(); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any?, _: Any? -> arrayOf<Any?>(0, ByteArray(0)) }, { bs: Any?, _: Any? -> System.out.write(bs as ByteArray); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> arrayOf<Any?>(0, \"\") }, { s: Any?, _: Any? -> kotlin.io.print(s as String); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> false })"
+  let defaultStderr := "arrayOf<Any?>(0, { _: Any? -> System.err.flush(); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any?, _: Any? -> arrayOf<Any?>(0, ByteArray(0)) }, { bs: Any?, _: Any? -> System.err.write(bs as ByteArray); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> arrayOf<Any?>(0, \"\") }, { s: Any?, _: Any? -> System.err.print(s as String); arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> false })"
+  let defaultStdin := "arrayOf<Any?>(0, { _: Any? -> arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { n: Any?, _: Any? -> arrayOf<Any?>(0, System.`in`.readNBytes((n as Int).coerceAtLeast(0))) }, { _: Any?, _: Any? -> arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> arrayOf<Any?>(0, (readlnOrNull()?.plus(\"\\n\") ?: \"\")) }, { _: Any?, _: Any? -> arrayOf<Any?>(0, arrayOf<Any?>(0)) }, { _: Any? -> false })"
+  if fn == `IO.getStdout then
+    return some s!"((System.getProperties()[\"lean.stdout\"] as? Array<Any?>) ?: {defaultStdout})"
+  if fn == `IO.setStdout && !args.isEmpty then
+    let h ← toKotlinArg args[0]!
+    return some s!"(run \{ val prev = (System.getProperties()[\"lean.stdout\"] as? Array<Any?>) ?: {defaultStdout}; System.getProperties()[\"lean.stdout\"] = {h}; prev })"
+  if fn == `IO.getStderr then
+    return some s!"((System.getProperties()[\"lean.stderr\"] as? Array<Any?>) ?: {defaultStderr})"
+  if fn == `IO.setStderr && !args.isEmpty then
+    let h ← toKotlinArg args[0]!
+    return some s!"(run \{ val prev = (System.getProperties()[\"lean.stderr\"] as? Array<Any?>) ?: {defaultStderr}; System.getProperties()[\"lean.stderr\"] = {h}; prev })"
+  if fn == `IO.getStdin then
+    return some s!"((System.getProperties()[\"lean.stdin\"] as? Array<Any?>) ?: {defaultStdin})"
+  if fn == `IO.setStdin && !args.isEmpty then
+    let h ← toKotlinArg args[0]!
+    return some s!"(run \{ val prev = (System.getProperties()[\"lean.stdin\"] as? Array<Any?>) ?: {defaultStdin}; System.getProperties()[\"lean.stdin\"] = {h}; prev })"
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
     match fn with
     -- Conversions to Int8 (Byte)
-    | ``Int8.ofNat | ``Int8.ofInt | ``UInt8.toInt8 | ``Int16.toInt8 | ``Int32.toInt8 | ``Int64.toInt8 | ``ISize.toInt8 =>
+    | ``Int8.ofNat =>
+      return some (← fromNatTo a0 "Byte")
+    | ``Int8.ofInt | ``UInt8.toInt8 | ``Int16.toInt8 | ``Int32.toInt8 | ``Int64.toInt8 | ``ISize.toInt8 =>
       return some (if a0Ty? == some "Byte" then a0 else s!"({a0}).toByte()")
     | `Float.toInt8 | `Float32.toInt8 =>
       return some s!"({a0}).toInt().toByte()"
     | ``Bool.toInt8 =>
       return some s!"(if ({a0}) (1).toByte() else (0).toByte())"
     -- Conversions to Int16 (Short)
-    | ``Int16.ofNat | ``Int16.ofInt | ``UInt16.toInt16 | ``Int8.toInt16 | ``Int32.toInt16 | ``Int64.toInt16 | ``ISize.toInt16 =>
+    | ``Int16.ofNat =>
+      return some (← fromNatTo a0 "Short")
+    | ``Int16.ofInt | ``UInt16.toInt16 | ``Int8.toInt16 | ``Int32.toInt16 | ``Int64.toInt16 | ``ISize.toInt16 =>
       return some (if a0Ty? == some "Short" then a0 else s!"({a0}).toShort()")
     | `Float.toInt16 | `Float32.toInt16 =>
       return some s!"({a0}).toInt().toShort()"
     | ``Bool.toInt16 =>
       return some s!"(if ({a0}) (1).toShort() else (0).toShort())"
-    -- Conversions to Int32 / ISize / USize / Nat / Int (Int)
-    | `Int.ofNat | `Int.toNat | `Int8.toInt | `Int16.toInt | `Int32.toInt | `Int64.toInt
-    | `Int.toInt32 | `Int.toInt64
-    | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt | ``USize.ofNat
+    -- Conversions to Int32 / ISize / USize / Int (Int)
+    | `Int.ofNat | ``Int32.ofNat | ``ISize.ofNat | ``USize.ofNat =>
+      return some (← fromNatTo a0 "Int")
+    | `Int8.toInt | `Int16.toInt | `Int32.toInt | `Int64.toInt
+    | `Int.toInt32
+    | ``Int32.ofInt | ``ISize.ofInt
     | ``UInt32.toInt32 | ``Int8.toInt32 | ``Int16.toInt32 | ``Int64.toInt32 | ``ISize.toInt32
     | ``Int32.toISize | ``Int64.toISize | ``UInt32.toUSize | ``UInt64.toUSize
-    | ``UInt8.toNat | ``UInt16.toNat | ``UInt32.toNat | ``UInt64.toNat | ``USize.toNat | ``Char.toNat
-    | ``Int8.toNatClampNeg | ``Int16.toNatClampNeg | ``Int32.toNatClampNeg | ``Int64.toNatClampNeg
     | `Float.toInt32 | `Float.toISize | `Float32.toInt32 | `Float32.toISize =>
       return some (if a0Ty? == some "Int" then a0 else s!"({a0}).toInt()")
     | `Float.toUSize | `Float32.toUSize =>
       return some s!"({a0}).toUInt().toInt()"
-    | ``Bool.toInt32 | ``Bool.toISize | ``Bool.toNat | ``Bool.toUSize =>
+    | ``Bool.toInt32 | ``Bool.toISize | ``Bool.toUSize =>
       return some s!"(if ({a0}) 1 else 0)"
+    -- Conversions to Nat (java.math.BigInteger)
+    | ``UInt8.toNat =>
+      return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "UByte"}).toLong())"
+    | ``UInt16.toNat =>
+      return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "UShort"}).toLong())"
+    | ``UInt32.toNat | ``Char.toNat =>
+      return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "UInt"}).toLong())"
+    | ``USize.toNat =>
+      return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "Int"}).toUInt().toLong())"
+    | ``UInt64.toNat =>
+      return some s!"(run \{ val l = ({← castIfNeeded a0 "ULong"}).toLong(); if (l >= 0L) java.math.BigInteger.valueOf(l) else java.math.BigInteger.valueOf(l and Long.MAX_VALUE).setBit(63) })"
+    | `Int.toNat | ``Int32.toNatClampNeg | ``ISize.toNatClampNeg =>
+      return some s!"java.math.BigInteger.valueOf(maxOf(0, {← castIfNeeded a0 "Int"}).toLong())"
+    | ``Int8.toNatClampNeg =>
+      return some s!"java.math.BigInteger.valueOf(maxOf(0, ({← castIfNeeded a0 "Byte"}).toInt()).toLong())"
+    | ``Int16.toNatClampNeg =>
+      return some s!"java.math.BigInteger.valueOf(maxOf(0, ({← castIfNeeded a0 "Short"}).toInt()).toLong())"
+    | ``Int64.toNatClampNeg =>
+      return some s!"java.math.BigInteger.valueOf(maxOf(0L, {← castIfNeeded a0 "Long"}))"
+    | ``Bool.toNat =>
+      return some s!"(if ({a0}) java.math.BigInteger.ONE else java.math.BigInteger.ZERO)"
     -- Conversions to Int64 (Long)
-    | ``Int64.ofNat | ``Int64.ofInt | ``UInt64.toInt64 | ``Int8.toInt64 | ``Int16.toInt64 | ``Int32.toInt64 | ``ISize.toInt64
+    | ``Int64.ofNat =>
+      return some (← fromNatTo a0 "Long")
+    | `Int.toInt64 | ``Int64.ofInt | ``UInt64.toInt64 | ``Int8.toInt64 | ``Int16.toInt64 | ``Int32.toInt64 | ``ISize.toInt64
     | `Float.toInt64 | `Float32.toInt64 =>
       return some (if a0Ty? == some "Long" then a0 else s!"({a0}).toLong()")
     | ``Bool.toInt64 =>
       return some s!"(if ({a0}) 1L else 0L)"
     -- Conversions to UInt8 (UByte)
-    | ``UInt8.ofNat | ``Int8.toUInt8 | ``UInt16.toUInt8 | ``UInt32.toUInt8 | ``UInt64.toUInt8 | ``USize.toUInt8 =>
+    | ``UInt8.ofNat =>
+      return some (← fromNatTo a0 "UByte")
+    | ``Int8.toUInt8 | ``UInt16.toUInt8 | ``UInt32.toUInt8 | ``UInt64.toUInt8 | ``USize.toUInt8 =>
       return some (if a0Ty? == some "UByte" then a0 else s!"({a0}).toUByte()")
     | `Float.toUInt8 | `Float32.toUInt8 =>
       return some s!"({a0}).toUInt().toUByte()"
     | ``Bool.toUInt8 =>
       return some s!"(if ({a0}) (1u).toUByte() else (0u).toUByte())"
     -- Conversions to UInt16 (UShort)
-    | ``UInt16.ofNat | ``Int16.toUInt16 | ``UInt8.toUInt16 | ``UInt32.toUInt16 | ``UInt64.toUInt16 | ``USize.toUInt16 =>
+    | ``UInt16.ofNat =>
+      return some (← fromNatTo a0 "UShort")
+    | ``Int16.toUInt16 | ``UInt8.toUInt16 | ``UInt32.toUInt16 | ``UInt64.toUInt16 | ``USize.toUInt16 =>
       return some (if a0Ty? == some "UShort" then a0 else s!"({a0}).toUShort()")
     | `Float.toUInt16 | `Float32.toUInt16 =>
       return some s!"({a0}).toUInt().toUShort()"
     | ``Bool.toUInt16 =>
       return some s!"(if ({a0}) (1u).toUShort() else (0u).toUShort())"
     -- Conversions to UInt32 (UInt) / Char
-    | ``UInt32.ofNat | ``Char.ofNatAux | ``Int32.toUInt32 | ``UInt8.toUInt32 | ``UInt16.toUInt32 | ``UInt64.toUInt32 | ``USize.toUInt32
+    | ``UInt32.ofNat | ``Char.ofNatAux =>
+      return some (← fromNatTo a0 "UInt")
+    | ``Int32.toUInt32 | ``UInt8.toUInt32 | ``UInt16.toUInt32 | ``UInt64.toUInt32 | ``USize.toUInt32
     | `Float.toUInt32 | `Float32.toUInt32 =>
       return some (if a0Ty? == some "UInt" then a0 else s!"({a0}).toUInt()")
     | ``Char.ofNat =>
-      return some s!"(run \{ val cp = ({← castIfNeeded a0 "Int"}).toUInt(); if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })"
+      if let some d := extractNatLiteralDigits? a0 then
+        if d.length <= 7 then
+          return some s!"(run \{ val cp = {d}u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })"
+      return some s!"(run \{ val b = {← castIfNeeded a0 "java.math.BigInteger"}; val cp = if (b.bitLength() <= 21) b.toInt().toUInt() else 0x110000u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })"
     | ``Char.utf8Size =>
-      return some s!"(run \{ val cp = {← castIfNeeded a0 "UInt"}; if (cp <= 0x7Fu) 1 else if (cp <= 0x7FFu) 2 else if (cp <= 0xFFFFu) 3 else 4 })"
+      return some s!"java.math.BigInteger.valueOf((run \{ val cp = {← castIfNeeded a0 "UInt"}; if (cp <= 0x7Fu) 1L else if (cp <= 0x7FFu) 2L else if (cp <= 0xFFFFu) 3L else 4L }))"
     | ``Bool.toUInt32 =>
       return some s!"(if ({a0}) 1u else 0u)"
     -- Conversions to UInt64 (ULong)
-    | ``UInt64.ofNat | ``Int64.toUInt64 | ``UInt8.toUInt64 | ``UInt16.toUInt64 | ``UInt32.toUInt64 | ``USize.toUInt64
+    | ``UInt64.ofNat =>
+      return some (← fromNatTo a0 "ULong")
+    | ``Int64.toUInt64 | ``UInt8.toUInt64 | ``UInt16.toUInt64 | ``UInt32.toUInt64 | ``USize.toUInt64
     | `Float.toUInt64 | `Float32.toUInt64 =>
       return some (if a0Ty? == some "ULong" then a0 else s!"({a0}).toULong()")
     | ``Bool.toUInt64 =>
       return some s!"(if ({a0}) 1uL else 0uL)"
     -- Conversions to Float (Double)
+    | `Float.ofNat | `Nat.toFloat =>
+      return some (← fromNatTo a0 "Double")
     | `Float32.toFloat | `UInt8.toFloat | `UInt16.toFloat | `UInt32.toFloat | `UInt64.toFloat | `USize.toFloat
     | `Int8.toFloat | `Int16.toFloat | `Int32.toFloat | `Int64.toFloat | `ISize.toFloat
-    | `Float.ofNat | `Float.ofInt | `Nat.toFloat | `Int.toFloat =>
+    | `Float.ofInt | `Int.toFloat =>
       return some (if a0Ty? == some "Double" then a0 else s!"({a0}).toDouble()")
     -- Conversions to Float32 (Float)
+    | `Float32.ofNat | `Nat.toFloat32 =>
+      return some (← fromNatTo a0 "Float")
     | `Float.toFloat32 | `UInt8.toFloat32 | `UInt16.toFloat32 | `UInt32.toFloat32 | `UInt64.toFloat32 | `USize.toFloat32
     | `Int8.toFloat32 | `Int16.toFloat32 | `Int32.toFloat32 | `Int64.toFloat32 | `ISize.toFloat32
-    | `Float32.ofNat | `Float32.ofInt | `Nat.toFloat32 | `Int.toFloat32 =>
+    | `Float32.ofInt | `Int.toFloat32 =>
       return some (if a0Ty? == some "Float" then a0 else s!"({a0}).toFloat()")
     -- Unary Nat / Int
     | `Nat.pred =>
-      return some s!"(maxOf(0, {← castIfNeeded a0 "Int"} - 1))"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO))"
     | `Nat.log2 =>
-      return some s!"(if ({← castIfNeeded a0 "Int"} <= 1) 0 else 31 - ({← castIfNeeded a0 "Int"}).countLeadingZeroBits())"
+      return some s!"java.math.BigInteger.valueOf(maxOf(0, ({← castIfNeeded a0 "java.math.BigInteger"}).bitLength() - 1).toLong())"
     | `Nat.reprFast | `Nat.repr | ``USize.repr | `Int.repr =>
       return some s!"({a0}).toString()"
     -- Unary negation
     | ``Int32.neg | ``Int64.neg | ``ISize.neg =>
       return some s!"(-{a0})"
-    | `Int.neg | `Int.negOfNat =>
+    | `Int.neg =>
       return some s!"(-{← castIfNeeded a0 "Int"})"
+    | `Int.negOfNat =>
+      return some s!"(-{← fromNatTo a0 "Int"})"
     | `Int.negSucc =>
-      return some s!"(-({← castIfNeeded a0 "Int"} + 1))"
+      return some s!"(-({← fromNatTo a0 "Int"} + 1))"
     | `Int.natAbs =>
-      return some s!"kotlin.math.abs({← castIfNeeded a0 "Int"})"
+      return some s!"java.math.BigInteger.valueOf(kotlin.math.abs(({← castIfNeeded a0 "Int"}).toLong()))"
     | `Int.decNonneg =>
       return some s!"({← castIfNeeded a0 "Int"} >= 0)"
     | ``Int8.neg =>
@@ -627,10 +828,28 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"(0u - ({a0}).toUInt()).toUShort()"
     | ``USize.neg =>
       return some s!"(-{a0})"
-    -- Bitwise complement
+    -- Bitwise complement & log2 & abs
     | ``Int8.complement | ``Int16.complement | ``Int32.complement | ``Int64.complement | ``ISize.complement
     | ``UInt8.complement | ``UInt16.complement | ``UInt32.complement | ``UInt64.complement | ``USize.complement =>
       return some s!"{a0}.inv()"
+    | `UInt8.log2 =>
+      return some s!"(maxOf(0, 7 - ({← castIfNeeded a0 "UByte"}).countLeadingZeroBits())).toUByte()"
+    | `UInt16.log2 =>
+      return some s!"(maxOf(0, 15 - ({← castIfNeeded a0 "UShort"}).countLeadingZeroBits())).toUShort()"
+    | `UInt32.log2 =>
+      return some s!"(maxOf(0, 31 - ({← castIfNeeded a0 "UInt"}).countLeadingZeroBits())).toUInt()"
+    | `UInt64.log2 =>
+      return some s!"(maxOf(0, 63 - ({← castIfNeeded a0 "ULong"}).countLeadingZeroBits())).toULong()"
+    | `USize.log2 =>
+      return some s!"maxOf(0, 31 - ({← castIfNeeded a0 "Int"}).countLeadingZeroBits())"
+    | `Int8.abs =>
+      return some s!"(run \{ val v = {← castIfNeeded a0 "Byte"}; if (v < 0) (-v.toInt()).toByte() else v })"
+    | `Int16.abs =>
+      return some s!"(run \{ val v = {← castIfNeeded a0 "Short"}; if (v < 0) (-v.toInt()).toShort() else v })"
+    | `Int32.abs | `ISize.abs =>
+      return some s!"(run \{ val v = {← castIfNeeded a0 "Int"}; if (v < 0) -v else v })"
+    | `Int64.abs =>
+      return some s!"(run \{ val v = {← castIfNeeded a0 "Long"}; if (v < 0L) -v else v })"
     -- Unary Float (Double)
     | `Float.neg => return some s!"(-{← castIfNeeded a0 "Double"})"
     | `Float.abs => return some s!"kotlin.math.abs({← castIfNeeded a0 "Double"})"
@@ -694,9 +913,13 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `Float32.toBits => return some s!"({← castIfNeeded a0 "Float"}).toRawBits().toUInt()"
     | `Float32.ofBits => return some s!"Float.fromBits(({← castIfNeeded a0 "UInt"}).toInt())"
     -- Unary String
-    | `String.length | `String.Internal.length => return some s!"({← castIfNeeded a0 "String"}).length"
-    | `String.utf8ByteSize => return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().size"
+    | `String.length | `String.Internal.length => return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "String"}).length.toLong())"
+    | `String.utf8ByteSize => return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "String"}).encodeToByteArray().size.toLong())"
     | `String.isEmpty | `String.Internal.isEmpty => return some s!"({← castIfNeeded a0 "String"}).isEmpty()"
+    | `String.hash =>
+      return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().contentHashCode().toULong()"
+    | `String.Slice.hash =>
+      return some s!"(run \{ val sl = {a0} as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() })"
     | `String.singleton => return some s!"Character.toString(({← castIfNeeded a0 "UInt"}).toInt())"
     | `String.ofList | `String.mk | `List.asString =>
       return some s!"buildString \{ var cur: Any? = {a0}; while (((cur as Array<*>)[0] as Int) == 1) \{ appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }"
@@ -709,7 +932,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `String.markLinear => return some a0
     -- Unary ByteArray
     | `ByteArray.emptyWithCapacity => return some "ByteArray(0)"
-    | `ByteArray.size | `ByteArray.usize => return some s!"({← castIfNeeded a0 "ByteArray"}).size"
+    | `ByteArray.size => return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "ByteArray"}).size.toLong())"
+    | `ByteArray.usize => return some s!"({← castIfNeeded a0 "ByteArray"}).size"
     | `ByteArray.isEmpty => return some s!"({← castIfNeeded a0 "ByteArray"}).isEmpty()"
     | `ByteArray.hash => return some s!"({← castIfNeeded a0 "ByteArray"}).contentHashCode().toULong()"
     | `ByteArray.markLinear => return some s!"({← castIfNeeded a0 "ByteArray"}).copyOf()"
@@ -717,17 +941,20 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"(try \{ java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap({← castIfNeeded a0 "ByteArray"})); true } catch (_: Throwable) \{ false })"
     -- Unary FloatArray
     | `FloatArray.emptyWithCapacity => return some "DoubleArray(0)"
-    | `FloatArray.size | `FloatArray.usize => return some s!"({← castIfNeeded a0 "DoubleArray"}).size"
+    | `FloatArray.size => return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "DoubleArray"}).size.toLong())"
+    | `FloatArray.usize => return some s!"({← castIfNeeded a0 "DoubleArray"}).size"
     | `FloatArray.isEmpty => return some s!"({← castIfNeeded a0 "DoubleArray"}).isEmpty()"
     | `FloatArray.markLinear => return some s!"({← castIfNeeded a0 "DoubleArray"}).copyOf()"
     | _ =>
       if fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64") then
         if a0Ty? == some "Long" then return some a0
         if a0Ty? == some "Int" then return some s!"{a0}.toLong()"
+        if a0Ty? == some "java.math.BigInteger" then return some s!"({a0}).toLong()"
         return some s!"({a0} as Number).toLong()"
       if fn.isStr && fn.getString! == "toUInt32" then
         if a0Ty? == some "Int" then return some a0
         if a0Ty? == some "Long" then return some s!"{a0}.toInt()"
+        if a0Ty? == some "java.math.BigInteger" then return some s!"({a0}).toInt()"
         return some s!"({a0} as Number).toInt()"
       return none
   if args.isEmpty then
@@ -741,6 +968,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     let a1Int ← do
       if (← get).varTypes[a1]? == some "Int" then
         pure a1
+      else if let some d := extractNatLiteralDigits? a1 then
+        if d.length <= 9 then pure d else pure s!"({a1}).toInt()"
       else if let some src := (← get).intSources[a1]? then
         pure src
       else if let some intExpr := stripToLong? a1 then
@@ -752,6 +981,10 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       else
         pure s!"({a1}).toInt()"
     match fn with
+    | `mixHash =>
+      let h1 ← castIfNeeded a0 "ULong"
+      let h2 ← castIfNeeded a1 "ULong"
+      return some s!"(run \{ val k = {h2} * 0xc6a4a7935bd1e995uL; val k2 = (k xor (k shr 47)) * 0xc6a4a7935bd1e995uL; ({h1} xor k2) * 0xc6a4a7935bd1e995uL })"
     -- Signed Int32 / ISize / USize (Int)
     | ``Int32.add | ``ISize.add | ``USize.add =>
       return some s!"({← castIfNeeded a0 "Int"} + {← castIfNeeded a1 "Int"})"
@@ -898,6 +1131,10 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `Float.scaleB => return some s!"Math.scalb({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Int"})"
     | `Float.minimum => return some s!"kotlin.math.min({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
     | `Float.maximum => return some s!"kotlin.math.max({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"})"
+    | `Float.minimumNumber =>
+      return some s!"(run \{ val x = {← castIfNeeded a0 "Double"}; val y = {← castIfNeeded a1 "Double"}; if (x.isNaN()) y else if (y.isNaN()) x else kotlin.math.min(x, y) })"
+    | `Float.maximumNumber =>
+      return some s!"(run \{ val x = {← castIfNeeded a0 "Double"}; val y = {← castIfNeeded a1 "Double"}; if (x.isNaN()) y else if (y.isNaN()) x else kotlin.math.max(x, y) })"
 
     -- Binary Float32 (Float)
     | `Float32.add => return some s!"({← castIfNeeded a0 "Float"} + {← castIfNeeded a1 "Float"})"
@@ -912,15 +1149,21 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `Float32.scaleB => return some s!"Math.scalb({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Int"})"
     | `Float32.minimum => return some s!"kotlin.math.min({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
     | `Float32.maximum => return some s!"kotlin.math.max({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
+    | `Float32.minimumNumber =>
+      return some s!"(run \{ val x = {← castIfNeeded a0 "Float"}; val y = {← castIfNeeded a1 "Float"}; if (x.isNaN()) y else if (y.isNaN()) x else kotlin.math.min(x, y) })"
+    | `Float32.maximumNumber =>
+      return some s!"(run \{ val x = {← castIfNeeded a0 "Float"}; val y = {← castIfNeeded a1 "Float"}; if (x.isNaN()) y else if (y.isNaN()) x else kotlin.math.max(x, y) })"
 
     -- Binary ByteArray & FloatArray
     | `ByteArray.push => return some s!"({← castIfNeeded a0 "ByteArray"} + ({← castIfNeeded a1 "UByte"}).toByte())"
-    | `ByteArray.get! => return some s!"(({← castIfNeeded a0 "ByteArray"})[{← castIfNeeded a1 "Int"}]).toUByte()"
+    | `ByteArray.get! => return some s!"(({← castIfNeeded a0 "ByteArray"})[{← fromNatTo a1 "Int"}]).toUByte()"
     | `ByteArray.beq | `ByteArray.decEq => return some s!"({← castIfNeeded a0 "ByteArray"}).contentEquals({← castIfNeeded a1 "ByteArray"})"
+    | `ByteSlice.beq =>
+      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val bx = x[1] as ByteArray; val sx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, bx.size); val lx = (x[3] as java.math.BigInteger).toInt().coerceIn(0, bx.size - sx); val by = y[1] as ByteArray; val sy = (y[2] as java.math.BigInteger).toInt().coerceIn(0, by.size); val ly = (y[3] as java.math.BigInteger).toInt().coerceIn(0, by.size - sy); java.util.Arrays.equals(bx, sx, sx + lx, by, sy, sy + ly) })"
     | `ByteArray.propagateMark => return some a1
     | `ByteArray.fastAppend | `ByteArray.append => return some s!"({← castIfNeeded a0 "ByteArray"} + {← castIfNeeded a1 "ByteArray"})"
     | `FloatArray.push => return some s!"({← castIfNeeded a0 "DoubleArray"} + {← castIfNeeded a1 "Double"})"
-    | `FloatArray.get! => return some s!"({← castIfNeeded a0 "DoubleArray"})[{← castIfNeeded a1 "Int"}]"
+    | `FloatArray.get! => return some s!"({← castIfNeeded a0 "DoubleArray"})[{← fromNatTo a1 "Int"}]"
     | `FloatArray.propagateMark => return some a1
 
     -- Binary String
@@ -928,24 +1171,28 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `String.push => return some s!"({← castIfNeeded a0 "String"} + Character.toString(({a1}).toInt()))"
     | `String.decEq => return some s!"({← castIfNeeded a0 "String"} == {← castIfNeeded a1 "String"})"
     | `String.decLt | `String.decidableLT | `String.lt => return some s!"({← castIfNeeded a0 "String"} < {← castIfNeeded a1 "String"})"
+    | `String.compare =>
+      return some s!"(run \{ val c = ({← castIfNeeded a0 "String"}).compareTo({← castIfNeeded a1 "String"}); if (c < 0) 0 else if (c == 0) 1 else 2 })"
+    | `String.Slice.instDecidableLt =>
+      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val sx = (x[1] as String).encodeToByteArray(); val bx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, sx.size); val ex = (x[3] as java.math.BigInteger).toInt().coerceIn(bx, sx.size); val sy = (y[1] as String).encodeToByteArray(); val by = (y[2] as java.math.BigInteger).toInt().coerceIn(0, sy.size); val ey = (y[3] as java.math.BigInteger).toInt().coerceIn(by, sy.size); java.util.Arrays.compareUnsigned(sx, bx, ex, sy, by, ey) < 0 })"
     | `String.Internal.isPrefixOf => return some s!"({← castIfNeeded a1 "String"}).startsWith({← castIfNeeded a0 "String"})"
     | `String.propagateMark => return some a1
     | `String.ofByteArray | `String.fromUTF8 =>
       return some s!"({← castIfNeeded a0 "ByteArray"}).decodeToString()"
     | `String.getUTF8Byte | `String.Internal.getUTF8Byte | `String.Internal.ugetUTF8Byte =>
-      return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray()[{← castIfNeeded a1 "Int"}].toUByte()"
+      return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray()[{← fromNatTo a1 "Int"}].toUByte()"
     | `String.Pos.Raw.isValid =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← castIfNeeded a1 "Int"}; idx == bs.size || (idx in 0 until bs.size && (bs[idx].toInt() and 0xC0) != 0x80) })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; idx == bs.size || (idx in 0 until bs.size && (bs[idx].toInt() and 0xC0) != 0x80) })"
     | `String.Pos.Raw.atEnd | `String.atEnd | `String.Internal.atEnd =>
-      return some s!"({← castIfNeeded a1 "Int"} >= ({← castIfNeeded a0 "String"}).encodeToByteArray().size)"
+      return some s!"({← fromNatTo a1 "Int"} >= ({← castIfNeeded a0 "String"}).encodeToByteArray().size)"
     | `String.decodeChar | `String.Pos.Raw.get | `String.get | `String.Pos.Raw.get' | `String.get' | `String.Pos.Raw.get! | `String.get! | `String.Internal.get =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← castIfNeeded a1 "Int"}; if (idx < 0 || idx >= bs.size) 65u else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) 65u else bs.decodeToString(idx, idx + len).codePointAt(0).toUInt() } })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) 65u else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) 65u else bs.decodeToString(idx, idx + len).codePointAt(0).toUInt() } })"
     | `String.Pos.Raw.get? | `String.get? =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← castIfNeeded a1 "Int"}; if (idx < 0 || idx >= bs.size) arrayOf<Any?>(0) else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) arrayOf<Any?>(0) else arrayOf<Any?>(1, bs.decodeToString(idx, idx + len).codePointAt(0).toUInt()) } })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) arrayOf<Any?>(0) else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) arrayOf<Any?>(0) else arrayOf<Any?>(1, bs.decodeToString(idx, idx + len).codePointAt(0).toUInt()) } })"
     | `String.Pos.next | `String.Pos.Raw.next | `String.next | `String.Pos.Raw.next' | `String.next' | `String.Internal.next =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← castIfNeeded a1 "Int"}; if (idx < 0 || idx >= bs.size) idx + 1 else \{ val b0 = bs[idx].toInt() and 0xFF; idx + (if (b0 < 0xC0) 1 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4) } })"
+      return some s!"java.math.BigInteger.valueOf((run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) idx + 1 else \{ val b0 = bs[idx].toInt() and 0xFF; idx + (if (b0 < 0xC0) 1 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4) } }).toLong())"
     | `String.Pos.Raw.prev | `String.prev =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); var idx = {← castIfNeeded a1 "Int"} - 1; while (idx > 0 && idx < bs.size && (bs[idx].toInt() and 0xC0) == 0x80) \{ idx -= 1 }; maxOf(0, idx) })"
+      return some s!"java.math.BigInteger.valueOf((run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); var idx = {← fromNatTo a1 "Int"} - 1; while (idx > 0 && idx < bs.size && (bs[idx].toInt() and 0xC0) == 0x80) \{ idx -= 1 }; maxOf(0, idx) }).toLong())"
 
     -- Binary Int (Int)
     | `Int.add => return some s!"({← castIfNeeded a0 "Int"} + {← castIfNeeded a1 "Int"})"
@@ -967,65 +1214,73 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
 
     | ``Bool.decEq => return some s!"({a0} == {a1})"
     | ``Nat.decEq | `Nat.beq =>
-      return some s!"({← castIfNeeded a0 "Int"} == {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"} == {← castIfNeeded a1 "java.math.BigInteger"})"
     | ``Nat.decLt | `Nat.blt =>
-      return some s!"({← castIfNeeded a0 "Int"} < {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"} < {← castIfNeeded a1 "java.math.BigInteger"})"
     | ``Nat.decLe | `Nat.ble =>
-      return some s!"({← castIfNeeded a0 "Int"} <= {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"} <= {← castIfNeeded a1 "java.math.BigInteger"})"
     | `Nat.land =>
-      return some s!"({← castIfNeeded a0 "Int"} and {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.and({← castIfNeeded a1 "java.math.BigInteger"}))"
     | `Nat.lor =>
-      return some s!"({← castIfNeeded a0 "Int"} or {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.or({← castIfNeeded a1 "java.math.BigInteger"}))"
     | `Nat.xor =>
-      return some s!"({← castIfNeeded a0 "Int"} xor {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.xor({← castIfNeeded a1 "java.math.BigInteger"}))"
     | `Nat.shiftLeft =>
-      return some s!"({← castIfNeeded a0 "Int"} shl {a1Int})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.shiftLeft({← fromNatTo a1 "Int"}))"
     | `Nat.shiftRight =>
-      return some s!"({← castIfNeeded a0 "Int"} ushr {a1Int})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.shiftRight({← fromNatTo a1 "Int"}))"
     | `Nat.add =>
-      return some s!"({← castIfNeeded a0 "Int"} + {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.add({← castIfNeeded a1 "java.math.BigInteger"}))"
     | `Nat.sub =>
-      return some s!"(maxOf(0, {← castIfNeeded a0 "Int"} - {← castIfNeeded a1 "Int"}))"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.subtract({← castIfNeeded a1 "java.math.BigInteger"}).max(java.math.BigInteger.ZERO))"
     | `Nat.mul =>
-      return some s!"({← castIfNeeded a0 "Int"} * {← castIfNeeded a1 "Int"})"
-    | `Nat.div =>
-      return some s!"({← castIfNeeded a0 "Int"} / {← castIfNeeded a1 "Int"})"
-    | `Nat.mod =>
-      return some s!"({← castIfNeeded a0 "Int"} % {← castIfNeeded a1 "Int"})"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.multiply({← castIfNeeded a1 "java.math.BigInteger"}))"
+    | `Nat.div | `Nat.divExact =>
+      let x ← castIfNeeded a0 "java.math.BigInteger"
+      let y ← castIfNeeded a1 "java.math.BigInteger"
+      return some s!"(if ({y} == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ({x}).divide({y}))"
+    | `Nat.mod | `Nat.modCore =>
+      let x ← castIfNeeded a0 "java.math.BigInteger"
+      let y ← castIfNeeded a1 "java.math.BigInteger"
+      return some s!"(if ({y} == java.math.BigInteger.ZERO) {x} else ({x}).remainder({y}))"
     | `Nat.pow =>
-      return some s!"Math.pow(({← castIfNeeded a0 "Int"}).toDouble(), ({← castIfNeeded a1 "Int"}).toDouble()).toInt()"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.pow({← fromNatTo a1 "Int"}))"
     | `Nat.gcd =>
-      return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "Int"}).toLong()).gcd(java.math.BigInteger.valueOf(({← castIfNeeded a1 "Int"}).toLong())).toInt()"
+      return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.gcd({← castIfNeeded a1 "java.math.BigInteger"}))"
     | _ => return none
   if args.size == 3 then
     let a0 ← toKotlinArg args[0]!
     let a1 ← toKotlinArg args[1]!
     let a2 ← toKotlinArg args[2]!
     match fn with
+    | `Float.fma =>
+      return some s!"Math.fma({← castIfNeeded a0 "Double"}, {← castIfNeeded a1 "Double"}, {← castIfNeeded a2 "Double"})"
+    | `Float32.fma =>
+      return some s!"Math.fma({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"}, {← castIfNeeded a2 "Float"})"
     | `Float.ofScientific =>
-      if !a0.isEmpty && a0.all Char.isDigit && !a2.isEmpty && a2.all Char.isDigit && (a1 == "true" || a1 == "false") then
-        if a2 == "0" then return some s!"{a0}.0"
-        else if a1 == "true" then return some s!"{a0}e-{a2}"
-        else return some s!"{a0}e{a2}"
-      else
-        return some s!"(({← castIfNeeded a0 "Int"}).toDouble() * Math.pow(10.0, if ({a1}) -({← castIfNeeded a2 "Int"}).toDouble() else ({← castIfNeeded a2 "Int"}).toDouble()))"
+      if let (some d0, some d2) := (extractNatLiteralDigits? a0, extractNatLiteralDigits? a2) then
+        if a1 == "true" || a1 == "false" then
+          if d2 == "0" then return some s!"{d0}.0"
+          else if a1 == "true" then return some s!"{d0}e-{d2}"
+          else return some s!"{d0}e{d2}"
+      return some s!"(({← fromNatTo a0 "Double"}) * Math.pow(10.0, if ({a1}) -({← fromNatTo a2 "Double"}) else ({← fromNatTo a2 "Double"})))"
     | `Float32.ofScientific =>
-      if !a0.isEmpty && a0.all Char.isDigit && !a2.isEmpty && a2.all Char.isDigit && (a1 == "true" || a1 == "false") then
-        if a2 == "0" then return some s!"{a0}.0f"
-        else if a1 == "true" then return some s!"{a0}e-{a2}f"
-        else return some s!"{a0}e{a2}f"
-      else
-        return some s!"(({← castIfNeeded a0 "Int"}).toDouble() * Math.pow(10.0, if ({a1}) -({← castIfNeeded a2 "Int"}).toDouble() else ({← castIfNeeded a2 "Int"}).toDouble())).toFloat()"
+      if let (some d0, some d2) := (extractNatLiteralDigits? a0, extractNatLiteralDigits? a2) then
+        if a1 == "true" || a1 == "false" then
+          if d2 == "0" then return some s!"{d0}.0f"
+          else if a1 == "true" then return some s!"{d0}e-{d2}f"
+          else return some s!"{d0}e{d2}f"
+      return some s!"(({← fromNatTo a0 "Double"}) * Math.pow(10.0, if ({a1}) -({← fromNatTo a2 "Double"}) else ({← fromNatTo a2 "Double"}))).toFloat()"
     | `ByteArray.get | `ByteArray.uget =>
-      return some s!"(({← castIfNeeded a0 "ByteArray"})[{← castIfNeeded a1 "Int"}]).toUByte()"
+      return some s!"(({← castIfNeeded a0 "ByteArray"})[{← fromNatTo a1 "Int"}]).toUByte()"
     | `ByteArray.extract =>
-      return some s!"(run \{ val bs = {← castIfNeeded a0 "ByteArray"}; val start = ({← castIfNeeded a1 "Int"}).coerceIn(0, bs.size); val stop = ({← castIfNeeded a2 "Int"}).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })"
+      return some s!"(run \{ val bs = {← castIfNeeded a0 "ByteArray"}; val start = ({← fromNatTo a1 "Int"}).coerceIn(0, bs.size); val stop = ({← fromNatTo a2 "Int"}).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })"
     | `FloatArray.get | `FloatArray.uget =>
-      return some s!"({← castIfNeeded a0 "DoubleArray"})[{← castIfNeeded a1 "Int"}]"
+      return some s!"({← castIfNeeded a0 "DoubleArray"})[{← fromNatTo a1 "Int"}]"
     | `String.extract | `String.Pos.extract | `String.Pos.Raw.extract | `String.Internal.extract =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val start = ({← castIfNeeded a1 "Int"}).coerceIn(0, bs.size); val stop = ({← castIfNeeded a2 "Int"}).coerceIn(start, bs.size); bs.decodeToString(start, stop) })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val start = ({← fromNatTo a1 "Int"}).coerceIn(0, bs.size); val stop = ({← fromNatTo a2 "Int"}).coerceIn(start, bs.size); bs.decodeToString(start, stop) })"
     | `String.Pos.set | `String.Pos.Raw.set | `String.set =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← castIfNeeded a1 "Int"}; if (idx < 0 || idx >= bs.size) {← castIfNeeded a0 "String"} else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) {← castIfNeeded a0 "String"} else bs.decodeToString(0, idx) + Character.toString(({← castIfNeeded a2 "UInt"}).toInt()) + bs.decodeToString(idx + len, bs.size) } })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) {← castIfNeeded a0 "String"} else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) {← castIfNeeded a0 "String"} else bs.decodeToString(0, idx) + Character.toString(({← castIfNeeded a2 "UInt"}).toInt()) + bs.decodeToString(idx + len, bs.size) } })"
     | _ => return none
   if args.size == 4 then
     let a0 ← toKotlinArg args[0]!
@@ -1043,7 +1298,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     if fn == `mkPanicMessageWithDecl then
       return some s!"(\"PANIC at \" + {← castIfNeeded a1 "String"} + \" \" + {← castIfNeeded a0 "String"} + \":\" + ({a2}).toString() + \":\" + ({a3}).toString() + \": \" + {← castIfNeeded a4 "String"})"
     if fn == `String.Slice.Pattern.Internal.memcmpStr then
-      return some s!"java.util.Arrays.equals(({← castIfNeeded a0 "String"}).encodeToByteArray(), {← castIfNeeded a2 "Int"}, {← castIfNeeded a2 "Int"} + {← castIfNeeded a4 "Int"}, ({← castIfNeeded a1 "String"}).encodeToByteArray(), {← castIfNeeded a3 "Int"}, {← castIfNeeded a3 "Int"} + {← castIfNeeded a4 "Int"})"
+      return some s!"java.util.Arrays.equals(({← castIfNeeded a0 "String"}).encodeToByteArray(), {← fromNatTo a2 "Int"}, {← fromNatTo a2 "Int"} + {← fromNatTo a4 "Int"}, ({← castIfNeeded a1 "String"}).encodeToByteArray(), {← fromNatTo a3 "Int"}, {← fromNatTo a3 "Int"} + {← fromNatTo a4 "Int"})"
   if args.size == 6 then
     if fn == `ByteArray.copySlice then
       let a0 ← toKotlinArg args[0]!
@@ -1051,7 +1306,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       let a2 ← toKotlinArg args[2]!
       let a3 ← toKotlinArg args[3]!
       let a4 ← toKotlinArg args[4]!
-      return some s!"(run \{ val s = {← castIfNeeded a0 "ByteArray"}; val d = {← castIfNeeded a2 "ByteArray"}; val sOff = {← castIfNeeded a1 "Int"}; if (sOff < 0 || sOff > s.size) d.copyOf() else \{ val l = minOf(maxOf(0, {← castIfNeeded a4 "Int"}), s.size - sOff); val dOff = ({← castIfNeeded a3 "Int"}).coerceIn(0, d.size); val r = d.copyOf(maxOf(d.size, dOff + l)); s.copyInto(r, dOff, sOff, sOff + l); r } })"
+      return some s!"(run \{ val s = {← castIfNeeded a0 "ByteArray"}; val d = {← castIfNeeded a2 "ByteArray"}; val sOff = {← fromNatTo a1 "Int"}; if (sOff < 0 || sOff > s.size) d.copyOf() else \{ val l = minOf(maxOf(0, {← fromNatTo a4 "Int"}), s.size - sOff); val dOff = ({← fromNatTo a3 "Int"}).coerceIn(0, d.size); val r = d.copyOf(maxOf(d.size, dOff + l)); s.copyInto(r, dOff, sOff, sOff + l); r } })"
   return none
 
 /--
@@ -1131,21 +1386,24 @@ def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Emi
   let arg (i : Nat) : EmitM String := toKotlinArg (args[i]?.getD .erased)
   if fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" then
     let arrTy ← arrayType (args[2]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 2) arrTy}[{← castIfNeeded (← arg 3) "Int"}]"
+    return some s!"{← castIfNeeded (← arg 2) arrTy}[{← fromNatTo (← arg 3) "Int"}]"
   if fn == arrOp "getInternal" || fn == arrOp "getInternalBorrowed" then
     let arrTy ← arrayType (args[1]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← castIfNeeded (← arg 2) "Int"}]"
+    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← fromNatTo (← arg 2) "Int"}]"
   if fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
     let arrTy ← arrayType (args[1]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← castIfNeeded (← arg 2) "Int"}]"
-  if fn == arrOp "size" || fn == arrOp "usize" then
+    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← fromNatTo (← arg 2) "Int"}]"
+  if fn == arrOp "size" then
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    return some s!"java.math.BigInteger.valueOf({← castIfNeeded (← arg 1) arrTy}.size.toLong())"
+  if fn == arrOp "usize" then
     let arrTy ← arrayType (args[1]?.getD .erased)
     return some s!"{← castIfNeeded (← arg 1) arrTy}.size"
   if fn == arrOp "replicate" || fn == arrOp "mkArray" then
     let arrTy := match getJvmTypeDesc? resTy with
       | some d => (d.drop 7).toString
       | none => "Array<Any?>"
-    return some (← kotlinArrayAlloc arrTy (← castIfNeeded (← arg 1) "Int") (← arg 2))
+    return some (← kotlinArrayAlloc arrTy (← fromNatTo (← arg 1) "Int") (← arg 2))
   if fn == arrOp "mkEmpty" || fn == arrOp "emptyWithCapacity" then
     let t := match getJvmTypeDesc? resTy with
       | some d => (d.drop 7).toString
@@ -1227,35 +1485,42 @@ def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Emi
     let stopIdx := args.size - 1
     let arrTy ← arrayType (args[aIdx]?.getD .erased)
     let aStr ← castIfNeeded (← arg aIdx) arrTy
-    let startStr ← castIfNeeded (← arg startIdx) "Int"
-    let stopStr ← castIfNeeded (← arg stopIdx) "Int"
+    let startStr ← fromNatTo (← arg startIdx) "Int"
+    let stopStr ← fromNatTo (← arg stopIdx) "Int"
     return some s!"{aStr}.copyOfRange(({startStr}).coerceIn(0, {aStr}.size), ({stopStr}).coerceIn(({startStr}).coerceIn(0, {aStr}.size), {aStr}.size))"
+  if (fn == arrOp "propagateMark" || fn == `Array.propagateMark._redArg) && !args.isEmpty then
+    return some (← arg (args.size - 1))
+  if (fn == arrOp "markLinear" || fn == `Array.markLinear._redArg) && !args.isEmpty then
+    let aIdx := args.size - 1
+    let arrTy ← arrayType (args[aIdx]?.getD .erased)
+    let aStr ← castIfNeeded (← arg aIdx) arrTy
+    return some s!"({aStr}).copyOf()"
   return none
 
 /-- In-place `Array`/`ByteArray`/`FloatArray` updates: `(array arg, index expr, value arg, checkBounds)`. -/
 def arraySet? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × Arg .impure × Bool)) := do
   let fn := match fn with | .str p "_boxed" => p | _ => fn
   if fn == arrOp "set!" || fn == arrOp "setIfInBounds" then
-    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!, false)
+    return some (args[1]!, ← fromNatTo (← toKotlinArg args[2]!) "Int", args[3]!, false)
   if fn == arrOp "uset" || fn == arrOp "fset" || fn == arrOp "set" then
-    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!, false)
+    return some (args[1]!, ← fromNatTo (← toKotlinArg args[2]!) "Int", args[3]!, false)
   if fn == `ByteArray.set! || fn == `FloatArray.set! then
-    return some (args[0]!, ← castIfNeeded (← toKotlinArg args[1]!) "Int", args[2]!, true)
+    return some (args[0]!, ← fromNatTo (← toKotlinArg args[1]!) "Int", args[2]!, true)
   if fn == `ByteArray.set || fn == `ByteArray.uset ||
      fn == `FloatArray.set || fn == `FloatArray.uset then
-    return some (args[0]!, ← castIfNeeded (← toKotlinArg args[1]!) "Int", args[2]!, false)
+    return some (args[0]!, ← fromNatTo (← toKotlinArg args[1]!) "Int", args[2]!, false)
   return none
 
 /-- In-place `Array` element swaps: `(array arg, idx1 expr, idx2 expr, checkBounds)`. -/
 def arraySwap? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × String × Bool)) := do
   let fn := match fn with | .str p "_boxed" => p | _ => fn
   if fn == arrOp "swap" || fn == arrOp "uswap" then
-    let iStr ← castIfNeeded (← toKotlinArg args[2]!) "Int"
-    let jStr ← castIfNeeded (← toKotlinArg args[3]!) "Int"
+    let iStr ← fromNatTo (← toKotlinArg args[2]!) "Int"
+    let jStr ← fromNatTo (← toKotlinArg args[3]!) "Int"
     return some (args[1]!, iStr, jStr, false)
   if fn == arrOp "swapIfInBounds" then
-    let iStr ← castIfNeeded (← toKotlinArg args[2]!) "Int"
-    let jStr ← castIfNeeded (← toKotlinArg args[3]!) "Int"
+    let iStr ← fromNatTo (← toKotlinArg args[2]!) "Int"
+    let jStr ← fromNatTo (← toKotlinArg args[3]!) "Int"
     return some (args[1]!, iStr, jStr, true)
   return none
 
@@ -1348,11 +1613,12 @@ def prodComponentKotlinType? (type : Expr) (c : Nat) : EmitM (Option String) := 
   let comp := type.getAppArgs[c]!
   if comp.hasLooseBVars then return none
   try
-    let impure ← (Meta.MetaM.run' do
+    let t ← (Meta.MetaM.run' do
       let t ← toLCNFType comp
-      let t ← toMonoType t
-      toImpureType t : CoreM Expr)
-    let t := toKotlinType impure
+      let mono ← toMonoType t
+      if isRichMonoType mono then return toKotlinType mono
+      let impure ← toImpureType mono
+      return toKotlinType impure : CoreM String)
     return if t == "Any?" then none else some t
   catch _ => return none
 
@@ -1394,6 +1660,7 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
   let baseFn := match fn with | .str p "_boxed" => p | _ => fn
   if let some ci := (env.find? fn).orElse (fun _ => env.find? baseFn) then
     if resultType ci.type == mkConst ``Unit then return "Unit"
+    if resultType ci.type == mkConst ``Nat then return "java.math.BigInteger"
     if resultType ci.type == mkConst ``String then return "String"
     if resultType ci.type == mkConst ``ByteArray then return "ByteArray"
     if resultType ci.type == mkConst ``FloatArray then return "DoubleArray"
@@ -1573,15 +1840,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     | .uint64 n =>
       if decl.type == ImpureType.int64 then return formatInt64 n
       else return formatUInt64 n
-    | .nat n =>
-      let n32 := n % 4294967296
-      if n32 == 2147483648 then
-        return "Int.MIN_VALUE"
-      else if n32 > 2147483647 then
-        let signedVal : Int := (n32 : Int) - 4294967296
-        return s!"({signedVal})"
-      else
-        return s!"{n32}"
+    | .nat n => return formatNatLit n
     | .str s => return s!"\"{escapeKotlinString s}\""
   | .erased => return "null"
   | .fap fn args =>
@@ -1654,7 +1913,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         | none => "Any?"
       if impTy != "Any?" then impTy
       else match monoDecl?.bind (·.params[i]?) with
-        | some mp => toKotlinType mp.type
+        | some mp => if isRichMonoType mp.type then toKotlinType mp.type else "Any?"
         | none => "Any?"
     let mut callArgs : Array String := #[]
     let mut fullArgs : Array (Arg .impure) := args
@@ -2451,6 +2710,8 @@ structure AliasState where
   comps : Std.HashMap (FVarId × Nat) FVarId := {}
   /-- Roots of the arguments passed to each join point parameter (`none`: not a variable). -/
   jmpArgs : Std.HashMap FVarId (Array (Option FVarId)) := {}
+  /-- Variables in scope at each non-inlined join point parameter's declaration site. -/
+  jpScope : Std.HashMap FVarId (Std.HashSet FVarId) := {}
 
 /--
 Variables of `code` that are emitted as Kotlin aliases of another variable, mapped to the root:
@@ -2458,13 +2719,14 @@ in-place updates of `@[mutable_kotlin_class]` values (aliases of the unique sour
 fields), results of calls identical to an argument (see `registerDropped`), and join point
 parameters all of whose arguments are aliases of the same variable.
 -/
-partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVarId) := do
+partial def collectAliases (params : Array (Param .impure)) (code : Code .impure) :
+    EmitM (Std.HashMap FVarId FVarId) := do
   let root (f : FVarId) : StateT AliasState EmitM FVarId := return (← get).aliases.getD f f
   let addAlias (x r : FVarId) : StateT AliasState EmitM Unit :=
     modify fun (s : AliasState) => { s with aliases := s.aliases.insert x r }
   let addProj (x : FVarId) (p : ProjInfo) : StateT AliasState EmitM Unit :=
     modify fun (s : AliasState) => { s with projs := s.projs.insert x p }
-  let rec go (c : Code .impure) : StateT AliasState EmitM Unit := do
+  let rec go (inScope : Std.HashSet FVarId) (c : Code .impure) : StateT AliasState EmitM Unit := do
     match c with
     | .let decl k =>
       let x := decl.fvarId
@@ -2488,6 +2750,8 @@ partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVa
       | .fap fn args =>
         if fn == arrOp "set!" || fn == arrOp "setIfInBounds" || fn == arrOp "uset" then
           if let some (.fvar y) := (args[1]? : Option (Arg .impure)) then addAlias x (← root y)
+        else if fn == arrOp "propagateMark" || fn == `Array.propagateMark._redArg then
+          if let some (.fvar y) := args.back? then addAlias x (← root y)
         else if let some ai := Ownership.inplaceArg? (← getEnv) fn args then
           if let some (.fvar y) := args[ai]? then addAlias x (← root y)
         else
@@ -2502,9 +2766,21 @@ partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVa
                   modify fun (s : AliasState) => { s with comps := s.comps.insert (x, c) r }
           | _ => pure ()
       | _ => pure ()
-      go k
-    | .jp decl k | .fun decl k _ => go decl.value; go k
-    | .cases cs => for alt in cs.alts do go alt.getCode
+      go (inScope.insert x) k
+    | .jp decl k =>
+      let isSingleUse := countJmp decl.fvarId k == 1 && countJmp decl.fvarId decl.value == 0
+      let mut bodyScope := inScope
+      for p in decl.params do
+        unless isSingleUse do
+          modify fun (s : AliasState) => { s with jpScope := s.jpScope.insert p.fvarId inScope }
+        bodyScope := bodyScope.insert p.fvarId
+      go bodyScope decl.value
+      go inScope k
+    | .fun decl k _ =>
+      let bodyScope := decl.params.foldl (init := inScope) fun s p => s.insert p.fvarId
+      go bodyScope decl.value
+      go (inScope.insert decl.fvarId) k
+    | .cases cs => for alt in cs.alts do go inScope alt.getCode
     | .jmp fn args =>
       let some (d : FunDecl .impure) ← findFunDecl? fn | return
       for h : i in [:d.params.size] do
@@ -2513,16 +2789,20 @@ partial def collectAliases (code : Code .impure) : EmitM (Std.HashMap FVarId FVa
           | _ => pure none
         let pid := d.params[i].fvarId
         modify fun (s : AliasState) => { s with jmpArgs := s.jmpArgs.insert pid ((s.jmpArgs.getD pid #[]).push r) }
-    | c => if let some k := skipCont? c then go k
+    | c => if let some k := skipCont? c then go inScope k
   -- Join point bodies precede their jumps: a multi-pass fixed point sees nested parameter aliases.
+  let initScope := params.foldl (init := ({} : Std.HashSet FVarId)) fun s p => s.insert p.fvarId
   let mut seed : Std.HashMap FVarId FVarId := {}
   let mut aliases : Std.HashMap FVarId FVarId := {}
   for _ in [0:4] do
-    let ((), st) ← (go code).run ({ aliases := seed } : AliasState)
+    let ((), st) ← (go initScope code).run ({ aliases := seed } : AliasState)
     aliases := st.aliases
     for (pid, rs) in st.jmpArgs do
       if let some (some r) := rs[0]? then
-        if rs.all (· == some r) && r != pid then
+        let inJpScope := match st.jpScope[pid]? with
+          | some sc => sc.contains r || sc.any fun v => aliases[v]? == some r
+          | none => true
+        if inJpScope && rs.all (· == some r) && r != pid then
           aliases := aliases.insert pid r
           seed := seed.insert pid r
   return aliases
@@ -2542,7 +2822,8 @@ def litKotlinType (v : LitValue) (ty : Expr) : String :=
   | .uint32 _ =>
     if ty == ImpureType.int32 then "Int"
     else "UInt"
-  | .usize _ | .nat _ => "Int"
+  | .usize _ => "Int"
+  | .nat _ => "java.math.BigInteger"
   | .uint64 _ =>
     if ty == ImpureType.int64 then "Long"
     else "ULong"
@@ -2575,11 +2856,37 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       return "Array<Any?>"
     if baseFn == `ST.Prim.Ref.ptrEq || baseFn == `ST.Prim.Ref.ptrEq._redArg then
       return "Boolean"
+    if baseFn == `mixHash || baseFn == `String.hash || baseFn == `String.Slice.hash then
+      return "ULong"
+    if baseFn == `String.compare then
+      return "Int"
+    if baseFn == `String.Slice.instDecidableLt || baseFn == `ByteSlice.beq ||
+       baseFn == `isExclusiveUnsafe || baseFn == `isExclusiveUnsafe._redArg then
+      return "Boolean"
+    if baseFn == `ptrAddrUnsafe || baseFn == `ptrAddrUnsafe._redArg then
+      return "Int"
+    if baseFn == `System.Platform.getNumBits || baseFn == `IO.monoMsNow ||
+       baseFn == `IO.monoNanosNow || baseFn == `IO.getNumHeartbeats then
+      return "java.math.BigInteger"
+    if baseFn == `IO.initializing || baseFn == `IO.checkCanceled then
+      return "Boolean"
+    if baseFn == `IO.setNumHeartbeats || baseFn == `Runtime.forget || baseFn == `Runtime.forget._redArg ||
+       baseFn == `Runtime.hold || baseFn == `Runtime.hold._redArg then
+      return "Unit"
+    if baseFn == `IO.getTID then
+      return "ULong"
+    if baseFn == `IO.Process.getPID then
+      return "UInt"
+    if baseFn == `IO.getEnv || baseFn == `IO.getStdout || baseFn == `IO.setStdout ||
+       baseFn == `IO.getStderr || baseFn == `IO.setStderr ||
+       baseFn == `IO.getStdin || baseFn == `IO.setStdin then
+      return "Array<Any?>"
     let p := baseFn.getPrefix
     let s := match baseFn with | .str _ str => str | _ => ""
+    if s == "toNat" || s == "toNatClampNeg" || s == "natAbs" then return "java.math.BigInteger"
     if s == "toInt64" then return "Long"
     if s == "toUInt64" then return "ULong"
-    if s == "toInt32" then return "Int"
+    if s == "toInt32" || s == "toInt" || s == "toISize" || s == "toUSize" then return "Int"
     if s == "toUInt32" then return "UInt"
     if s == "toInt16" then return "Short"
     if s == "toUInt16" then return "UShort"
@@ -2588,6 +2895,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     if s == "toFloat" then return "Double"
     if s == "toFloat32" then return "Float"
     if s == "toString" || s == "reprFast" || s == "repr" || baseFn == `mkPanicMessage || baseFn == `mkPanicMessageWithDecl then return "String"
+    if p == ``Nat then
+      if s.startsWith "dec" || s == "beq" || s == "blt" || s == "ble" then return "Boolean"
+      else return "java.math.BigInteger"
     if p == ``Int64 || s == "shl64" || s == "ushr64" || s == "ashr64" then
       if s.startsWith "dec" then return "Boolean" else return "Long"
     if p == ``Int32 || s == "ushr32" then
@@ -2604,6 +2914,8 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       if s.startsWith "dec" then return "Boolean" else return "UShort"
     if p == ``UInt8 then
       if s.startsWith "dec" then return "Boolean" else return "UByte"
+    if p == ``ISize || p == ``USize then
+      if s.startsWith "dec" then return "Boolean" else return "Int"
     if p == `Float then
       if s.startsWith "dec" || s == "beq" || s == "lt" || s == "le" || s.startsWith "is" then return "Boolean" else return "Double"
     if p == `Float32 then
@@ -2611,11 +2923,11 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     if p == `Int then
       if s.startsWith "dec" then return "Boolean" else return "Int"
     if p == ``Char then
-      if s == "toNat" || s == "utf8Size" then return "Int"
+      if s == "toNat" || s == "utf8Size" then return "java.math.BigInteger"
       else if s == "ofNat" || s == "ofNatAux" then return "UInt"
     if p == `String || p == `String.Internal || p == `String.Pos || p == `String.Pos.Raw then
       if s.startsWith "dec" || s == "lt" || s == "isEmpty" || s == "isPrefixOf" || s == "atEnd" || s == "isValid" then return "Boolean"
-      else if s == "length" || s == "utf8ByteSize" || s == "next" || s == "next'" || s == "prev" then return "Int"
+      else if s == "length" || s == "utf8ByteSize" || s == "next" || s == "next'" || s == "prev" then return "java.math.BigInteger"
       else if s == "append" || s == "push" || s == "singleton" || s == "ofList" || s == "mk" || s == "extract" || s == "set" || s == "markLinear" || s == "propagateMark" || s == "fromUTF8!" || s == "fromUTF8" || s == "ofByteArray" then return "String"
       else if s == "decodeChar" || s == "get" || s == "get'" || s == "get!" then return "UInt"
       else if s == "getUTF8Byte" || s == "ugetUTF8Byte" then return "UByte"
@@ -2623,14 +2935,16 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       else if s == "toList" || s == "data" || s == "get?" then return "Array<Any?>"
     if baseFn == `List.asString then return "String"
     if p == ``ByteArray then
-      if s == "size" || s == "usize" then return "Int"
+      if s == "size" then return "java.math.BigInteger"
+      else if s == "usize" then return "Int"
       else if s == "isEmpty" || s == "validateUTF8" || s.startsWith "dec" then return "Boolean"
       else if s == "get!" || s == "get" || s == "uget" then return "UByte"
       else if s == "hash" then return "ULong"
       else if s == "data" then return if baseTy != "Any?" then baseTy else "UByteArray"
       else return "ByteArray"
     if p == ``FloatArray then
-      if s == "size" || s == "usize" then return "Int"
+      if s == "size" then return "java.math.BigInteger"
+      else if s == "usize" then return "Int"
       else if s == "isEmpty" || s.startsWith "dec" then return "Boolean"
       else if s == "get!" || s == "get" || s == "uget" then return "Double"
       else if s == "data" then return if baseTy != "Any?" then baseTy else "DoubleArray"
@@ -2652,12 +2966,17 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       return (kotlinArrayElem? arrTy).getD baseTy
     if baseFn == arrOp "push" || baseFn == arrOp "pop" then
       return ← arrayType (args[1]?.getD .erased)
+    if baseFn == arrOp "propagateMark" || baseFn == `Array.propagateMark._redArg ||
+       baseFn == arrOp "markLinear" || baseFn == `Array.markLinear._redArg then
+      return ← arrayType (args[args.size - 1]?.getD .erased)
     if baseFn == arrOp "append" || baseFn == `Array.append._redArg ||
        baseFn == arrOp "appendCore" || baseFn == `Array.appendCore._redArg then
       return ← arrayType (args[args.size - 2]?.getD .erased)
     if baseFn == arrOp "extract" || baseFn == `Array.extract._redArg then
       return ← arrayType (args[args.size - 3]?.getD .erased)
-    if baseFn == arrOp "size" || baseFn == arrOp "usize" then
+    if baseFn == arrOp "size" then
+      return "java.math.BigInteger"
+    if baseFn == arrOp "usize" then
       return "Int"
     if baseFn == arrOp "toList" then
       return "Array<Any?>"
@@ -2691,7 +3010,7 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
         | none => "Any?"
       if impTy != "Any?" then impTy
       else match monoDecl?.bind (·.params[i]?) with
-        | some mp => toKotlinType mp.type
+        | some mp => if isRichMonoType mp.type then toKotlinType mp.type else "Any?"
         | none => "Any?"
     let mut remParams : Array String := #[]
     for i in [args.size:numParams] do
@@ -2748,8 +3067,21 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       return true
     return false
   | .fap fn args =>
-    if fn == `Void.mk || fn == `Void.mk._redArg then
+    let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+    if baseFn == `Void.mk || baseFn == `Void.mk._redArg then
       setParamVarName x "null"
+      return true
+    if baseFn == arrOp "propagateMark" || baseFn == `Array.propagateMark._redArg ||
+       baseFn == `ByteArray.propagateMark || baseFn == `FloatArray.propagateMark ||
+       baseFn == `String.propagateMark ||
+       baseFn == `dbgTraceIfShared || baseFn == `dbgTraceIfShared._redArg then
+      if let some lastArg := args.back? then
+        setParamVarName x (← toKotlinArg lastArg)
+        return true
+    if (baseFn == `Runtime.markMultiThreaded || baseFn == `Runtime.markMultiThreaded._redArg ||
+        baseFn == `Runtime.markPersistent || baseFn == `Runtime.markPersistent._redArg) && !args.isEmpty then
+      let idx := if args.size >= 2 then args.size - 2 else 0
+      setParamVarName x (← toKotlinArg args[idx]!)
       return true
     if args.isEmpty then
       if let some d := (← read).declMap[fn]? then
@@ -2779,29 +3111,8 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       let a0 ← toKotlinArg args[0]!
       if (← get).varTypes[a0]? == some "Int" then
         match fn with
-        | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat
-        | ``Int32.ofNat | ``Int32.ofInt | ``ISize.ofNat | ``ISize.ofInt
-        | `Int.ofNat | `Int.toNat | `Int8.toInt | `Int16.toInt | `Int32.toInt
-        | `Int.toInt32 | `Int.toInt64
-        | ``Int32.toNatClampNeg | ``Int32.toISize | ``ISize.toInt32 =>
-          setParamVarName x a0
-          return true
-        | _ => pure ()
-      if (← get).varTypes[a0]? == some "UInt" then
-        match fn with
-        | ``UInt32.ofNat =>
-          setParamVarName x a0
-          return true
-        | _ => pure ()
-      if (← get).varTypes[a0]? == some "Long" then
-        match fn with
-        | ``Int64.ofNat | ``Int64.ofInt =>
-          setParamVarName x a0
-          return true
-        | _ => pure ()
-      if (← get).varTypes[a0]? == some "ULong" then
-        match fn with
-        | ``UInt64.ofNat =>
+        | ``Int32.ofInt | ``ISize.ofInt | `Int32.toInt
+        | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32 =>
           setParamVarName x a0
           return true
         | _ => pure ()
@@ -2922,12 +3233,12 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
   if p == ``Int8 || p == ``Int16 || p == ``Int32 || p == ``Int64 || p == ``ISize ||
      p == ``UInt8 || p == ``UInt16 || p == ``UInt32 || p == ``UInt64 || p == ``USize then
     if numArgs == 1 then
-      s.startsWith "to" || s.startsWith "of" || s == "neg" || s == "complement"
+      s.startsWith "to" || s.startsWith "of" || s == "neg" || s == "complement" || s == "log2" || s == "abs"
     else if numArgs == 2 then
       s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" ||
       s == "land" || s == "lor" || s == "xor" || s == "lxor" ||
       s == "shiftLeft" || s == "shiftRight" ||
-      s == "decEq" || s == "decLt" || s == "decLe"
+      s == "decEq" || s == "decLt" || s == "decLe" || s == "ofNatLT"
     else false
   else if p == `Float || p == `Float32 then
     if numArgs == 1 then
@@ -2939,24 +3250,24 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
     else if numArgs == 2 then
       s == "add" || s == "sub" || s == "mul" || s == "div" ||
       s == "beq" || s == "decLt" || s == "lt" || s == "decLe" || s == "le" ||
-      s == "pow" || s == "atan2" || s == "scaleB" || s == "minimum" || s == "maximum"
+      s == "pow" || s == "atan2" || s == "scaleB" || s == "minimum" || s == "maximum" || s == "minimumNumber" || s == "maximumNumber"
     else if numArgs == 3 then
-      s == "ofScientific"
+      s == "ofScientific" || s == "fma"
     else false
-  else if p == `String || p == `String.Internal || p == `String.Pos || p == `String.Pos.Raw then
+  else if p == `String || p == `String.Internal || p == `String.Pos || p == `String.Pos.Raw || p == `String.Slice then
     if numArgs == 1 then
-      s == "length" || s == "utf8ByteSize" || s == "isEmpty" || s == "singleton" || s == "ofList" || s == "mk" || s == "toList" || s == "data" || s == "markLinear" || s == "toUTF8" || s == "toByteArray" || s == "fromUTF8!"
+      s == "length" || s == "utf8ByteSize" || s == "isEmpty" || s == "hash" || s == "singleton" || s == "ofList" || s == "mk" || s == "toList" || s == "data" || s == "markLinear" || s == "toUTF8" || s == "toByteArray" || s == "fromUTF8!"
     else if numArgs == 2 then
-      s == "append" || s == "push" || s == "decEq" || s == "decLt" || s == "decidableLT" || s == "lt" || s == "isPrefixOf" ||
+      s == "append" || s == "push" || s == "decEq" || s == "decLt" || s == "decidableLT" || s == "lt" || s == "compare" || s == "instDecidableLt" || s == "isPrefixOf" ||
       s == "propagateMark" || s == "getUTF8Byte" || s == "ugetUTF8Byte" || s == "isValid" || s == "atEnd" ||
       s == "decodeChar" || s == "get" || s == "get'" || s == "get!" || s == "get?" || s == "next" || s == "next'" || s == "prev" ||
       s == "fromUTF8" || s == "ofByteArray"
     else if numArgs == 3 then
       s == "extract" || s == "set"
     else false
-  else if p == ``ByteArray then
+  else if p == ``ByteArray || p == `ByteSlice then
     if numArgs == 1 then s == "size" || s == "usize" || s == "isEmpty" || s == "hash" || s == "validateUTF8"
-    else if numArgs == 2 then s == "get!"
+    else if numArgs == 2 then s == "get!" || s == "beq" || s == "decEq"
     else if numArgs == 3 then s == "get" || s == "uget"
     else false
   else if p == ``FloatArray then
@@ -2971,16 +3282,24 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
       s.startsWith "to" || s.startsWith "of" || s == "shiftLeft" || s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" ||
       s == "neg" || s == "negSucc" || s == "negOfNat" || s == "natAbs" || s == "decNonneg" ||
       s == "pred" || s == "log2" || s == "reprFast" || s == "repr"
-    else if numArgs == 2 then
+    else if numArgs >= 2 then
       s == "decEq" || s == "decLt" || s == "decLe" || s == "beq" || s == "blt" || s == "ble" ||
       s == "land" || s == "lor" || s == "xor" || s == "shiftLeft" || s == "shiftRight" ||
-      s == "add" || s == "sub" || s == "mul" || s == "div" || s == "mod" || s == "pow" || s == "gcd" ||
+      s == "add" || s == "sub" || s == "mul" || s == "div" || s == "divExact" || s == "mod" || s == "modCore" || s == "pow" || s == "gcd" ||
       s == "tdiv" || s == "tmod" || s == "ediv" || s == "emod"
     else false
   else if p == ``Bool then
     if numArgs == 1 then s.startsWith "to"
     else if numArgs == 2 then s == "decEq"
     else false
+  else if fn == `mixHash && numArgs == 2 then true
+  else if fn == `System.Platform.getNumBits then true
+  else if fn == `isExclusiveUnsafe || fn == `isExclusiveUnsafe._redArg ||
+          fn == `ptrAddrUnsafe || fn == `ptrAddrUnsafe._redArg then true
+  else if fn == `UInt8.ofNatLT._redArg || fn == `UInt16.ofNatLT._redArg ||
+          fn == `UInt32.ofNatLT._redArg || fn == `UInt64.ofNatLT._redArg ||
+          fn == `USize.ofNatLT._redArg || fn == `Int.divExact._redArg ||
+          fn == `Nat.divExact._redArg then true
   else
     if numArgs == 1 && fn.isStr && (s == "ofNat" || s == "toUInt64" || s == "toUInt32") then true
     else false
@@ -3032,7 +3351,8 @@ def mayAliasArg (decl : LetDecl .impure) : EmitM Bool := do
       if extStr == "kotlin_op:id" || extStr == "kotlin_op:cast" then
         return true
     match fn with
-    | ``UInt32.toNat | ``USize.toNat | ``UInt32.ofNat | ``USize.ofNat => return true
+    | ``Int32.ofInt | ``ISize.ofInt | `Int32.toInt
+    | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32 => return true
     | _ => return false
   | _ => return false
 
@@ -3108,7 +3428,7 @@ def recordIntSource (n : String) (rhs : String) (decl : LetDecl .impure) : EmitM
     modify fun st => { st with intSources := st.intSources.insert n intExpr }
   else if let .fap fn args := decl.value then
     if args.size == 1 && (fn == ``Int32.toInt64 || fn == ``ISize.toInt64 || fn == ``UInt32.toUInt64 ||
-                          fn == ``Int64.ofInt || fn == ``Int64.ofNat) then
+                          fn == ``Int64.ofInt) then
       let a0 ← toKotlinArg args[0]!
       if (← get).varTypes[a0]? == some "Int" then
         modify fun st => { st with intSources := st.intSources.insert n a0 }
@@ -3223,7 +3543,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           modify fun st => { st with tuples := st.tuples.insert n strs }
         else
           let (pairExpr, pairTy) ← formatKotlinPair strs none
-          if countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
+          if !(← get).aliases.values.contains x && countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
             setParamVarName x pairExpr
             recordVarType pairExpr pairTy
             modify fun st => {
@@ -3270,7 +3590,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
           | _ => pure ()
         let rhs := s!"{cls}({String.intercalate ", " ctorArgs.toList})"
-        if countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+        if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
           setParamVarName x rhs
           recordVarType rhs cls
         else
@@ -3282,7 +3602,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
       else
         let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
         let rhs ← formatAdtCtor info objs usizes scalars
-        if countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+        if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
           setParamVarName x rhs
           recordVarType rhs "Array<Any?>"
           modify fun st => { st with adtVars := st.adtVars.insert rhs }
@@ -3637,7 +3957,7 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
   modify fun st => { st with loopCounter := n }
   let params := callee.params
   let selfArgs := collectSelfCallArgs callee.name body #[]
-  let aliases ← collectAliases body
+  let aliases ← collectAliases params body
   modify fun st => { st with aliases := aliases.fold (init := st.aliases) fun m k v => m.insert k v }
   let root (f : FVarId) : FVarId := aliases.getD f f
   let variant := params.mapIdx fun i p => selfArgs.any fun as =>
@@ -3785,7 +4105,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
   markUsed code
-  let fnAliases ← collectAliases code
+  let fnAliases ← collectAliases decl.params code
   modify fun st => { st with aliases := fnAliases }
   let env ← getEnv
   let opts ← getOptions
@@ -3963,13 +4283,15 @@ def isBuiltinArrayFn (fn : Name) : Bool :=
       s == "push" || s == "pop" ||
       s == "append" || s == "appendCore" ||
       s == "extract" ||
+      s == "propagateMark" || s == "markLinear" ||
       s == "set!" || s == "uset" || s == "setIfInBounds" || s == "set" || s == "fset" ||
       s == "swap" || s == "uswap" || s == "swapIfInBounds"
     | _ => false) ||
   fn == ``List.toArray || fn == `List.toArrayImpl || fn == `List.toArrayImpl._redArg ||
   fn == `ByteArray.mk || fn == `ByteArray.data || fn == `ByteArray.set! || fn == `ByteArray.set || fn == `ByteArray.uset ||
   fn == `FloatArray.mk || fn == `FloatArray.data || fn == `FloatArray.set! || fn == `FloatArray.set || fn == `FloatArray.uset ||
-  fn == `Array.append._redArg || fn == `Array.appendCore._redArg || fn == `Array.extract._redArg
+  fn == `Array.append._redArg || fn == `Array.appendCore._redArg || fn == `Array.extract._redArg ||
+  fn == `Array.propagateMark._redArg || fn == `Array.markLinear._redArg
 
 def isBuiltinFap (fn : Name) (arity : Nat) : CoreM Bool := do
   let env ← getEnv

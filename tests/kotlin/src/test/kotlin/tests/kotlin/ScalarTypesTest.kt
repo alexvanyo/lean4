@@ -51,13 +51,25 @@ class ScalarTypesTest {
 
     @Test
     fun testNatOps() {
-        val res = f_testNatOps(12, 18)
-        assertEquals(230, (res as Number).toInt())
+        val res = f_testNatOps(12.toBigInteger(), 18.toBigInteger())
+        assertEquals(230.toBigInteger(), res)
+    }
+
+    @Test
+    fun testLargeNatAndBitVec() {
+        val n = 2.toBigInteger()
+        val expected = n.pow(100) + java.math.BigInteger("1000000000000000000000000000000") - java.math.BigInteger.ONE
+        assertEquals(expected, f_testLargeNat(n))
+
+        val a = java.math.BigInteger("18446744073709551615") // 2^64 - 1
+        val b = java.math.BigInteger.TWO
+        // (a + b) mod 2^64 = 1; (a <<< 3) mod 2^64 = 2^64 - 8 = 18446744073709551608; 1 xor ... = 18446744073709551609
+        assertEquals(java.math.BigInteger("18446744073709551609"), f_testBitVec64(a, b))
     }
 
     @Test
     fun testPanicOpt() {
-        assertEquals(42, (f_testPanicOpt(arrayOf<Any?>(1, 42)) as Number).toInt())
+        assertEquals(42.toBigInteger(), f_testPanicOpt(arrayOf<Any?>(1, 42.toBigInteger())))
         assertFailsWith<IllegalStateException> {
             f_testPanicOpt(arrayOf<Any?>(0))
         }

@@ -22,12 +22,12 @@
     return f_testStringConcat((a as String), (b as String))
 }
 
-@PublishedApi internal fun f_testStringMetrics(s: String): Any? {
-    val v_x_13_1 = (s).encodeToByteArray().size
-    if (!(v_x_13_1 == 0))     {
-        return ((s).length + v_x_13_1)
+@PublishedApi internal fun f_testStringMetrics(s: String): java.math.BigInteger {
+    val v_x_13_1 = java.math.BigInteger.valueOf((s).encodeToByteArray().size.toLong())
+    if (!(v_x_13_1 == java.math.BigInteger.ZERO))     {
+        return (java.math.BigInteger.valueOf((s).length.toLong()).add(v_x_13_1))
     } else     {
-        return 0
+        return java.math.BigInteger.ZERO
     }
 }
 
@@ -56,7 +56,7 @@
     return ", int="
 }
 
-@PublishedApi internal fun f_testStringInterp(name: String, n: Any?, i: Any?): String {
+@PublishedApi internal fun f_testStringInterp(name: String, n: java.math.BigInteger, i: Any?): String {
     val v_x_33_1 = ": nat="
     val v_x_36_2 = ((name + v_x_33_1) + (n).toString())
     val v_x_37_3 = ", int="
@@ -64,7 +64,7 @@
 }
 
 @PublishedApi internal fun f_testStringInterp___boxed(name: Any?, n: Any?, i: Any?): Any? {
-    return f_testStringInterp((name as String), n, i)
+    return f_testStringInterp((name as String), (n as java.math.BigInteger), i)
 }
 
 @PublishedApi internal fun f_List_mapTR_loop___at___00testStringChars_spec__0(p_0: Any?, p_1: Any?): Any? {
@@ -116,15 +116,15 @@
     return ""
 }
 
-@PublishedApi internal fun f_testCharOps(n: Any?): Any? {
-    val c_86_1 = (run { val cp = ((n as Int)).toUInt(); if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
-    val v_x_89_2 = (((c_86_1).toInt()).toInt() + (run { val cp = c_86_1; if (cp <= 0x7Fu) 1 else if (cp <= 0x7FFu) 2 else if (cp <= 0xFFFFu) 3 else 4 }))
+@PublishedApi internal fun f_testCharOps(n: java.math.BigInteger): java.math.BigInteger {
+    val c_86_1 = (run { val b = n; val cp = if (b.bitLength() <= 21) b.toInt().toUInt() else 0x110000u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
+    val v_x_89_2 = (java.math.BigInteger.valueOf((c_86_1).toLong()).add(java.math.BigInteger.valueOf((run { val cp = c_86_1; if (cp <= 0x7Fu) 1L else if (cp <= 0x7FFu) 2L else if (cp <= 0xFFFFu) 3L else 4L }))))
     val v_x_90_3 = ""
-    return ((v_x_89_2 as Int) + ((v_x_90_3 + Character.toString((c_86_1).toInt()))).encodeToByteArray().size)
+    return (v_x_89_2.add(java.math.BigInteger.valueOf(((v_x_90_3 + Character.toString((c_86_1).toInt()))).encodeToByteArray().size.toLong())))
 }
 
 @PublishedApi internal fun f_testCharOps___boxed(n: Any?): Any? {
-    return f_testCharOps(n)
+    return f_testCharOps((n as java.math.BigInteger))
 }
 
 private fun f_List_reverse___redArg(p_0: Any?): Any? {

@@ -6,8 +6,12 @@ import kotlin.test.assertEquals
 class ScalarConversionsTest {
     @Test
     fun testConversions() {
-        val res = f_testConversions(10, -5, 100uL, 200L)
-        assertEquals(325, (res as Number).toInt())
+        val res = f_testConversions(10.toBigInteger(), -5, 100uL, 200L)
+        assertEquals(330.toBigInteger(), res)
+
+        val maxU64 = ULong.MAX_VALUE
+        val resLarge = f_testConversions(0.toBigInteger(), -5, maxU64, 0L)
+        assertEquals(java.math.BigInteger("18446744073709551615"), resLarge)
     }
 
     @Test
