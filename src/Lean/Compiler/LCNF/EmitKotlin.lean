@@ -230,6 +230,8 @@ partial def toKotlinType (ty : Expr) : String :=
   | .const ``Bool _ | .const ``Decidable _ => "Boolean"
   | .const ``Unit _ | .const ``PUnit _ => "Unit"
   | .const ``String _ => "String"
+  | .const ``ByteArray _ => "ByteArray"
+  | .const ``FloatArray _ => "DoubleArray"
   | .app (.app (.const ``Prod _) a) b =>
     s!"Pair<{toKotlinType a}, {toKotlinType b}>"
   | .app (.const `jvmType _) (.lit (.strVal desc)) =>
@@ -249,11 +251,12 @@ partial def toKotlinType (ty : Expr) : String :=
   | _ => "Any?"
 
 def isRichMonoType (e : Expr) : Bool :=
-  e.isForall || e.isConstOf ``String || e.isAppOfArity ``Prod 2
+  e.isForall || e.isConstOf ``String || e.isConstOf ``ByteArray || e.isConstOf ``FloatArray || e.isAppOfArity ``Prod 2
 
 def isAdtMonoType (e : Expr) : Bool :=
   let fn := e.getAppFn
-  fn.isConst && !fn.isConstOf ``lcAny && !fn.isConstOf ``lcErased && !fn.isConstOf ``Prod
+  fn.isConst && !fn.isConstOf ``lcAny && !fn.isConstOf ``lcErased && !fn.isConstOf ``Prod &&
+    !fn.isConstOf ``Array && !fn.isConstOf ``ByteArray && !fn.isConstOf ``FloatArray && !fn.isConstOf ``String
 
 /-- Parse `Pair<A, B>` into `(A, B)`. -/
 partial def parseKotlinPairType? (s : String) : Option (String × String) :=
@@ -315,6 +318,8 @@ def defaultKotlinVal (ty : String) : String :=
   | "Double" => "0.0"
   | "Float" => "0.0f"
   | "String" => "\"\""
+  | "ByteArray" => "ByteArray(0)"
+  | "DoubleArray" => "DoubleArray(0)"
   | "Unit" => "Unit"
   | _ => if ty.endsWith "?" then "null" else s!"(null as {ty})"
 
@@ -345,7 +350,7 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
   let actualTy? := match knownTy? with
     | some t => if t == "Any?" then vt[s]? else some t
     | none => vt[s]?
-  if actualTy? == some targetTy || (actualTy?.map (s!"{·}?") == some targetTy) then
+  if actualTy? == some targetTy || actualTy? == some "Nothing" || (actualTy?.map (s!"{·}?") == some targetTy) then
     return s
   if let some actualTy := actualTy? then
     if isKotlinIntType actualTy then
@@ -463,9 +468,9 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
      fnStr.startsWith "panic._at_." || fnStr.startsWith "panicWithPos._at_." ||
      fnStr.startsWith "panicWithPosWithDecl._at_." then
     if args.isEmpty then
-      return some "(error(\"panic\") as Any?)"
+      return some "error(\"panic\")"
     let msg ← toKotlinArg args.back!
-    return some s!"(error({msg}) as Any?)"
+    return some s!"error({msg})"
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
@@ -651,7 +656,24 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"buildString \{ var cur: Any? = {a0}; while (((cur as Array<*>)[0] as Int) == 1) \{ appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }"
     | `String.toList | `String.data =>
       return some s!"({← castIfNeeded a0 "String"}).codePoints().toArray().foldRight(arrayOf<Any?>(0) as Any?) \{ cp, acc -> arrayOf<Any?>(1, cp.toUInt(), acc) }"
+    | `String.toUTF8 | `String.toByteArray =>
+      return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray()"
+    | `String.fromUTF8! =>
+      return some s!"({← castIfNeeded a0 "ByteArray"}).decodeToString()"
     | `String.markLinear => return some a0
+    -- Unary ByteArray
+    | `ByteArray.emptyWithCapacity => return some "ByteArray(0)"
+    | `ByteArray.size | `ByteArray.usize => return some s!"({← castIfNeeded a0 "ByteArray"}).size"
+    | `ByteArray.isEmpty => return some s!"({← castIfNeeded a0 "ByteArray"}).isEmpty()"
+    | `ByteArray.hash => return some s!"({← castIfNeeded a0 "ByteArray"}).contentHashCode().toULong()"
+    | `ByteArray.markLinear => return some s!"({← castIfNeeded a0 "ByteArray"}).copyOf()"
+    | `ByteArray.validateUTF8 =>
+      return some s!"(try \{ java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap({← castIfNeeded a0 "ByteArray"})); true } catch (_: Throwable) \{ false })"
+    -- Unary FloatArray
+    | `FloatArray.emptyWithCapacity => return some "DoubleArray(0)"
+    | `FloatArray.size | `FloatArray.usize => return some s!"({← castIfNeeded a0 "DoubleArray"}).size"
+    | `FloatArray.isEmpty => return some s!"({← castIfNeeded a0 "DoubleArray"}).isEmpty()"
+    | `FloatArray.markLinear => return some s!"({← castIfNeeded a0 "DoubleArray"}).copyOf()"
     | _ =>
       if fn.isStr && (fn.getString! == "ofNat" || fn.getString! == "toUInt64") then
         if a0Ty? == some "Long" then return some a0
@@ -662,6 +684,11 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
         if a0Ty? == some "Long" then return some s!"{a0}.toInt()"
         return some s!"({a0} as Number).toInt()"
       return none
+  if args.isEmpty then
+    match fn with
+    | `ByteArray.empty => return some "ByteArray(0)"
+    | `FloatArray.empty => return some "DoubleArray(0)"
+    | _ => return none
   if args.size == 2 then
     let a0 ← toKotlinArg args[0]!
     let a1 ← toKotlinArg args[1]!
@@ -840,6 +867,16 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `Float32.minimum => return some s!"kotlin.math.min({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
     | `Float32.maximum => return some s!"kotlin.math.max({← castIfNeeded a0 "Float"}, {← castIfNeeded a1 "Float"})"
 
+    -- Binary ByteArray & FloatArray
+    | `ByteArray.push => return some s!"({← castIfNeeded a0 "ByteArray"} + ({← castIfNeeded a1 "UByte"}).toByte())"
+    | `ByteArray.get! => return some s!"(({← castIfNeeded a0 "ByteArray"})[{← castIfNeeded a1 "Int"}]).toUByte()"
+    | `ByteArray.beq | `ByteArray.decEq => return some s!"({← castIfNeeded a0 "ByteArray"}).contentEquals({← castIfNeeded a1 "ByteArray"})"
+    | `ByteArray.propagateMark => return some a1
+    | `ByteArray.fastAppend | `ByteArray.append => return some s!"({← castIfNeeded a0 "ByteArray"} + {← castIfNeeded a1 "ByteArray"})"
+    | `FloatArray.push => return some s!"({← castIfNeeded a0 "DoubleArray"} + {← castIfNeeded a1 "Double"})"
+    | `FloatArray.get! => return some s!"({← castIfNeeded a0 "DoubleArray"})[{← castIfNeeded a1 "Int"}]"
+    | `FloatArray.propagateMark => return some a1
+
     -- Binary String
     | `String.append | `String.Internal.append => return some s!"({← castIfNeeded a0 "String"} + {← castIfNeeded a1 "String"})"
     | `String.push => return some s!"({← castIfNeeded a0 "String"} + Character.toString(({a1}).toInt()))"
@@ -847,6 +884,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `String.decLt | `String.decidableLT | `String.lt => return some s!"({← castIfNeeded a0 "String"} < {← castIfNeeded a1 "String"})"
     | `String.Internal.isPrefixOf => return some s!"({← castIfNeeded a1 "String"}).startsWith({← castIfNeeded a0 "String"})"
     | `String.propagateMark => return some a1
+    | `String.ofByteArray | `String.fromUTF8 =>
+      return some s!"({← castIfNeeded a0 "ByteArray"}).decodeToString()"
     | `String.getUTF8Byte | `String.Internal.getUTF8Byte | `String.Internal.ugetUTF8Byte =>
       return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray()[{← castIfNeeded a1 "Int"}].toUByte()"
     | `String.Pos.Raw.isValid =>
@@ -931,6 +970,12 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
         else return some s!"{a0}e{a2}f"
       else
         return some s!"(({← castIfNeeded a0 "Int"}).toDouble() * Math.pow(10.0, if ({a1}) -({← castIfNeeded a2 "Int"}).toDouble() else ({← castIfNeeded a2 "Int"}).toDouble())).toFloat()"
+    | `ByteArray.get | `ByteArray.uget =>
+      return some s!"(({← castIfNeeded a0 "ByteArray"})[{← castIfNeeded a1 "Int"}]).toUByte()"
+    | `ByteArray.extract =>
+      return some s!"(run \{ val bs = {← castIfNeeded a0 "ByteArray"}; val start = ({← castIfNeeded a1 "Int"}).coerceIn(0, bs.size); val stop = ({← castIfNeeded a2 "Int"}).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })"
+    | `FloatArray.get | `FloatArray.uget =>
+      return some s!"({← castIfNeeded a0 "DoubleArray"})[{← castIfNeeded a1 "Int"}]"
     | `String.extract | `String.Pos.extract | `String.Pos.Raw.extract | `String.Internal.extract =>
       return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val start = ({← castIfNeeded a1 "Int"}).coerceIn(0, bs.size); val stop = ({← castIfNeeded a2 "Int"}).coerceIn(start, bs.size); bs.decodeToString(start, stop) })"
     | `String.Pos.set | `String.Pos.Raw.set | `String.set =>
@@ -953,6 +998,14 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"(\"PANIC at \" + {← castIfNeeded a1 "String"} + \" \" + {← castIfNeeded a0 "String"} + \":\" + ({a2}).toString() + \":\" + ({a3}).toString() + \": \" + {← castIfNeeded a4 "String"})"
     if fn == `String.Slice.Pattern.Internal.memcmpStr then
       return some s!"java.util.Arrays.equals(({← castIfNeeded a0 "String"}).encodeToByteArray(), {← castIfNeeded a2 "Int"}, {← castIfNeeded a2 "Int"} + {← castIfNeeded a4 "Int"}, ({← castIfNeeded a1 "String"}).encodeToByteArray(), {← castIfNeeded a3 "Int"}, {← castIfNeeded a3 "Int"} + {← castIfNeeded a4 "Int"})"
+  if args.size == 6 then
+    if fn == `ByteArray.copySlice then
+      let a0 ← toKotlinArg args[0]!
+      let a1 ← toKotlinArg args[1]!
+      let a2 ← toKotlinArg args[2]!
+      let a3 ← toKotlinArg args[3]!
+      let a4 ← toKotlinArg args[4]!
+      return some s!"(run \{ val s = {← castIfNeeded a0 "ByteArray"}; val d = {← castIfNeeded a2 "ByteArray"}; val sOff = {← castIfNeeded a1 "Int"}; if (sOff < 0 || sOff > s.size) d.copyOf() else \{ val l = minOf(maxOf(0, {← castIfNeeded a4 "Int"}), s.size - sOff); val dOff = ({← castIfNeeded a3 "Int"}).coerceIn(0, d.size); val r = d.copyOf(maxOf(d.size, dOff + l)); s.copyInto(r, dOff, sOff, sOff + l); r } })"
   return none
 
 /--
@@ -984,13 +1037,15 @@ def kotlinArrayElem? (arrTy : String) : Option String :=
 def kotlinTypeOf? (a : Arg .impure) : EmitM (Option String) := do
   let .fvar f := a | return none
   match getJvmTypeDesc? (← getType f) with
-  | some d => return if d.startsWith "kotlin:" then some (d.drop 7).toString else none
-  | none => return none
+  | some d => if d.startsWith "kotlin:" then return some (d.drop 7).toString
+  | none => pure ()
+  let name ← getVarName f
+  if let some t := (← get).varTypes[name]? then
+    if t != "Any?" then return some t
+  return none
 
 def arrayType (a : Arg .impure) : EmitM String := do
-  let some t ← kotlinTypeOf? a
-    | throwError "Kotlin backend: in `{(← read).currFn}`: `Array` operations require `set_option compiler.kotlin.typedArrays true`"
-  return t
+  return (← kotlinTypeOf? a).getD "Array<Any?>"
 
 def isZeroElem (elemTy vc : String) : Bool :=
   match elemTy with
@@ -1024,35 +1079,83 @@ def kotlinArrayAlloc (arrTy n v : String) : EmitM String := do
 
 def arrOp (s : String) : Name := .str `Array s
 
-/-- Reads of `Array`s (with `compiler.kotlin.typedArrays`). -/
+/-- Reads and allocations of `Array`, `ByteArray`, and `FloatArray`. -/
 def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : EmitM (Option String) := do
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   let arg (i : Nat) : EmitM String := toKotlinArg (args[i]?.getD .erased)
   if fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" then
-    discard <| arrayType (args[2]?.getD .erased)
-    return some s!"{← arg 2}[{← castIfNeeded (← arg 3) "Int"}]"
+    let arrTy ← arrayType (args[2]?.getD .erased)
+    return some s!"{← castIfNeeded (← arg 2) arrTy}[{← castIfNeeded (← arg 3) "Int"}]"
   if fn == arrOp "getInternal" || fn == arrOp "getInternalBorrowed" then
-    discard <| arrayType (args[1]?.getD .erased)
-    return some s!"{← arg 1}[{← castIfNeeded (← arg 2) "Int"}]"
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← castIfNeeded (← arg 2) "Int"}]"
   if fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
-    discard <| arrayType (args[1]?.getD .erased)
-    return some s!"{← arg 1}[{← castIfNeeded (← arg 2) "Int"}]"
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← castIfNeeded (← arg 2) "Int"}]"
   if fn == arrOp "size" || fn == arrOp "usize" then
-    discard <| arrayType (args[1]?.getD .erased)
-    return some s!"{← arg 1}.size"
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    return some s!"{← castIfNeeded (← arg 1) arrTy}.size"
   if fn == arrOp "replicate" || fn == arrOp "mkArray" then
-    let some d := getJvmTypeDesc? resTy
-      | throwError "Kotlin backend: in `{(← read).currFn}`: `Array` operations require `set_option compiler.kotlin.typedArrays true` (result type `{resTy}`)"
-    return some (← kotlinArrayAlloc (d.drop 7).toString (← castIfNeeded (← arg 1) "Int") (← arg 2))
+    let arrTy := match getJvmTypeDesc? resTy with
+      | some d => (d.drop 7).toString
+      | none => "Array<Any?>"
+    return some (← kotlinArrayAlloc arrTy (← castIfNeeded (← arg 1) "Int") (← arg 2))
   if fn == arrOp "mkEmpty" || fn == arrOp "emptyWithCapacity" then
-    let some d := getJvmTypeDesc? resTy
-      | throwError "Kotlin backend: in `{(← read).currFn}`: `Array` operations require `set_option compiler.kotlin.typedArrays true`"
-    let t := (d.drop 7).toString
+    let t := match getJvmTypeDesc? resTy with
+      | some d => (d.drop 7).toString
+      | none => "Array<Any?>"
     return some (if (kotlinArrayElem? t).isSome then s!"{t}(0)" else "arrayOfNulls<Any?>(0)")
+  if fn == arrOp "toList" then
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    let aStr ← castIfNeeded (← arg 1) arrTy
+    return some s!"({aStr}).foldRight(arrayOf<Any?>(0) as Any?) \{ elem, acc -> arrayOf<Any?>(1, elem, acc) }"
+  if fn == arrOp "mk" || fn == ``List.toArray || fn == `List.toArrayImpl || fn == `List.toArrayImpl._redArg then
+    let arrTy := match getJvmTypeDesc? resTy with
+      | some d => (d.drop 7).toString
+      | none => "Array<Any?>"
+    let listStr ← arg (args.size - 1)
+    match kotlinArrayElem? arrTy with
+    | some e =>
+      return some s!"(run \{ val tmp = ArrayList<{e}>(); var cur: Any? = {listStr}; while (((cur as Array<*>)[0] as Int) == 1) \{ tmp.add((cur as Array<*>)[1] as {e}); cur = (cur as Array<*>)[2] }; {arrTy}(tmp.size) \{ tmp[it] } })"
+    | none =>
+      return some s!"(run \{ val tmp = ArrayList<Any?>(); var cur: Any? = {listStr}; while (((cur as Array<*>)[0] as Int) == 1) \{ tmp.add((cur as Array<*>)[1]); cur = (cur as Array<*>)[2] }; tmp.toTypedArray() })"
+  if fn == `ByteArray.mk then
+    let arrTy ← arrayType (args[0]?.getD .erased)
+    let a0 ← arg 0
+    if arrTy == "UByteArray" then
+      let aStr ← castIfNeeded a0 "UByteArray"
+      return some s!"ByteArray({aStr}.size) \{ ({aStr}[it]).toByte() }"
+    else
+      let aStr ← castIfNeeded a0 "Array<Any?>"
+      return some s!"ByteArray({aStr}.size) \{ ({aStr}[it] as UByte).toByte() }"
+  if fn == `ByteArray.data then
+    let resArrTy := match getJvmTypeDesc? resTy with | some d => (d.drop 7).toString | none => "UByteArray"
+    let aStr ← castIfNeeded (← arg 0) "ByteArray"
+    if resArrTy == "UByteArray" then
+      return some s!"UByteArray({aStr}.size) \{ ({aStr}[it]).toUByte() }"
+    else
+      return some s!"Array<Any?>({aStr}.size) \{ ({aStr}[it]).toUByte() }"
+  if fn == `FloatArray.mk then
+    let arrTy ← arrayType (args[0]?.getD .erased)
+    let a0 ← arg 0
+    if arrTy == "DoubleArray" then
+      let aStr ← castIfNeeded a0 "DoubleArray"
+      return some s!"({aStr}).copyOf()"
+    else
+      let aStr ← castIfNeeded a0 "Array<Any?>"
+      return some s!"DoubleArray({aStr}.size) \{ ({aStr}[it] as Double) }"
+  if fn == `FloatArray.data then
+    let resArrTy := match getJvmTypeDesc? resTy with | some d => (d.drop 7).toString | none => "DoubleArray"
+    let aStr ← castIfNeeded (← arg 0) "DoubleArray"
+    if resArrTy == "DoubleArray" then
+      return some s!"({aStr}).copyOf()"
+    else
+      return some s!"Array<Any?>({aStr}.size) \{ {aStr}[it] }"
   if fn == arrOp "push" then
     let arrTy ← match getJvmTypeDesc? resTy with
       | some d => pure (d.drop 7).toString
       | none => arrayType (args[1]?.getD .erased)
-    let aStr ← arg 1
+    let aStr ← castIfNeeded (← arg 1) arrTy
     let vStr ← arg 2
     match kotlinArrayElem? arrTy with
     | some e =>
@@ -1061,42 +1164,45 @@ def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Emi
     | none =>
       return some s!"({aStr}.copyOf({aStr}.size + 1).also \{ it[{aStr}.size] = {vStr} })"
   if fn == arrOp "pop" then
-    discard <| arrayType (args[1]?.getD .erased)
-    let aStr ← arg 1
+    let arrTy ← arrayType (args[1]?.getD .erased)
+    let aStr ← castIfNeeded (← arg 1) arrTy
     return some s!"(if ({aStr}.isNotEmpty()) {aStr}.copyOf({aStr}.size - 1) else {aStr})"
   if fn == arrOp "append" || fn == `Array.append._redArg ||
      fn == arrOp "appendCore" || fn == `Array.appendCore._redArg then
     let aIdx := args.size - 2
     let bIdx := args.size - 1
-    discard <| arrayType (args[aIdx]?.getD .erased)
-    let aStr ← arg aIdx
-    let bStr ← arg bIdx
+    let arrTy ← arrayType (args[aIdx]?.getD .erased)
+    let aStr ← castIfNeeded (← arg aIdx) arrTy
+    let bStr ← castIfNeeded (← arg bIdx) arrTy
     return some s!"({aStr} + {bStr})"
   if fn == arrOp "extract" || fn == `Array.extract._redArg then
     let aIdx := args.size - 3
     let startIdx := args.size - 2
     let stopIdx := args.size - 1
-    discard <| arrayType (args[aIdx]?.getD .erased)
-    let aStr ← arg aIdx
+    let arrTy ← arrayType (args[aIdx]?.getD .erased)
+    let aStr ← castIfNeeded (← arg aIdx) arrTy
     let startStr ← castIfNeeded (← arg startIdx) "Int"
     let stopStr ← castIfNeeded (← arg stopIdx) "Int"
     return some s!"{aStr}.copyOfRange(({startStr}).coerceIn(0, {aStr}.size), ({stopStr}).coerceIn(({startStr}).coerceIn(0, {aStr}.size), {aStr}.size))"
-  if fn.getPrefix == `Array && (fn matches .str _ _) then
-    let supported := ["set!", "uset", "setIfInBounds", "swap", "uswap", "swapIfInBounds"]
-    unless supported.contains fn.getString! do
-      throwError "Kotlin backend: `{fn}` is not supported (Kotlin arrays have a fixed size)"
   return none
 
-/-- In-place `Array` updates: `(array arg, index expr, value arg)`. -/
-def arraySet? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × Arg .impure)) := do
+/-- In-place `Array`/`ByteArray`/`FloatArray` updates: `(array arg, index expr, value arg, checkBounds)`. -/
+def arraySet? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × Arg .impure × Bool)) := do
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   if fn == arrOp "set!" || fn == arrOp "setIfInBounds" then
-    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!)
-  if fn == arrOp "uset" then
-    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!)
+    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!, false)
+  if fn == arrOp "uset" || fn == arrOp "fset" || fn == arrOp "set" then
+    return some (args[1]!, ← castIfNeeded (← toKotlinArg args[2]!) "Int", args[3]!, false)
+  if fn == `ByteArray.set! || fn == `FloatArray.set! then
+    return some (args[0]!, ← castIfNeeded (← toKotlinArg args[1]!) "Int", args[2]!, true)
+  if fn == `ByteArray.set || fn == `ByteArray.uset ||
+     fn == `FloatArray.set || fn == `FloatArray.uset then
+    return some (args[0]!, ← castIfNeeded (← toKotlinArg args[1]!) "Int", args[2]!, false)
   return none
 
 /-- In-place `Array` element swaps: `(array arg, idx1 expr, idx2 expr, checkBounds)`. -/
 def arraySwap? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .impure × String × String × Bool)) := do
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   if fn == arrOp "swap" || fn == arrOp "uswap" then
     let iStr ← castIfNeeded (← toKotlinArg args[2]!) "Int"
     let jStr ← castIfNeeded (← toKotlinArg args[3]!) "Int"
@@ -1239,9 +1345,12 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
     if let some ci := env.find? fn then
       if let some t ← prodComponentKotlinType? (resultType ci.type) c then
         return t
-  if let some ci := env.find? fn then
+  let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+  if let some ci := (env.find? fn).orElse (fun _ => env.find? baseFn) then
     if resultType ci.type == mkConst ``Unit then return "Unit"
     if resultType ci.type == mkConst ``String then return "String"
+    if resultType ci.type == mkConst ``ByteArray then return "ByteArray"
+    if resultType ci.type == mkConst ``FloatArray then return "DoubleArray"
   if let some d := (← read).declMap[fn]? then
     let t := toKotlinType d.type
     if t != "Any?" then return t
@@ -2402,8 +2511,16 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
   | .unbox fvarId =>
     return (← get).varTypes[← getVarName fvarId]?.getD baseTy
   | .fap fn args =>
-    let p := fn.getPrefix
-    let s := match fn with | .str _ str => str | _ => ""
+    let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+    let fnStr := baseFn.toString
+    if baseFn == `panic || baseFn == `panic._redArg || baseFn == `panicCore || baseFn == `panicCore._redArg ||
+       baseFn == `panicWithPos || baseFn == `panicWithPos._redArg ||
+       baseFn == `panicWithPosWithDecl || baseFn == `panicWithPosWithDecl._redArg ||
+       fnStr.startsWith "panic._at_." || fnStr.startsWith "panicWithPos._at_." ||
+       fnStr.startsWith "panicWithPosWithDecl._at_." then
+      return "Nothing"
+    let p := baseFn.getPrefix
+    let s := match baseFn with | .str _ str => str | _ => ""
     if s == "toInt64" then return "Long"
     if s == "toUInt64" then return "ULong"
     if s == "toInt32" then return "Int"
@@ -2414,7 +2531,7 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     if s == "toUInt8" then return "UByte"
     if s == "toFloat" then return "Double"
     if s == "toFloat32" then return "Float"
-    if s == "toString" || s == "reprFast" || s == "repr" || fn == `mkPanicMessage || fn == `mkPanicMessageWithDecl then return "String"
+    if s == "toString" || s == "reprFast" || s == "repr" || baseFn == `mkPanicMessage || baseFn == `mkPanicMessageWithDecl then return "String"
     if p == ``Int64 || s == "shl64" || s == "ushr64" || s == "ashr64" then
       if s.startsWith "dec" then return "Boolean" else return "Long"
     if p == ``Int32 || s == "ushr32" then
@@ -2443,9 +2560,25 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     if p == `String || p == `String.Internal || p == `String.Pos || p == `String.Pos.Raw then
       if s.startsWith "dec" || s == "lt" || s == "isEmpty" || s == "isPrefixOf" || s == "atEnd" || s == "isValid" then return "Boolean"
       else if s == "length" || s == "utf8ByteSize" || s == "next" || s == "next'" || s == "prev" then return "Int"
-      else if s == "append" || s == "push" || s == "singleton" || s == "ofList" || s == "mk" || s == "extract" || s == "set" || s == "markLinear" || s == "propagateMark" then return "String"
+      else if s == "append" || s == "push" || s == "singleton" || s == "ofList" || s == "mk" || s == "extract" || s == "set" || s == "markLinear" || s == "propagateMark" || s == "fromUTF8!" || s == "fromUTF8" || s == "ofByteArray" then return "String"
       else if s == "decodeChar" || s == "get" || s == "get'" || s == "get!" then return "UInt"
-    if fn == `List.asString then return "String"
+      else if s == "getUTF8Byte" || s == "ugetUTF8Byte" then return "UByte"
+      else if s == "toUTF8" || s == "toByteArray" then return "ByteArray"
+      else if s == "toList" || s == "data" || s == "get?" then return "Array<Any?>"
+    if baseFn == `List.asString then return "String"
+    if p == ``ByteArray then
+      if s == "size" || s == "usize" then return "Int"
+      else if s == "isEmpty" || s == "validateUTF8" || s.startsWith "dec" then return "Boolean"
+      else if s == "get!" || s == "get" || s == "uget" then return "UByte"
+      else if s == "hash" then return "ULong"
+      else if s == "data" then return if baseTy != "Any?" then baseTy else "UByteArray"
+      else return "ByteArray"
+    if p == ``FloatArray then
+      if s == "size" || s == "usize" then return "Int"
+      else if s == "isEmpty" || s.startsWith "dec" then return "Boolean"
+      else if s == "get!" || s == "get" || s == "uget" then return "Double"
+      else if s == "data" then return if baseTy != "Any?" then baseTy else "DoubleArray"
+      else return "DoubleArray"
     if p == ``Bool then
       return "Boolean"
     if args.isEmpty then
@@ -2454,22 +2587,27 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
           if let .lit v := d0.value then
             let effTy := if decl.type.isScalar then decl.type else d0.type
             return litKotlinType v effTy
-    if fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" then
+    if baseFn == arrOp "get!Internal" || baseFn == arrOp "get!InternalBorrowed" then
       let arrTy ← arrayType (args[2]?.getD .erased)
       return (kotlinArrayElem? arrTy).getD baseTy
-    if fn == arrOp "getInternal" || fn == arrOp "getInternalBorrowed" ||
-       fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
+    if baseFn == arrOp "getInternal" || baseFn == arrOp "getInternalBorrowed" ||
+       baseFn == arrOp "uget" || baseFn == arrOp "ugetBorrowed" then
       let arrTy ← arrayType (args[1]?.getD .erased)
       return (kotlinArrayElem? arrTy).getD baseTy
-    if fn == arrOp "push" || fn == arrOp "pop" then
+    if baseFn == arrOp "push" || baseFn == arrOp "pop" then
       return ← arrayType (args[1]?.getD .erased)
-    if fn == arrOp "append" || fn == `Array.append._redArg ||
-       fn == arrOp "appendCore" || fn == `Array.appendCore._redArg then
+    if baseFn == arrOp "append" || baseFn == `Array.append._redArg ||
+       baseFn == arrOp "appendCore" || baseFn == `Array.appendCore._redArg then
       return ← arrayType (args[args.size - 2]?.getD .erased)
-    if fn == arrOp "extract" || fn == `Array.extract._redArg then
+    if baseFn == arrOp "extract" || baseFn == `Array.extract._redArg then
       return ← arrayType (args[args.size - 3]?.getD .erased)
-    if fn == arrOp "size" || fn == arrOp "usize" then
+    if baseFn == arrOp "size" || baseFn == arrOp "usize" then
       return "Int"
+    if baseFn == arrOp "toList" then
+      return "Array<Any?>"
+    if baseFn == arrOp "mk" || baseFn == ``List.toArray || baseFn == `List.toArrayImpl || baseFn == `List.toArrayImpl._redArg ||
+       baseFn == arrOp "replicate" || baseFn == arrOp "mkArray" || baseFn == arrOp "mkEmpty" || baseFn == arrOp "emptyWithCapacity" then
+      return if baseTy != "Any?" then baseTy else "Array<Any?>"
     if baseTy != "Any?" then return baseTy
     fnRetKotlinType fn decl.type
   | .fvar fvarId args =>
@@ -2719,6 +2857,7 @@ partial def onlyUsedAsVirtualTuple (x : FVarId) (code : Code .impure) : Bool :=
   | .setTag y _ k _ => y != x && onlyUsedAsVirtualTuple x k
 
 def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   let p := fn.getPrefix
   let s := match fn with | .str _ str => str | _ => ""
   if p == ``Int8 || p == ``Int16 || p == ``Int32 || p == ``Int64 || p == ``ISize ||
@@ -2747,13 +2886,24 @@ def isPrimitiveOp (fn : Name) (numArgs : Nat) : Bool :=
     else false
   else if p == `String || p == `String.Internal || p == `String.Pos || p == `String.Pos.Raw then
     if numArgs == 1 then
-      s == "length" || s == "utf8ByteSize" || s == "isEmpty" || s == "singleton" || s == "ofList" || s == "mk" || s == "toList" || s == "data" || s == "markLinear"
+      s == "length" || s == "utf8ByteSize" || s == "isEmpty" || s == "singleton" || s == "ofList" || s == "mk" || s == "toList" || s == "data" || s == "markLinear" || s == "toUTF8" || s == "toByteArray" || s == "fromUTF8!"
     else if numArgs == 2 then
       s == "append" || s == "push" || s == "decEq" || s == "decLt" || s == "decidableLT" || s == "lt" || s == "isPrefixOf" ||
       s == "propagateMark" || s == "getUTF8Byte" || s == "ugetUTF8Byte" || s == "isValid" || s == "atEnd" ||
-      s == "decodeChar" || s == "get" || s == "get'" || s == "get!" || s == "get?" || s == "next" || s == "next'" || s == "prev"
+      s == "decodeChar" || s == "get" || s == "get'" || s == "get!" || s == "get?" || s == "next" || s == "next'" || s == "prev" ||
+      s == "fromUTF8" || s == "ofByteArray"
     else if numArgs == 3 then
       s == "extract" || s == "set"
+    else false
+  else if p == ``ByteArray then
+    if numArgs == 1 then s == "size" || s == "usize" || s == "isEmpty" || s == "hash" || s == "validateUTF8"
+    else if numArgs == 2 then s == "get!"
+    else if numArgs == 3 then s == "get" || s == "uget"
+    else false
+  else if p == ``FloatArray then
+    if numArgs == 1 then s == "size" || s == "usize" || s == "isEmpty"
+    else if numArgs == 2 then s == "get!"
+    else if numArgs == 3 then s == "get" || s == "uget"
     else false
   else if p == ``Char then
     numArgs == 1 && (s == "toNat" || s == "ofNat" || s == "ofNatAux" || s == "utf8Size")
@@ -2789,14 +2939,15 @@ def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
   let .fap fn args := decl.value | return false
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited" || fn.getString!.contains "boxed_const") then return true
   if (← loopExpandable? decl.value).isSome then return false
-  if Ownership.isArraySet fn then return false
+  if Ownership.isArraySet fn || Ownership.isScalarArraySet fn then return false
   if (Ownership.inplaceArg? (← getEnv) fn args).isSome then return false
   if (← dropShape? fn).isSome then return false
   if isPrimitiveOp fn args.size then return true
-  if fn == arrOp "size" || fn == arrOp "usize" ||
-     fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" ||
-     fn == arrOp "getInternal" || fn == arrOp "getInternalBorrowed" ||
-     fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
+  let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+  if baseFn == arrOp "size" || baseFn == arrOp "usize" ||
+     baseFn == arrOp "get!Internal" || baseFn == arrOp "get!InternalBorrowed" ||
+     baseFn == arrOp "getInternal" || baseFn == arrOp "getInternalBorrowed" ||
+     baseFn == arrOp "uget" || baseFn == arrOp "ugetBorrowed" then
     return true
   let env ← getEnv
   if let some extStr := getExternNameFor env `kotlin fn then
@@ -3097,18 +3248,28 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         emitFieldWrite y (·.objs[k]?) (← toKotlinArg args[k])
       setParamVarName x (← getVarName y)
     | .fap fn args =>
-      if let some (a, idx, v) ← arraySet? fn args then
+      if let some (a, idx, v, checkBounds) ← arraySet? fn args then
         let arrTy ← arrayType a
         let vStr ← toKotlinArg v
-        let vStr ← match kotlinArrayElem? arrTy with
-          | some e => castIfNeeded vStr e
-          | none => pure vStr
-        let aStr ← toKotlinArg a
-        emitLn s!"{aStr}[{idx}] = {vStr}"
+        let isByteArraySet :=
+          let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+          baseFn.getPrefix == `ByteArray
+        let vStr ←
+          if isByteArraySet then
+            pure s!"({← castIfNeeded vStr "UByte"}).toByte()"
+          else
+            match kotlinArrayElem? arrTy with
+            | some e => castIfNeeded vStr e
+            | none => pure vStr
+        let aStr ← castIfNeeded (← toKotlinArg a) arrTy
+        if checkBounds then
+          emitLn s!"if ({idx} >= 0 && {idx} < {aStr}.size) {aStr}[{idx}] = {vStr}"
+        else
+          emitLn s!"{aStr}[{idx}] = {vStr}"
         setParamVarName x aStr
       else if let some (a, iStr, jStr, checkBounds) ← arraySwap? fn args then
-        discard <| arrayType a
-        let aStr ← toKotlinArg a
+        let arrTy ← arrayType a
+        let aStr ← castIfNeeded (← toKotlinArg a) arrTy
         let count := (← get).nameCounter + 1
         modify fun st => { st with nameCounter := count }
         let tmpName := s!"tmp_{count}"
@@ -3207,7 +3368,7 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
                   return
           let needsShape ← match decl.value with
             | .fap fn _ => do
-              pure ((← dropShape? fn).isSome || Ownership.isArraySet fn ||
+              pure ((← dropShape? fn).isSome || Ownership.isArraySet fn || Ownership.isScalarArraySet fn ||
                 Ownership.isInplaceExtern (← getEnv) fn)
             | .ctor .. => pure true
             | .oproj _ y => do pure ((← get).tuples.contains (← getVarName y))
@@ -3721,6 +3882,7 @@ def fileSpecTexts (spec : _root_.Lean.Compiler.Kotlin.FileSpec) : Array String :
   return out
 
 def isBuiltinArrayFn (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   (fn.getPrefix == `Array && match fn with
     | .str _ s =>
       s == "get!Internal" || s == "get!InternalBorrowed" ||
@@ -3729,12 +3891,16 @@ def isBuiltinArrayFn (fn : Name) : Bool :=
       s == "size" || s == "usize" ||
       s == "replicate" || s == "mkArray" ||
       s == "mkEmpty" || s == "emptyWithCapacity" ||
+      s == "toList" || s == "mk" ||
       s == "push" || s == "pop" ||
       s == "append" || s == "appendCore" ||
       s == "extract" ||
-      s == "set!" || s == "uset" || s == "setIfInBounds" ||
+      s == "set!" || s == "uset" || s == "setIfInBounds" || s == "set" || s == "fset" ||
       s == "swap" || s == "uswap" || s == "swapIfInBounds"
     | _ => false) ||
+  fn == ``List.toArray || fn == `List.toArrayImpl || fn == `List.toArrayImpl._redArg ||
+  fn == `ByteArray.mk || fn == `ByteArray.data || fn == `ByteArray.set! || fn == `ByteArray.set || fn == `ByteArray.uset ||
+  fn == `FloatArray.mk || fn == `FloatArray.data || fn == `FloatArray.set! || fn == `FloatArray.set || fn == `FloatArray.uset ||
   fn == `Array.append._redArg || fn == `Array.appendCore._redArg || fn == `Array.extract._redArg
 
 def isBuiltinFap (fn : Name) (arity : Nat) : CoreM Bool := do
