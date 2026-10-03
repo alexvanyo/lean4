@@ -302,7 +302,7 @@
     when (((x as Array<*>)[0] as Int))     {
         0 ->         {
             val v_x_280_1 = f_testPanicOpt___closed__3()
-            return (error(v_x_280_1) as Any?)
+            return error(v_x_280_1)
         }
         1 ->         {
             return (x as Array<*>)[1]

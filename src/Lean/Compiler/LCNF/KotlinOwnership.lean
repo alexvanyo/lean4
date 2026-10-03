@@ -73,6 +73,8 @@ structure Obj where
 inductive RetShape where
   /-- No `return` analyzed yet. -/
   | none
+  /-- The result is a freshly allocated, exclusively owned value. -/
+  | fresh
   /-- The result is (the object of) parameter `j`. -/
   | param (j : Nat)
   /-- The result is a `Prod.mk` whose components are parameters (`some j`) or unknown. -/
@@ -82,6 +84,7 @@ inductive RetShape where
 
 def RetShape.join : RetShape → RetShape → RetShape
   | .none, s | s, .none => s
+  | .fresh, .fresh => .fresh
   | .param i, .param j => if i == j then .param i else .unknown
   | .prod a, .prod b =>
     if a.size == b.size then .prod (a.zipWith (fun x y => if x == y then x else Option.none) b)
@@ -188,18 +191,35 @@ def escape (st : PathState) (i : Nat) : PathState :=
   modifyObj st i fun o => { o with rc := .top, pristine? := none }
 
 def isArraySet (fn : Name) : Bool :=
-  fn == ``Array.set! || fn == ``Array.uset || fn == `Array.setIfInBounds || fn == `Array.fset ||
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
+  fn == ``Array.set || fn == ``Array.set! || fn == ``Array.uset || fn == `Array.setIfInBounds || fn == `Array.fset ||
     fn == ``Array.swap || fn == ``Array.swapIfInBounds || fn == `Array.uswap
 
+def isScalarArraySet (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
+  fn == `ByteArray.set! || fn == `ByteArray.set || fn == `ByteArray.uset ||
+    fn == `FloatArray.set! || fn == `FloatArray.set || fn == `FloatArray.uset
+
 def isArrayAlloc (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   fn == ``Array.replicate || fn == `Array.mkArray || fn == ``Array.mkEmpty ||
-    fn == ``Array.emptyWithCapacity || fn == ``Array.push || fn == ``Array.pop ||
+    fn == ``Array.emptyWithCapacity || fn == ``Array.empty ||
+    fn == ``Array.mk || fn == ``List.toArray || fn == `List.toArrayImpl || fn == `List.toArrayImpl._redArg ||
+    fn == ``Array.push || fn == ``Array.pop ||
     fn == ``Array.append || fn == `Array.append._redArg ||
     fn == ``Array.appendCore || fn == `Array.appendCore._redArg ||
     fn == ``Array.extract || fn == `Array.extract._redArg ||
     fn == ``Array.mkArray0 || fn == ``Array.mkArray1 || fn == ``Array.mkArray2 ||
     fn == ``Array.mkArray3 || fn == ``Array.mkArray4 || fn == ``Array.mkArray5 ||
-    fn == ``Array.mkArray6 || fn == ``Array.mkArray7 || fn == ``Array.mkArray8
+    fn == ``Array.mkArray6 || fn == ``Array.mkArray7 || fn == ``Array.mkArray8 ||
+    fn == `ByteArray.emptyWithCapacity || fn == `ByteArray.empty ||
+    fn == `ByteArray.mk || fn == `ByteArray.data || fn == `ByteArray.push ||
+    fn == `ByteArray.copySlice || fn == `ByteArray.extract ||
+    fn == `ByteArray.fastAppend || fn == `ByteArray.append ||
+    fn == `ByteArray.markLinear || fn == `String.toUTF8 || fn == `String.toByteArray ||
+    fn == `FloatArray.emptyWithCapacity || fn == `FloatArray.empty ||
+    fn == `FloatArray.mk || fn == `FloatArray.data || fn == `FloatArray.push ||
+    fn == `FloatArray.markLinear
 
 /--
 `@[extern "kotlin_inplace:<template>"]`: a Kotlin statement that updates its first argument, which
@@ -213,6 +233,7 @@ def isInplaceExtern (env : Environment) (fn : Name) : Bool :=
 /-- Index of the argument updated in place by `fn`, if `fn` is an in-place update. -/
 def inplaceArg? (env : Environment) (fn : Name) (args : Array (Arg .impure)) : Option Nat :=
   if isArraySet fn then some 1
+  else if isScalarArraySet fn then some 0
   else if isInplaceExtern env fn then args.findIdx? (· matches .fvar _)
   else none
 
@@ -467,6 +488,9 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
   | .none =>
     let (st2, i) := newObj st { rc := .top, pending := true, isMutableClass := isMut }
     return bind st2 x i
+  | .fresh =>
+    let (st2, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
+    return bind st2 x i
   | .param j =>
     match argObjs[j]? with
     | some (some i) => return bind st x i
@@ -500,6 +524,9 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
     else if o.ctor? == some ``Prod.mk then
       .prod ((List.range 2).toArray.map fun c =>
         (o.children.find? (·.1 == c)).bind fun (_, ci) => paramOf? ci)
+    else if o.rc == .exact 1 && (o.deep || o.ctor?.isSome) &&
+            o.children.all (fun (_, c) => st.objs[c]!.rc == .exact 1 && (st.objs[c]!.deep || st.objs[c]!.ctor?.isSome)) then
+      .fresh
     else .unknown
   -- Parameters returned as (part of) the result must come back exclusive if they came in exclusive.
   let summary := ctx.summaries[ctx.decl.name]?.getD { exclusive := #[] }

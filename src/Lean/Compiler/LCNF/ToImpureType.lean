@@ -190,6 +190,10 @@ where
   visitApp (declName : Name) (args : Array Lean.Expr) : CoreM Expr := do
     if declName == ``Array && args.size == 1 && compiler.kotlin.typedArrays.get (← getOptions) then
       return ImpureType.jvmType s!"kotlin:{kotlinArrayType args[0]!}"
+    if declName == ``ByteArray && compiler.kotlin.typedArrays.get (← getOptions) then
+      return ImpureType.jvmType "kotlin:ByteArray"
+    if declName == ``FloatArray && compiler.kotlin.typedArrays.get (← getOptions) then
+      return ImpureType.jvmType "kotlin:DoubleArray"
     if let some type := builtinImpureType? declName then
       return type
     if let some info ← hasTrivialImpureStructure? declName then

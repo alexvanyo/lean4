@@ -76,3 +76,191 @@
     return (v_x_69_2.copyOf(v_x_69_2.size + 1).also { it[v_x_69_2.size] = b })
 }
 
+@PublishedApi internal fun f_listToArrayNat(xs: Any?): Array<Any?> {
+    return (run { val tmp = ArrayList<Any?>(); var cur: Any? = xs; while (((cur as Array<*>)[0] as Int) == 1) { tmp.add((cur as Array<*>)[1]); cur = (cur as Array<*>)[2] }; tmp.toTypedArray() })
+}
+
+@PublishedApi internal fun f_arrayToListNat(xs: Array<Any?>): Any? {
+    return (xs).foldRight(arrayOf<Any?>(0) as Any?) { elem, acc -> arrayOf<Any?>(1, elem, acc) }
+}
+
+@PublishedApi internal fun f_listToArrayU32(xs: Any?): UIntArray {
+    return (run { val tmp = ArrayList<UInt>(); var cur: Any? = xs; while (((cur as Array<*>)[0] as Int) == 1) { tmp.add((cur as Array<*>)[1] as UInt); cur = (cur as Array<*>)[2] }; UIntArray(tmp.size) { tmp[it] } })
+}
+
+@PublishedApi internal fun f_arrayToListU32(xs: UIntArray): Any? {
+    return (xs).foldRight(arrayOf<Any?>(0) as Any?) { elem, acc -> arrayOf<Any?>(1, elem, acc) }
+}
+
+@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal: Any?, p_1: Array<Any?>, i: Int, stop: Int, b: Array<Any?>): Array<Any?> {
+    val v_y_85_1: Array<Any?>
+    if (!(i == stop))     {
+        val v_x_90_2 = p_1[i]
+        if (!((minVal as Int) <= (v_x_90_2 as Int)))         {
+            v_y_85_1 = b
+        } else         {
+            val v_x_92_3 = (b.copyOf(b.size + 1).also { it[b.size] = v_x_90_2 })
+            v_y_85_1 = v_x_92_3
+        }
+    } else     {
+        return b
+    }
+    return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, p_1, (i + 1), stop, v_y_85_1)
+}
+
+@PublishedApi internal fun f_filterNatArray___closed__0(): Array<Any?> {
+    return arrayOfNulls<Any?>(0)
+}
+
+@PublishedApi internal fun f_filterNatArray(xs: Array<Any?>, minVal: Any?): Array<Any?> {
+    val v_x_98_1 = xs.size
+    val v_x_99_2 = f_filterNatArray___closed__0()
+    if (!(0 < v_x_98_1))     {
+        return v_x_99_2
+    } else     {
+        if (!(v_x_98_1 <= v_x_98_1))         {
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, v_x_98_1, v_x_99_2)
+        } else         {
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, v_x_98_1, v_x_99_2)
+        }
+    }
+}
+
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0: Array<Any?>, i: Int, stop: Int, b: Any?): Any? {
+    if (!(i == stop))     {
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(p_0, (i + 1), stop, ((b as Int) + (p_0[i] as Int)))
+    } else     {
+        return b
+    }
+}
+
+@PublishedApi internal fun f_sumNatArray(xs: Array<Any?>): Any? {
+    val v_x_120_1 = xs.size
+    if (!(0 < v_x_120_1))     {
+        return 0
+    } else     {
+        if (!(v_x_120_1 <= v_x_120_1))         {
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, v_x_120_1, 0)
+        } else         {
+            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, v_x_120_1, 0)
+        }
+    }
+}
+
+@PublishedApi internal fun f_makeByteArray(a: UByte, b: UByte, c: UByte): ByteArray {
+    val v_x_132_1 = ByteArray(0)
+    val v_x_133_2 = (v_x_132_1 + (a).toByte())
+    val v_x_134_3 = (v_x_133_2 + (b).toByte())
+    return (v_x_134_3 + (c).toByte())
+}
+
+@PublishedApi internal fun f_byteArraySize(bs: ByteArray): Any? {
+    return (bs).size
+}
+
+@PublishedApi internal fun f_byteArrayGet_x21(bs: ByteArray, i: Any?): UByte {
+    return ((bs)[(i as Int)]).toUByte()
+}
+
+@PublishedApi internal fun f_byteArraySet_x21(bs: ByteArray, i: Any?, v: UByte): ByteArray {
+    val v_x_144_1 = (bs).copyOf()
+    if ((i as Int) >= 0 && (i as Int) < v_x_144_1.size) v_x_144_1[(i as Int)] = (v).toByte()
+    return v_x_144_1
+}
+
+@PublishedApi internal fun f_byteArrayAppend(a: ByteArray, b: ByteArray): ByteArray {
+    return (run { val s = b; val d = a; val sOff = 0; if (sOff < 0 || sOff > s.size) d.copyOf() else { val l = minOf(maxOf(0, (b).size), s.size - sOff); val dOff = ((a).size).coerceIn(0, d.size); val r = d.copyOf(maxOf(d.size, dOff + l)); s.copyInto(r, dOff, sOff, sOff + l); r } })
+}
+
+@PublishedApi internal fun f_byteArrayExtract(bs: ByteArray, start: Any?, stop: Any?): ByteArray {
+    return (run { val bs = bs; val start = ((start as Int)).coerceIn(0, bs.size); val stop = ((stop as Int)).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
+}
+
+@PublishedApi internal fun f_byteArrayEq(a: ByteArray, b: ByteArray): Boolean {
+    return ((a).contentEquals(b) as Boolean)
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip___closed__0(): String {
+    return "Init.Data.String.Basic"
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip___closed__1(): String {
+    return "String.fromUTF8!"
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip___closed__2(): String {
+    return "invalid UTF-8 string"
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip___closed__3(): String {
+    val v_x_163_1 = "invalid UTF-8 string"
+    val v_x_166_2 = "String.fromUTF8!"
+    val v_x_167_3 = "Init.Data.String.Basic"
+    return ("PANIC at " + v_x_166_2 + " " + v_x_167_3 + ":" + (193).toString() + ":" + (46).toString() + ": " + v_x_163_1)
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip(s: String): String {
+    val v_x_170_1 = (s).encodeToByteArray()
+    if (!(try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(v_x_170_1)); true } catch (_: Throwable) { false }))     {
+        val v_x_172_2 = f_stringUTF8RoundTrip___closed__3()
+        return error(v_x_172_2)
+    } else     {
+        return (v_x_170_1).decodeToString()
+    }
+}
+
+@PublishedApi internal fun f_stringUTF8RoundTrip___boxed(s: Any?): Any? {
+    return f_stringUTF8RoundTrip((s as String))
+}
+
+@PublishedApi internal fun f_byteArrayValidateUTF8(bs: ByteArray): Boolean {
+    return (try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bs)); true } catch (_: Throwable) { false })
+}
+
+@PublishedApi internal fun f_makeFloatArray(a: Double, b: Double, c: Double): DoubleArray {
+    val v_x_182_1 = DoubleArray(0)
+    val v_x_183_2 = (v_x_182_1 + a)
+    val v_x_184_3 = (v_x_183_2 + b)
+    return (v_x_184_3 + c)
+}
+
+@PublishedApi internal fun f_floatArraySize(ds: DoubleArray): Any? {
+    return (ds).size
+}
+
+@PublishedApi internal fun f_floatArrayGet_x21(ds: DoubleArray, i: Any?): Double {
+    return (ds)[(i as Int)]
+}
+
+@PublishedApi internal fun f_floatArraySet_x21(ds: DoubleArray, i: Any?, v: Double): DoubleArray {
+    val v_x_194_1 = (ds).copyOf()
+    if ((i as Int) >= 0 && (i as Int) < v_x_194_1.size) v_x_194_1[(i as Int)] = v
+    return v_x_194_1
+}
+
+@PublishedApi internal tailrec fun f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(p_0: DoubleArray, i: Int, stop: Int, b: Double): Double {
+    if (!(i == stop))     {
+        return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(p_0, (i + 1), stop, (b + (p_0)[i]))
+    } else     {
+        return b
+    }
+}
+
+@PublishedApi internal fun f_sumFloatArray___closed__0(): Double {
+    return 0e-1
+}
+
+@PublishedApi internal fun f_sumFloatArray(ds: DoubleArray): Double {
+    val v_x_212_1 = f_sumFloatArray___closed__0()
+    val v_x_213_2 = (ds).size
+    if (!(0 < v_x_213_2))     {
+        return v_x_212_1
+    } else     {
+        if (!(v_x_213_2 <= v_x_213_2))         {
+            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, v_x_213_2, v_x_212_1)
+        } else         {
+            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, v_x_213_2, v_x_212_1)
+        }
+    }
+}
+
