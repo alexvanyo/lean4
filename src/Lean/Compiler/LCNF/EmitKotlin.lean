@@ -22,6 +22,14 @@ import Lean.Structure
 import Lean.Compiler.LCNF.Types
 import Lean.Compiler.LCNF.MonoTypes
 import Lean.Compiler.LCNF.FVarUtil
+import Lean.Compiler.LCNF.ToImpure
+import Lean.Compiler.LCNF.PushProj
+import Lean.Compiler.LCNF.ElimDead
+import Lean.Compiler.LCNF.SimpCase
+import Lean.Compiler.LCNF.InferBorrow
+import Lean.Compiler.LCNF.ExplicitBoxing
+import Lean.Compiler.LCNF.ExplicitRC
+import Lean.Compiler.LCNF.CoalesceRC
 public import Lean.Compiler.KotlinSpec
 import Lean.DocString.Extension
 import Std.Data.HashSet
@@ -343,6 +351,18 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
         return s!"({s}).{conv}"
   return s!"({s} as {targetTy})"
 
+def isKotlinKeyword (s : String) : Bool :=
+  match s with
+  | "as" | "break" | "class" | "continue" | "do" | "else" | "false" | "for" | "fun"
+  | "if" | "in" | "interface" | "is" | "null" | "object" | "package" | "return"
+  | "super" | "this" | "throw" | "true" | "try" | "typealias" | "typeof" | "val"
+  | "var" | "when" | "while" => true
+  | _ => false
+
+def sanitizeIdent (s : String) : String :=
+  s.foldl (init := "") fun acc c =>
+    if c.isAlphanum || c == '_' then acc.push c else acc.push '_'
+
 def getVarName (fvarId : FVarId) : EmitM String := do
   let mut f := fvarId
   for _ in [:8] do
@@ -353,9 +373,13 @@ def getVarName (fvarId : FVarId) : EmitM String := do
     break
   if let some name := (← get).varNames[f]? then
     return name
-  let rawName := (← getBinderName f).toString
-  let cleanName := rawName.replace "." "_"
-  let cleanName := if cleanName.startsWith "_" then "v" ++ cleanName else cleanName
+  let rawName := (← getBinderName f).eraseMacroScopes.toString
+  let cleanName := sanitizeIdent rawName
+  let cleanName :=
+    if cleanName.isEmpty || cleanName.front.isDigit || cleanName.startsWith "_" then
+      "v" ++ (if cleanName.startsWith "_" then cleanName else "_" ++ cleanName)
+    else
+      cleanName
   let count := (← get).nameCounter + 1
   let uniqueName := s!"{cleanName}_{count}"
   modify fun st => {
@@ -427,6 +451,7 @@ def stripToLong? (s : String) : Option String :=
     none
 
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
@@ -1395,6 +1420,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         | some mp => toKotlinType mp.type
         | none => "Any?"
     let mut callArgs : Array String := #[]
+    let mut fullArgs : Array (Arg .impure) := args
     for i in [:args.size] do
       let aStr ← toKotlinArg args[i]!
       let aStr ← castIfNeeded aStr (paramTy i)
@@ -1405,8 +1431,15 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       let pTy := paramTy i
       lambdaParams := lambdaParams.push s!"{pName}: {pTy}"
       callArgs := callArgs.push pName
-    let fnName := toKotlinFnName targetFn
-    let callStr := s!"{fnName}({String.intercalate ", " callArgs.toList})"
+      let dummyFv : FVarId := { name := .num `_pap_param i }
+      setParamVarName dummyFv pName
+      recordVarType pName pTy
+      fullArgs := fullArgs.push (.fvar dummyFv)
+    let callStr ← match ← emitPrimitiveOp? targetFn fullArgs with
+      | some primExpr => pure primExpr
+      | none =>
+        let fnName := toKotlinFnName targetFn
+        pure s!"{fnName}({String.intercalate ", " callArgs.toList})"
     let paramStr := String.intercalate ", " lambdaParams.toList
     return s!"\{ {paramStr} -> {callStr} }"
   | .box _ fvarId =>
@@ -1573,35 +1606,49 @@ Checks whether all uses of `x` in `code` are either as the callee of `.fvar x ar
 `loopExpandable` function, so `x` is beta-inlined at every use and does not need a Kotlin variable.
 -/
 partial def allUsesAreBetaInlined (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
-    (x : FVarId) (code : Code .impure) : Bool :=
+    (x : FVarId) (code : Code .impure) (papRemArity? : Option Nat := none) : Bool :=
   let usesLV (v : LetValue .impure) : Bool :=
     ((v.forFVarM (m := StateM Bool) (fun f => if f == x then set true else pure ())).run false).2
   match code with
   | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
-    allUsesAreBetaInlined env declMap x k
+    allUsesAreBetaInlined env declMap x k papRemArity?
   | .let d k =>
     let okVal := match d.value with
-      | .fvar _ args => !args.any (· == .fvar x)
-      | .fap fn _ =>
+      | .fvar fnFv args =>
+        !args.any (· == .fvar x) &&
+        (fnFv != x || match papRemArity? with | some rem => args.size == rem | none => true)
+      | .fap fn args =>
         if !usesLV d.value then true
         else match declMap[fn]? with
-          | some callee => isLoopExpandable env callee
+          | some callee =>
+            if !isLoopExpandable env callee then false
+            else match callee.value with
+              | .code calleeBody =>
+                let selfArgs := collectSelfCallArgs callee.name calleeBody #[]
+                args.zipIdx.all fun (a, i) =>
+                  if a != .fvar x then true
+                  else match callee.params[i]? with
+                    | some p =>
+                      let isInvariant := selfArgs.all fun sa => sa[i]? == some (.fvar p.fvarId)
+                      isInvariant && allUsesAreBetaInlined env declMap p.fvarId calleeBody papRemArity?
+                    | none => false
+              | _ => false
           | none => false
       | v => !usesLV v
-    okVal && allUsesAreBetaInlined env declMap x k
+    okVal && allUsesAreBetaInlined env declMap x k papRemArity?
   | .jp d k | .fun d k _ =>
-    allUsesAreBetaInlined env declMap x d.value && allUsesAreBetaInlined env declMap x k
+    allUsesAreBetaInlined env declMap x d.value papRemArity? && allUsesAreBetaInlined env declMap x k papRemArity?
   | .cases cs =>
-    cs.discr != x && cs.alts.all fun alt => allUsesAreBetaInlined env declMap x alt.getCode
+    cs.discr != x && cs.alts.all fun alt => allUsesAreBetaInlined env declMap x alt.getCode papRemArity?
   | .jmp fn args => fn != x && !args.any (· == .fvar x)
   | .return f => f != x
   | .unreach _ => true
   | .oset y _ a k _ =>
-    y != x && a != .fvar x && allUsesAreBetaInlined env declMap x k
+    y != x && a != .fvar x && allUsesAreBetaInlined env declMap x k papRemArity?
   | .sset y _ _ z _ k _ | .uset y _ z k _ =>
-    y != x && z != x && allUsesAreBetaInlined env declMap x k
+    y != x && z != x && allUsesAreBetaInlined env declMap x k papRemArity?
   | .setTag y _ k _ =>
-    y != x && allUsesAreBetaInlined env declMap x k
+    y != x && allUsesAreBetaInlined env declMap x k papRemArity?
 
 /-- Declarations called (or, if `paps`, also partially applied) in `code`. -/
 partial def collectCalls (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
@@ -1610,11 +1657,20 @@ partial def collectCalls (env : Environment) (declMap : Std.HashMap Name (Decl .
   | .let decl k =>
     let acc := match decl.value with
       | .fap n _ => acc.push n
-      | .pap n _ =>
+      | .pap n papArgs =>
         let unboxed := match n with | .str p "_boxed" => p | _ => n
         if paps then (acc.push n).push unboxed
-        else if !allUsesAreBetaInlined env declMap decl.fvarId k then acc.push unboxed
-        else acc
+        else
+          let canBeta := match declMap[n]? with
+            | some d =>
+              match d.value with
+              | .code c =>
+                !hasRecursiveJP c && (!hasSelfCall d.name c || selfCallsAllTail d.name c) &&
+                allUsesAreBetaInlined env declMap decl.fvarId k (some (d.params.size - papArgs.size))
+              | _ => false
+            | none => false
+          if !canBeta then acc.push unboxed
+          else acc
       | _ => acc
     collectCalls env declMap k acc paps
   | .jp decl k => collectCalls env declMap k (collectCalls env declMap decl.value acc paps) paps
@@ -1648,14 +1704,18 @@ def papBeta? (v : LetValue .impure) : EmitM (Option (Decl .impure × Array (Arg 
   let .fvar f args := v | return none
   let some (fn, papArgs) := (← get).paps[← getVarName f]? | return none
   let some d := (← read).declMap[fn]? | return none
-  return some (d, papArgs ++ args)
+  let fullArgs := papArgs ++ args
+  unless fullArgs.size == d.params.size do return none
+  return some (d, fullArgs)
 
 /-- Records `let x := pap fn args` of a local code declaration, emitting nothing if all uses are beta-inlined. -/
 def recordPap? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
   let .pap fn args := decl.value | return false
   let some d := (← read).declMap[fn]? | return false
-  let .code _ := d.value | return false
-  unless allUsesAreBetaInlined (← getEnv) (← read).declMap decl.fvarId k do return false
+  let .code c := d.value | return false
+  unless !hasRecursiveJP c && (!hasSelfCall d.name c || selfCallsAllTail d.name c) do return false
+  let remArity := d.params.size - args.size
+  unless allUsesAreBetaInlined (← getEnv) (← read).declMap decl.fvarId k (some remArity) do return false
   let x ← getVarName decl.fvarId
   modify fun st => { st with paps := st.paps.insert x (fn, args) }
   return true
@@ -3441,6 +3501,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | none => toKotlinType decl.type
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
+  let mut seenParamNames : Std.HashSet String := {}
   for i in [:params.size] do
     let p := params[i]!
     if i == 0 && member?.isSome then
@@ -3454,8 +3515,10 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       -- binder name when it is a plain identifier. Locals always get a numeric suffix.
       let raw := (origParamNames[i]?.getD p.binderName).eraseMacroScopes.toString
       let pName :=
-        if !raw.isEmpty && raw.all (fun c => c.isAlphanum || c == '_') && !(raw.front.isDigit) then raw
+        if !raw.isEmpty && raw.all (fun c => c.isAlphanum || c == '_') && !(raw.front.isDigit) &&
+           raw != "_" && !isKotlinKeyword raw && !seenParamNames.contains raw then raw
         else s!"p_{i}"
+      seenParamNames := seenParamNames.insert pName
       setParamVarName p.fvarId pName
       let emittedIdx := if member?.isSome then i - 1 else i
       let defaultParamTy := match monoDecl?.bind (·.params[i]?) with
@@ -3556,13 +3619,127 @@ def fileSpecTexts (spec : _root_.Lean.Compiler.Kotlin.FileSpec) : Array String :
     | .topLevel => pure ()
   return out
 
+def isBuiltinArrayFn (fn : Name) : Bool :=
+  (fn.getPrefix == `Array && match fn with
+    | .str _ s =>
+      s == "get!Internal" || s == "get!InternalBorrowed" ||
+      s == "getInternal" || s == "getInternalBorrowed" ||
+      s == "uget" || s == "ugetBorrowed" ||
+      s == "size" || s == "usize" ||
+      s == "replicate" || s == "mkArray" ||
+      s == "mkEmpty" || s == "emptyWithCapacity" ||
+      s == "push" || s == "pop" ||
+      s == "append" || s == "appendCore" ||
+      s == "extract" ||
+      s == "set!" || s == "uset" || s == "setIfInBounds" ||
+      s == "swap" || s == "uswap" || s == "swapIfInBounds"
+    | _ => false) ||
+  fn == `Array.append._redArg || fn == `Array.appendCore._redArg || fn == `Array.extract._redArg
+
+def isBuiltinFap (fn : Name) (arity : Nat) : CoreM Bool := do
+  let env ← getEnv
+  if isBuiltinArrayFn fn then return true
+  if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited") then return true
+  if (getExternNameFor env `kotlin fn).isSome then return true
+  if (Compiler.getKotlinMemberInfo? env fn).isSome then return true
+  let prim? ← (emitPrimitiveOp? fn (Array.replicate arity .erased)).run { modName := default, localDecls := #[] } |>.run' {} |>.run (phase := .impure)
+  return prim?.isSome
+
+def isBuiltinPap (fn : Name) : CoreM Bool := do
+  let targetFn := match fn with | .str p "_boxed" => p | _ => fn
+  for arity in [1, 2, 3] do
+    if ← isBuiltinFap targetFn arity then return true
+  return false
+
+partial def collectExternalCalls (code : Code .impure) (acc : Array Name := #[]) : CoreM (Array Name) := do
+  match code with
+  | .let decl k =>
+    let mut acc := acc
+    match decl.value with
+    | .fap fn args =>
+      unless ← isBuiltinFap fn args.size do
+        acc := acc.push fn
+    | .pap fn _ =>
+      unless ← isBuiltinPap fn do
+        let unboxed := match fn with | .str p "_boxed" => p | _ => fn
+        acc := (acc.push fn).push unboxed
+    | _ => pure ()
+    collectExternalCalls k acc
+  | .jp decl k =>
+    let acc ← collectExternalCalls decl.value acc
+    collectExternalCalls k acc
+  | .cases c =>
+    c.alts.foldlM (fun acc alt => collectExternalCalls alt.getCode acc) acc
+  | c =>
+    match skipCont? c with
+    | some k => collectExternalCalls k acc
+    | none => return acc
+
+def runPass (inPhase outPhase : Purity) (pass : Pass) (decls : Array (Decl inPhase)) :
+    CompilerM (Array (Decl outPhase)) := do
+  withPhase pass.phase do
+    let decls ← inPhase.withAssertPurity pass.phase.toPurity fun h =>
+      pass.run (h ▸ decls)
+    return pass.phaseOut.toPurity.withAssertPurity outPhase fun h => h ▸ decls
+
+def lowerMonoDeclToImpure (monoDecl : Decl .pure) : CoreM (Array (Decl .impure)) := do
+  let origSig? ← getImpureSignature? monoDecl.name
+  let decls ← CompilerM.run (phase := .mono) do
+    let decl ← monoDecl.internalize
+    let mut decls ← runPass .pure .impure toImpure #[decl]
+    decls ← runPass .impure .impure (pushProj (occurrence := 0)) decls
+    decls ← runPass .impure .impure (elimDeadVars (phase := .impure) (occurrence := 0)) decls
+    decls ← runPass .impure .impure simpCase decls
+    decls ← runPass .impure .impure inferBorrow decls
+    if let some origSig := origSig? then
+      decls := decls.map fun d =>
+        if d.name == monoDecl.name && d.params.size == origSig.params.size then
+          let params := d.params.mapIdx fun i p => { p with borrow := origSig.params[i]!.borrow }
+          { d with params }
+        else d
+      for d in decls do
+        if d.name == monoDecl.name then
+          d.saveImpure
+    decls ← runPass .impure .impure explicitBoxing decls
+    decls ← runPass .impure .impure explicitRc decls
+    decls ← runPass .impure .impure coalesceRC decls
+    decls ← runPass .impure .impure (pushProj (occurrence := 1)) decls
+    return decls
+  decls.mapM normalizeFVarIds
+
 public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM String := do
   let (localDecls, otherModuleDecls) ← collectUsedDecls decls
-  let env ← getEnv
+  let env0 ← getEnv
   let opts ← getOptions
-  let indexMap := getImpureDeclIndices env decls
+  let indexMap := getImpureDeclIndices env0 decls
   let localDecls := localDecls.qsort fun l r => indexMap[l.name]! < indexMap[r.name]!
-  let declMap := localDecls.foldl (init := ({} : Std.HashMap Name (Decl .impure))) fun m d => m.insert d.name d
+  let mut declMap := localDecls.foldl (init := ({} : Std.HashMap Name (Decl .impure))) fun m d => m.insert d.name d
+  let mut extDecls : Array (Decl .impure) := #[]
+  let mut seenExt : Std.HashSet Name := {}
+  let mut extWork : Array Name := #[]
+  for d in localDecls do
+    if let .code c := d.value then
+      extWork ← collectExternalCalls c extWork
+  while !extWork.isEmpty do
+    let fn := extWork.back!
+    extWork := extWork.pop
+    unless declMap.contains fn || seenExt.contains fn do
+      seenExt := seenExt.insert fn
+      let monoDecl? ← match ← getMonoDecl? fn with
+        | some md => pure (some md)
+        | none => match fn with | .str p "_boxed" => getMonoDecl? p | _ => pure none
+      if let some monoDecl := monoDecl? then
+        if monoDecl.value matches .code _ then
+          seenExt := seenExt.insert monoDecl.name
+          let lowered ← lowerMonoDeclToImpure monoDecl
+          for d in lowered do
+            unless declMap.contains d.name do
+              declMap := declMap.insert d.name d
+              extDecls := extDecls.push d
+              if let .code c := d.value then
+                extWork ← collectExternalCalls c extWork
+  let env ← getEnv
+  let allDecls := localDecls ++ extDecls
   let fileSpec? ← match ← findFileSpecDecl? env with
     | some n => some <$> evalFileSpec n
     | none => pure none
@@ -3574,51 +3751,58 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
   let specText := match fileSpec? with
     | some spec => String.intercalate "\n" (fileSpecTexts spec).toList
     | none => ""
-  let toEmit ←
-    if !compiler.kotlin.pruneUnreachable.get opts then
-      pure localDecls
+  let prune := compiler.kotlin.pruneUnreachable.get opts
+  let roots :=
+    if !prune then
+      localDecls
     else
       let tokens := identTokens (headerText ++ "\n" ++ footerText ++ "\n" ++ specText)
-      let roots := localDecls.filter fun d =>
+      localDecls.filter fun d =>
         (Compiler.getKotlinMemberInfo? env d.name).isSome || isExport env d.name ||
           tokens.contains (toKotlinFnName d.name)
-      let mut visited : Std.HashSet Name := {}
-      -- Declarations that are fully applied somewhere (as opposed to only partially applied).
-      let mut applied : Std.HashSet Name := {}
-      let mut work := roots.map (·.name)
-      while !work.isEmpty do
-        let n := work.back!
-        work := work.pop
-        unless visited.contains n do
-          visited := visited.insert n
-          if let some d := declMap[n]? then
-            if let .code c := d.value then
-              for m in collectCalls env declMap c #[] do
-                if declMap.contains m && !visited.contains m then
-                  work := work.push m
-              for m in collectCalls env declMap (paps := false) c #[] do
-                applied := applied.insert m
-      let rootNames := roots.map (·.name)
-      -- Loop-expandable declarations are emitted inline at every call site, and declarations
-      -- that are only partially applied are beta-inlined at every application.
-      pure <| localDecls.filter fun d =>
-        visited.contains d.name && !isLoopExpandable env d && (isInlinedConstDecl? d).isNone &&
-          (applied.contains d.name || rootNames.contains d.name)
+  let mut visited : Std.HashSet Name := {}
+  -- Declarations that are fully applied somewhere (as opposed to only partially applied).
+  let mut applied : Std.HashSet Name := {}
+  let mut work := roots.map (·.name)
+  while !work.isEmpty do
+    let n := work.back!
+    work := work.pop
+    unless visited.contains n do
+      visited := visited.insert n
+      if let some d := declMap[n]? then
+        if let .code c := d.value then
+          for m in collectCalls env declMap c #[] do
+            if declMap.contains m && !visited.contains m then
+              work := work.push m
+          for m in collectCalls env declMap (paps := false) c #[] do
+            applied := applied.insert m
+  let rootNames := roots.map (·.name)
+  -- Loop-expandable declarations are emitted inline at every call site, and declarations
+  -- that are only partially applied are beta-inlined at every application.
+  let emittedLocal :=
+    if !prune then localDecls
+    else localDecls.filter fun d =>
+      visited.contains d.name && !isLoopExpandable env d && (isInlinedConstDecl? d).isNone &&
+        (applied.contains d.name || rootNames.contains d.name)
+  let emittedExt := extDecls.filter fun d =>
+    visited.contains d.name && !isLoopExpandable env d && (isInlinedConstDecl? d).isNone &&
+      applied.contains d.name
+  let toEmit := emittedLocal ++ emittedExt
   let classStructs := env.constants.map₂.foldl (init := ({} : Std.HashMap String Name)) fun m n _ =>
     match Compiler.getKotlinClass? env n with
     | some t => m.insert t n
     | none => m
   -- In-place updates must be justified by exclusive ownership.
-  let papTargets := localDecls.foldl (init := ({} : Std.HashSet Name)) fun acc d =>
+  let papTargets := allDecls.foldl (init := ({} : Std.HashSet Name)) fun acc d =>
     match d.value with
     | .code c => collectPaps c acc
     | _ => acc
   let isMember (n : Name) := (Compiler.getKotlinMemberInfo? env n).isSome
-  let ownership ← (Ownership.analyze localDecls isMember
+  let ownership ← (Ownership.analyze allDecls isMember
     (fun n => isMember n || isExport env n || papTargets.contains n)).run (phase := .impure)
   unless ownership.errors.isEmpty do
     throwError (MessageData.joinSep ownership.errors.toList "\n")
-  let ctx : Context := { modName, localDecls, otherModuleDecls, declMap,
+  let ctx : Context := { modName, localDecls := allDecls, otherModuleDecls, declMap,
                          summaries := ownership.summaries, classStructs }
   let ((), st) ← ((do
     let mut topBuf := ""

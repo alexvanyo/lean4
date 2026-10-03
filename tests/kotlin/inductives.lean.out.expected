@@ -418,3 +418,153 @@
     return f_sampleTree(x_boxed_287_1, y_boxed_288_2)
 }
 
+@PublishedApi internal fun f_reverseList(xs: Any?): Any? {
+    return f_List_reverse___redArg(xs)
+}
+
+@PublishedApi internal fun f_appendLists(xs: Any?, ys: Any?): Any? {
+    return f_List_appendTR___redArg(xs, ys)
+}
+
+@PublishedApi internal fun f_listLength(xs: Any?): Any? {
+    return f_List_lengthTR___redArg(xs)
+}
+
+@PublishedApi internal fun f_listLength___boxed(xs: Any?): Any? {
+    return f_listLength(xs)
+}
+
+@PublishedApi internal tailrec fun f_List_mapTR_loop___at___00mapListInc_spec__0(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_1)
+        }
+        1 ->         {
+            val v_x_308_2 = ((p_0 as Array<*>)[1] as UInt)
+            return f_List_mapTR_loop___at___00mapListInc_spec__0((p_0 as Array<*>)[2], arrayOf<Any?>(1, (v_x_308_2 + 1u), p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_mapListInc(xs: Any?): Any? {
+    return f_List_mapTR_loop___at___00mapListInc_spec__0(xs, arrayOf<Any?>(0))
+}
+
+@PublishedApi internal tailrec fun f_List_filterTR_loop___at___00filterListGt_spec__0(threshold: UInt, p_1: Any?, p_2: Any?): Any? {
+    when (((p_1 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_2)
+        }
+        1 ->         {
+            val head_323_2 = (p_1 as Array<*>)[1]
+            val tail_324_3 = (p_1 as Array<*>)[2]
+            val v_x_328_4 = (head_323_2 as UInt)
+            if (!(threshold < v_x_328_4))             {
+                return f_List_filterTR_loop___at___00filterListGt_spec__0(threshold, tail_324_3, p_2)
+            } else             {
+                return f_List_filterTR_loop___at___00filterListGt_spec__0(threshold, tail_324_3, arrayOf<Any?>(1, head_323_2, p_2))
+            }
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_filterTR_loop___at___00filterListGt_spec__0___boxed(threshold: Any?, p_1: Any?, p_2: Any?): Any? {
+    val threshold_boxed_339_1 = (threshold as UInt)
+    return f_List_filterTR_loop___at___00filterListGt_spec__0(threshold_boxed_339_1, p_1, p_2)
+}
+
+@PublishedApi internal fun f_filterListGt(xs: Any?, threshold: UInt): Any? {
+    return f_List_filterTR_loop___at___00filterListGt_spec__0(threshold, xs, arrayOf<Any?>(0))
+}
+
+@PublishedApi internal fun f_filterListGt___boxed(xs: Any?, threshold: Any?): Any? {
+    val threshold_boxed_347_1 = (threshold as UInt)
+    return f_filterListGt(xs, threshold_boxed_347_1)
+}
+
+@PublishedApi internal tailrec fun f_List_foldl___at___00foldlListSum_spec__0(p_0: UInt, p_1: Any?): UInt {
+    when (((p_1 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_0
+        }
+        1 ->         {
+            val v_x_353_1 = ((p_1 as Array<*>)[1] as UInt)
+            return f_List_foldl___at___00foldlListSum_spec__0((p_0 + v_x_353_1), (p_1 as Array<*>)[2])
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_foldl___at___00foldlListSum_spec__0___boxed(p_0: Any?, p_1: Any?): Any? {
+    val x_36_boxed_358_1 = (p_0 as UInt)
+    val res_359_2 = f_List_foldl___at___00foldlListSum_spec__0(x_36_boxed_358_1, p_1)
+    return res_359_2
+}
+
+@PublishedApi internal fun f_foldlListSum(xs: Any?): UInt {
+    return f_List_foldl___at___00foldlListSum_spec__0(0u, xs)
+}
+
+@PublishedApi internal fun f_foldlListSum___boxed(xs: Any?): Any? {
+    val res_365_1 = f_foldlListSum(xs)
+    return res_365_1
+}
+
+@PublishedApi internal fun f_stdOptionMapGetD(o: Any?, defaultVal: UInt): UInt {
+    when (((o as Array<*>)[0] as Int))     {
+        0 ->         {
+            return defaultVal
+        }
+        1 ->         {
+            val v_x_371_1 = ((o as Array<*>)[1] as UInt)
+            return (v_x_371_1 shl 1)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_stdOptionMapGetD___boxed(o: Any?, defaultVal: Any?): Any? {
+    val defaultVal_boxed_375_1 = (defaultVal as UInt)
+    val res_376_2 = f_stdOptionMapGetD(o, defaultVal_boxed_375_1)
+    return res_376_2
+}
+
+@PublishedApi internal fun f_List_reverse___redArg(p_0: Any?): Any? {
+    return f_List_reverseAux___redArg(p_0, arrayOf<Any?>(0))
+}
+
+@PublishedApi internal tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_reverseAux___redArg((p_0 as Array<*>)[2], arrayOf<Any?>(1, (p_0 as Array<*>)[1], p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_lengthTR___redArg(p_0: Any?): Any? {
+    return f_List_lengthTRAux___redArg(p_0, 0)
+}
+
+@PublishedApi internal tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_lengthTRAux___redArg((p_0 as Array<*>)[2], ((p_1 as Int) + 1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_appendTR___redArg(p_0: Any?, bs: Any?): Any? {
+    val v_x_398_1 = f_List_reverse___redArg(p_0)
+    return f_List_reverseAux___redArg(v_x_398_1, bs)
+}
+
