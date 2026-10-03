@@ -2,6 +2,7 @@ package tests.kotlin
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ScalarTypesTest {
@@ -46,5 +47,19 @@ class ScalarTypesTest {
         // sum = -4, diff = -7, prod = 14, q = 4, r = 2, eq = -3, er = 2, neg = -4, absVal = 7
         // -7 < 3 is true -> -4 + 2 + (-3) + 2 + 7 = 4
         assertEquals(4, (res as Number).toInt())
+    }
+
+    @Test
+    fun testNatOps() {
+        val res = f_testNatOps(12, 18)
+        assertEquals(230, (res as Number).toInt())
+    }
+
+    @Test
+    fun testPanicOpt() {
+        assertEquals(42, (f_testPanicOpt(arrayOf<Any?>(1, 42)) as Number).toInt())
+        assertFailsWith<IllegalStateException> {
+            f_testPanicOpt(arrayOf<Any?>(0))
+        }
     }
 }

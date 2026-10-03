@@ -57,3 +57,16 @@ def testLeanInts (a b : Int) : Int :=
   else
     neg - r + absVal
 
+def testNatOps (a b : Nat) : Nat :=
+  let bit := (a &&& b) + (a ||| b) + (a ^^^ b) + (a >>> 1)
+  let p := a ^ 2
+  let g := Nat.gcd a b
+  let lg := Nat.log2 a
+  let pr := Nat.pred a
+  if Nat.blt a b || Nat.ble a b || Nat.beq a b then
+    bit + p + g + lg + pr
+  else
+    bit
+
+def testPanicOpt (x : Option Nat) : Nat :=
+  x.get!

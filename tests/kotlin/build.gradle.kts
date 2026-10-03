@@ -21,6 +21,9 @@ val generateLean by tasks.registering {
         include("*.lean")
         include("*.lean.init.sh")
     })
+    if (File(leanBin).exists()) {
+        inputs.file(leanBin)
+    }
     outputs.dir(generatedKotlinDir)
 
     doLast {
