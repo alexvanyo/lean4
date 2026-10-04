@@ -2102,12 +2102,13 @@ Checks whether all uses of `x` in `code` are either as the callee of `.fvar x ar
 `loopExpandable` function, so `x` is beta-inlined at every use and does not need a Kotlin variable.
 -/
 partial def allUsesAreBetaInlined (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
-    (x : FVarId) (code : Code .impure) (papRemArity? : Option Nat := none) : Bool :=
+    (x : FVarId) (code : Code .impure) (papRemArity? : Option Nat := none)
+    (visited : Std.HashSet Name := {}) : Bool :=
   let usesLV (v : LetValue .impure) : Bool :=
     ((v.forFVarM (m := StateM Bool) (fun f => if f == x then set true else pure ())).run false).2
   match code with
   | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
-    allUsesAreBetaInlined env declMap x k papRemArity?
+    allUsesAreBetaInlined env declMap x k papRemArity? visited
   | .let d k =>
     let okVal := match d.value with
       | .fvar fnFv args =>
@@ -2115,6 +2116,7 @@ partial def allUsesAreBetaInlined (env : Environment) (declMap : Std.HashMap Nam
         (fnFv != x || match papRemArity? with | some rem => args.size == rem | none => true)
       | .fap fn args =>
         if !usesLV d.value then true
+        else if visited.contains fn then true
         else match declMap[fn]? with
           | some callee =>
             if !isLoopExpandable env callee then false
@@ -2126,25 +2128,25 @@ partial def allUsesAreBetaInlined (env : Environment) (declMap : Std.HashMap Nam
                   else match callee.params[i]? with
                     | some p =>
                       let isInvariant := selfArgs.all fun sa => sa[i]? == some (.fvar p.fvarId)
-                      isInvariant && allUsesAreBetaInlined env declMap p.fvarId calleeBody papRemArity?
+                      isInvariant && allUsesAreBetaInlined env declMap p.fvarId calleeBody papRemArity? (visited.insert fn)
                     | none => false
               | _ => false
           | none => false
       | v => !usesLV v
-    okVal && allUsesAreBetaInlined env declMap x k papRemArity?
+    okVal && allUsesAreBetaInlined env declMap x k papRemArity? visited
   | .jp d k | .fun d k _ =>
-    allUsesAreBetaInlined env declMap x d.value papRemArity? && allUsesAreBetaInlined env declMap x k papRemArity?
+    allUsesAreBetaInlined env declMap x d.value papRemArity? visited && allUsesAreBetaInlined env declMap x k papRemArity? visited
   | .cases cs =>
-    cs.discr != x && cs.alts.all fun alt => allUsesAreBetaInlined env declMap x alt.getCode papRemArity?
+    cs.discr != x && cs.alts.all fun alt => allUsesAreBetaInlined env declMap x alt.getCode papRemArity? visited
   | .jmp fn args => fn != x && !args.any (· == .fvar x)
   | .return f => f != x
   | .unreach _ => true
   | .oset y _ a k _ =>
-    y != x && a != .fvar x && allUsesAreBetaInlined env declMap x k papRemArity?
+    y != x && a != .fvar x && allUsesAreBetaInlined env declMap x k papRemArity? visited
   | .sset y _ _ z _ k _ | .uset y _ z k _ =>
-    y != x && z != x && allUsesAreBetaInlined env declMap x k papRemArity?
+    y != x && z != x && allUsesAreBetaInlined env declMap x k papRemArity? visited
   | .setTag y _ k _ =>
-    y != x && allUsesAreBetaInlined env declMap x k papRemArity?
+    y != x && allUsesAreBetaInlined env declMap x k papRemArity? visited
 
 /-- Declarations called (or, if `paps`, also partially applied) in `code`. -/
 partial def collectCalls (env : Environment) (declMap : Std.HashMap Name (Decl .impure))
