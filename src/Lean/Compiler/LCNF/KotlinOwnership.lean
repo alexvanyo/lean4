@@ -67,6 +67,8 @@ structure Obj where
   parent? : Option Nat := none
   /-- Whether this object is an instance of a `@[mutable_kotlin_class]` structure. -/
   isMutableClass : Bool := false
+  /-- Whether this object is a deeply immutable Kotlin value (e.g. `String`, `Nat`, scalar, function). -/
+  immutable : Bool := false
   /-- Whether the initial persistent reference of a 0-arg closed constant has been consumed. -/
   persistentUsed : Bool := false
   deriving Inhabited
@@ -170,12 +172,26 @@ def error (msg : MessageData) : M Unit := do
   let declName := (← read).decl.name
   modify fun o => { o with errors := o.errors.push m!"Kotlin backend: in `{declName}`: {msg}" }
 
+partial def isDeeplyImmutableMonoType (t : Expr) : Bool :=
+  match t with
+  | .const n _ =>
+    n == ``Nat || n == ``Int || n == ``String || n == ``Bool || n == ``Decidable ||
+    n == ``Char || n == ``Unit || n == ``PUnit ||
+    n == ``UInt8 || n == ``UInt16 || n == ``UInt32 || n == ``UInt64 || n == ``USize ||
+    n == ``Int8 || n == ``Int16 || n == ``Int32 || n == ``Int64 || n == ``ISize ||
+    n == ``Float || n == ``Float32 || n == ``lcErased || n == ``lcVoid
+  | .forallE .. => true
+  | .app (.app (.const ``Prod _) a) b =>
+    isDeeplyImmutableMonoType a && isDeeplyImmutableMonoType b
+  | _ => false
+
 /--
 Checks that object `i` is exclusively owned (and, if `deep`, everything reachable through its
 fields). Returns `false` after reporting an error or requesting a parameter to be exclusive.
 -/
 partial def claim (st : PathState) (i : Nat) (deep : Bool) (what : MessageData) : M Bool := do
   let o := st.objs[i]!
+  if o.immutable then return true
   if let some j := o.pristine? then
     modify fun out => { out with requireExclusive := out.requireExclusive.insert j }
     return false
@@ -313,6 +329,13 @@ def classCtorSource? (st : PathState) (args : Array (Arg .impure)) : Option Nat 
     if let .fvar a := a then
       if let some i := st.vars[a]? then
         if let some p := st.objs[i]!.parent? then
+          match src? with
+          | none => src? := some p
+          | some q => if q != p then return none
+  if src?.isNone then
+    for o in st.objs do
+      if let some p := o.parent? then
+        if st.objs[p]!.isMutableClass then
           match src? with
           | none => src? := some p
           | some q => if q != p then return none
@@ -486,7 +509,7 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       return ← visitCall st x fn args summary isMut
     let st ← consumeArgs st (some fn) args
     if isImmutablePrimOp fn then
-      let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
+      let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut, immutable := true }
       return bind st x i
     let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st x i
@@ -496,10 +519,10 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
     return bind st x i
   | .sproj _ _ y | .uproj _ y =>
     let (st, p) := objOf st y
-    let (st, i) := newObj st { rc := .top, parent? := some p, isMutableClass := isMut }
+    let (st, i) := newObj st { rc := .top, parent? := some p, isMutableClass := isMut, immutable := true }
     return bind st x i
   | .lit _ | .box _ _ =>
-    let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
+    let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut, immutable := true }
     return bind st x i
   | _ =>
     let (st, i) := newObj st { rc := .top, isMutableClass := isMut }
@@ -574,7 +597,7 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
       .prod ((List.range 2).toArray.map fun c =>
         (o.children.find? (·.1 == c)).bind fun (_, ci) => paramOf? ci)
     else if o.rc == .exact 1 && (o.deep || o.ctor?.isSome) &&
-            o.children.all (fun (_, c) => st.objs[c]!.rc == .exact 1 && (st.objs[c]!.deep || st.objs[c]!.ctor?.isSome)) then
+            o.children.all (fun (_, c) => st.objs[c]!.immutable || (st.objs[c]!.rc == .exact 1 && (st.objs[c]!.deep || st.objs[c]!.ctor?.isSome))) then
       .fresh
     else .unknown
   -- Parameters returned as (part of) the result must come back exclusive if they came in exclusive.
@@ -593,14 +616,19 @@ def analyzeDecl (decl : Decl .impure) (summaries : Std.HashMap Name Summary)
     (localParams : Std.HashMap Name (Array (Param .impure)))
     (mutableClasses : Std.HashSet String) : CompilerM Out := do
   let .code code := decl.value | return {}
+  let monoDecl? ← getMonoDecl? decl.name
   let summary := summaries[decl.name]?.getD { exclusive := decl.params.map fun _ => false }
   let mut st : PathState := {}
   let mut paramObjs := #[]
   for h : j in [:decl.params.size] do
     let p := decl.params[j]
     let isMut := isMutableClassType mutableClasses p.type
+    let isImm := match monoDecl?.bind (·.params[j]?) with
+      | some mp => isDeeplyImmutableMonoType mp.type
+      | none => false
     let o : Obj :=
-      if p.borrow then { rc := .top, isMutableClass := isMut }
+      if isImm then { rc := .exact 1, deep := true, isMutableClass := false, immutable := true }
+      else if p.borrow then { rc := .top, isMutableClass := isMut }
       else if summary.exclusive[j]?.getD false then { rc := .exact 1, deep := true, isMutableClass := isMut }
       else { rc := .top, pristine? := some j, isMutableClass := isMut }
     let (st', i) := newObj st o

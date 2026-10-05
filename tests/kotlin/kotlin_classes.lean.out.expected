@@ -15,7 +15,87 @@ public fun getXCoord(): Int {
 
 }
 
+class Person(val name: String, val age: java.math.BigInteger, val score: Int) {
+    public fun withScore(newScore: Int): Person {
+        val name_22_1 = name
+        val age_23_2 = age
+        return Person(name_22_1, age_23_2, newScore)
+    }
+
+    public fun birthday(): Person {
+        val name_32_1 = name
+        val age_33_2 = age
+        val score_34_3 = score
+        val v_x_39_4 = (age_33_2.add(java.math.BigInteger.ONE))
+        return Person(name_32_1, v_x_39_4, score_34_3)
+    }
+
+    public fun summary(): String {
+        val name_46_1 = name
+        val age_47_2 = age
+        val score_48_3 = score
+        val v_x_49_4 = ":"
+        return ((((name_46_1 + v_x_49_4) + (age_47_2).toString()) + v_x_49_4) + (score_48_3).toString())
+    }
+}
+
+class Counter(var count: Int) {
+    public fun inc(delta: Int): Unit {
+        val count_81_1 = count
+        count = (count_81_1 + delta)
+        return
+    }
+
+    public fun readCount(): Int {
+        return count
+    }
+}
+
+class MutablePerson(var name: String, var age: java.math.BigInteger) {
+    public fun birthday(): Unit {
+        val age_94_2 = age
+        val v_x_99_3 = (age_94_2.add(java.math.BigInteger.ONE))
+        age = v_x_99_3
+        return
+    }
+
+    public fun rename(newName: String): Unit {
+        name = newName
+        return
+    }
+}
+
 @PublishedApi internal fun f_makePoint(x: Int, y: Int): Point {
     return Point(x, y)
+}
+
+@PublishedApi internal fun f_Person_summary___closed__0(): String {
+    return ":"
+}
+
+@PublishedApi internal fun f_makePerson(name: String, age: java.math.BigInteger, score: Int): Person {
+    return Person(name, age, score)
+}
+
+@PublishedApi internal fun f_addMeters(a: Int, b: Int): Int {
+    return (a + b)
+}
+
+@PublishedApi internal fun f_addMeters___boxed(a: Any?, b: Any?): Any? {
+    val a_boxed_66_1 = (a as Int)
+    val b_boxed_67_2 = (b as Int)
+    val res_68_3 = f_addMeters(a_boxed_66_1, b_boxed_67_2)
+    return res_68_3
+}
+
+@PublishedApi internal fun f_scaleMeters(m: Int, factor: Int): Int {
+    return (m * factor)
+}
+
+@PublishedApi internal fun f_scaleMeters___boxed(m: Any?, factor: Any?): Any? {
+    val m_boxed_75_1 = (m as Int)
+    val factor_boxed_76_2 = (factor as Int)
+    val res_77_3 = f_scaleMeters(m_boxed_75_1, factor_boxed_76_2)
+    return res_77_3
 }
 

@@ -77,7 +77,8 @@ def impureIrrelevantType (type : Expr) : MetaM Bool := do
 public def setHasTrivialImpureStructure? (declName : Name) : CoreM Unit :=
   Irrelevant.setHasTrivialStructure? impureTrivialStructureInfoExt impureIrrelevantType declName
 
-public def hasTrivialImpureStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) :=
+public def hasTrivialImpureStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
+  if Compiler.isMutableKotlinClass (← getEnv) declName then return none
   Irrelevant.hasTrivialStructure? impureTrivialStructureInfoExt declName
 
 /--

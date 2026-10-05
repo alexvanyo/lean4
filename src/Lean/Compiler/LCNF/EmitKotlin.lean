@@ -1524,26 +1524,65 @@ def arraySwap? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .im
     return some (args[1]!, iStr, jStr, true)
   return none
 
-/-- Kotlin property names of a `@[kotlin_class]` structure by runtime position. -/
+/-- Kotlin property names and types of a `@[kotlin_class]` structure by runtime position. -/
 structure ClassLayout where
   objs : Std.HashMap Nat String := {}
+  objTypes : Std.HashMap Nat String := {}
   /-- By byte offset. -/
   scalars : Std.HashMap Nat String := {}
   usizes : Std.HashMap Nat String := {}
+  orderedFields : Array (String × String) := #[]
 
 def classLayout (s : Name) : EmitM ClassLayout := do
   let env ← getEnv
   let fields := getStructureFields env s
-  let layout ← getCtorLayout (getStructureCtor env s).name
+  let ctorVal := getStructureCtor env s
+  let layout ← getCtorLayout ctorVal.name
+  let fieldKotlinTypes ← (Meta.MetaM.run' do
+    Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
+      let fieldXs := xs.extract ctorVal.numParams xs.size
+      fieldXs.mapM fun x => do
+        let t ← toLCNFType (← Meta.inferType x)
+        let mt ← toMonoType t
+        if isRichMonoType mt then return toKotlinType mt
+        let it ← toImpureType mt
+        return toKotlinType it : CoreM (Array String))
+  let tyOverrides := (Compiler.getKotlinTypes? env s).getD #[]
   let mut r : ClassLayout := {}
+  let mut relIdx := 0
   for h : k in [:layout.fieldInfo.size] do
     let name := match fields[k]? with
       | some (.str _ n) => n
       | _ => s!"field{k}"
+    let defaultKotlinTy : String :=
+      match layout.fieldInfo[k] with
+      | .object _ _ => fieldKotlinTypes[k]?.getD "Any?"
+      | .scalar _ _ irTy => toKotlinType irTy
+      | .usize _ => "Int"
+      | _ => "Any?"
+    let kotlinTy := match tyOverrides[relIdx]? with
+      | some t => if t == "_" then defaultKotlinTy else t
+      | none => defaultKotlinTy
     match layout.fieldInfo[k] with
-    | .object i _ => r := { r with objs := r.objs.insert i name }
-    | .scalar _ off _ => r := { r with scalars := r.scalars.insert off name }
-    | .usize i => r := { r with usizes := r.usizes.insert i name }
+    | .object i _ =>
+      r := { r with
+        objs := r.objs.insert i name
+        objTypes := r.objTypes.insert i kotlinTy
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+      relIdx := relIdx + 1
+    | .scalar _ off _ =>
+      r := { r with
+        scalars := r.scalars.insert off name
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+      relIdx := relIdx + 1
+    | .usize i =>
+      r := { r with
+        usizes := r.usizes.insert i name
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+      relIdx := relIdx + 1
     | _ => pure ()
   return r
 
@@ -2422,6 +2461,12 @@ partial def collectWriteBacks (env : Environment) (isClassCtor : Name → Bool) 
     (projs : Std.HashMap FVarId ProjInfo) : StateM WriteBackState Unit := do
   let killArgs (projs : Std.HashMap FVarId ProjInfo) (args : Array (Arg .impure)) :=
     projs.filter fun _ (_, _, y) => !args.any (· == .fvar y)
+  let rec scalars (x : FVarId) (c : Code .impure) (r : Array (Nat × Nat × FVarId)) :=
+    match c with
+    | .sset y _ off v _ c _ => scalars x c (if y == x then r.push (1, off, v) else r)
+    | .uset y i v c _ => scalars x c (if y == x then r.push (2, i, v) else r)
+    | .inc (k := c) .. | .dec (k := c) .. => scalars x c r
+    | _ => r
   match code with
   | .let decl k =>
     let x := decl.fvarId
@@ -2432,21 +2477,15 @@ partial def collectWriteBacks (env : Environment) (isClassCtor : Name → Bool) 
     | .reset _ y =>
       let projs := match projs[y]? with | some p => projs.insert x p | none => projs
       collectWriteBacks env isClassCtor k projs
-    | .ctor info args =>
+    | .ctor info args | .reuse _ info _ args =>
       if !isClassCtor info.name.getPrefix then
         collectWriteBacks env isClassCtor k (killArgs projs args)
       else
         -- Field assignments `(kind, pos, value)`: object arguments, then the trailing `sset`/`uset`s.
-        let rec scalars (c : Code .impure) (r : Array (Nat × Nat × FVarId)) :=
-          match c with
-          | .sset y _ off v _ c _ => scalars c (if y == x then r.push (1, off, v) else r)
-          | .uset y i v c _ => scalars c (if y == x then r.push (2, i, v) else r)
-          | .inc (k := c) .. | .dec (k := c) .. => scalars c r
-          | _ => r
         let objs := args.mapIdx fun i a => match a with
           | .fvar v => some (0, i, v)
           | _ => none
-        let assigns := objs.filterMap id ++ scalars k #[]
+        let assigns := objs.filterMap id ++ scalars x k #[]
         let srcs := assigns.filterMap fun (_, _, v) => projs[v]?.map (·.2.2)
         let mut projs := projs
         if let some y := srcs[0]? then
@@ -2517,6 +2556,10 @@ partial def collectUsed (wb : Std.HashSet (FVarId × FVarId)) (code : Code .impu
     match decl.value with
     | .ctor _ args =>
       collectUsed wb k <| args.foldl (init := used) fun s a => match a with
+        | .fvar f => if wb.contains (decl.fvarId, f) then s else s.insert f
+        | _ => s
+    | .reuse y _ _ args =>
+      collectUsed wb k <| args.foldl (init := used.insert y) fun s a => match a with
         | .fvar f => if wb.contains (decl.fvarId, f) then s else s.insert f
         | _ => s
     | .fap fn args =>
@@ -2746,9 +2789,17 @@ partial def collectAliases (params : Array (Param .impure)) (code : Code .impure
             ++ Ownership.ctorScalars x k
           let roots ← vs.mapM root
           let projs := (← get).projs
-          let srcs := roots.filterMap fun v => projs[v]?.map (·.2.2)
-          if let some y := srcs[0]? then
-            if srcs.all (· == y) then addAlias x (← root y)
+          let mut srcs := roots.filterMap fun v => projs[v]?.map (·.2.2)
+          if srcs.isEmpty then
+            for (_, _, y) in projs.values do
+              if (← mutableClassStructOf? y) == some info.name.getPrefix then
+                srcs := srcs.push y
+          let mut rootSrcs : Array FVarId := #[]
+          for y in srcs do
+            let ry ← root y
+            unless rootSrcs.contains ry do rootSrcs := rootSrcs.push ry
+          if rootSrcs.size == 1 then
+            addAlias x rootSrcs[0]!
       | .fap fn args =>
         if fn == arrOp "set!" || fn == arrOp "setIfInBounds" || fn == arrOp "uset" then
           if let some (.fvar y) := (args[1]? : Option (Arg .impure)) then addAlias x (← root y)
@@ -3023,6 +3074,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     let retTy ← fnRetKotlinType targetFn defRetTy
     return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
   | .oproj i x =>
+    if let some s ← classStructOf? x then
+      if let some fTy := (← classLayout s).objTypes[i]? then
+        if fTy != "Any?" then return fTy
     let xName ← getVarName x
     if let some xTy := (← get).varTypes[xName]? then
       if let some (t0, t1) := parseKotlinPairType? xTy then
@@ -3128,7 +3182,7 @@ unused, and the field is recorded as held by `x` (see `State.fieldVals`).
 def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : LetDecl .impure) :
     EmitM Unit := do
   if (← classStructOf? y).isSome then
-    let ty := toKotlinType decl.type
+    let ty ← inferLetKotlinType decl
     let n ← getVarName x
     recordVarType n ty
     modify fun st => { st with projSrc := st.projSrc.insert n y }
@@ -3574,24 +3628,41 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
                 if (← getVarName prev) != (← getVarName y) then
                   throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
               src? := some y
+        if src?.isNone then
+          for y in (← get).projSrc.values do
+            if (← mutableClassStructOf? y) == some s then
+              if let some prev := src? then
+                if (← getVarName prev) != (← getVarName y) then
+                  throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
+              src? := some y
         let some y := src?
           | throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{s}` (`@[mutable_kotlin_class]` values are only updated in place)"
+        let clsLayout ← classLayout s
         for h : k in [:args.size] do
           if let .fvar v := args[k] then
             if ← isWriteBack x v then continue
-          emitFieldWrite y (·.objs[k]?) (← toKotlinArg args[k])
+          let mut vStr ← toKotlinArg args[k]
+          if let some fTy := clsLayout.objTypes[k]? then
+            vStr ← castIfNeeded vStr fTy
+          emitFieldWrite y (·.objs[k]?) vStr
         setParamVarName x (← getVarName y)
       else if let some cls := Compiler.getImmutableKotlinClass? (← getEnv) info.name.getPrefix then
         let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
         let layout ← getCtorLayout info.name
+        let clsLayout ← classLayout info.name.getPrefix
         let mut ctorArgs : Array String := #[]
         for fi in layout.fieldInfo do
           match fi with
-          | .object i _ => ctorArgs := ctorArgs.push (objs[i]?.getD "null")
+          | .object i _ =>
+            let mut vStr := objs[i]?.getD "null"
+            if let some fTy := clsLayout.objTypes[i]? then
+              vStr ← castIfNeeded vStr fTy
+            ctorArgs := ctorArgs.push vStr
           | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
           | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
           | _ => pure ()
-        let rhs := s!"{cls}({String.intercalate ", " ctorArgs.toList})"
+        let clsName := ({ recvType := cls : Compiler.KotlinMemberInfo }).className
+        let rhs := s!"{clsName}({String.intercalate ", " ctorArgs.toList})"
         if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
           setParamVarName x rhs
           recordVarType rhs cls
@@ -3625,8 +3696,17 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
       setParamVarName x (if (← isMutableClassFVar y) then "false" else "true")
     | .reset _ y => setParamVarName x (← getVarName y)
     | .reuse y _ _ args =>
+      let layout? ← match ← classStructOf? y with
+        | some s => some <$> classLayout s
+        | none => pure none
       for h : k in [:args.size] do
-        emitFieldWrite y (·.objs[k]?) (← toKotlinArg args[k])
+        if let .fvar v := args[k] then
+          if ← isWriteBack x v then continue
+        let mut vStr ← toKotlinArg args[k]
+        if let some layout := layout? then
+          if let some fTy := layout.objTypes[k]? then
+            vStr ← castIfNeeded vStr fTy
+        emitFieldWrite y (·.objs[k]?) vStr
       setParamVarName x (← getVarName y)
     | .fap fn args =>
       if let some (a, idx, v, checkBounds) ← arraySet? fn args then
@@ -4535,8 +4615,40 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     | none =>
       let (hdr, usedH) := spliceMembers headerText memberBufs
       let (ftr, usedF) := spliceMembers footerText memberBufs
+      let hasClassDecl (text cls : String) : Bool :=
+        text.contains s!"class {cls}(" || text.contains s!"class {cls} " || text.contains s!"class {cls}\{"
+      let localClassStructs :=
+        (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
+        (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
+      let mut synthClasses : Std.HashSet String := {}
+      let mut synthBuf := ""
+      for s in localClassStructs do
+        if (← hasTrivialImpureStructure? s).isSome then continue
+        let some rawCls := Compiler.getKotlinClass? env s | continue
+        let cls := ({ recvType := rawCls : Compiler.KotlinMemberInfo }).className
+        if usedH.contains cls || usedF.contains cls || synthClasses.contains cls ||
+           hasClassDecl headerText cls || hasClassDecl footerText cls then
+          continue
+        synthClasses := synthClasses.insert cls
+        let isMut := Compiler.isMutableKotlinClass env s
+        let propKw := if isMut then "var" else "val"
+        let layout ← classLayout s
+        let propStr := String.intercalate ", " (layout.orderedFields.map fun (f, t) => s!"{propKw} {f}: {t}").toList
+        let clsBuf ← captureBuf do
+          if let some (.inl doc) ← findInternalDocString? env s (includeBuiltin := false) then
+            for l in kdocLines doc do emitLn l
+          let members := memberBufs.getD cls ""
+          if members.isEmpty then
+            emitLn s!"class {cls}({propStr})"
+            emitLn ""
+          else
+            emitLn s!"class {cls}({propStr}) \{"
+            emit (reindent "    " members)
+            emitLn "}"
+            emitLn ""
+        synthBuf := synthBuf ++ clsBuf
       for cls in memberBufs.keys do
-        unless usedH.contains cls || usedF.contains cls do
+        unless usedH.contains cls || usedF.contains cls || synthClasses.contains cls do
           throwError "Kotlin backend: no `// @LeanMembers({cls})` marker in the preamble or footer"
       emitLn "// Generated automatically by Lean 4 to Kotlin compiler backend."
       emitLn "// DO NOT EDIT DIRECTLY."
@@ -4547,6 +4659,7 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       if !headerText.isEmpty then
         emit hdr
         emitLn ""
+      emit synthBuf
       emit topBuf
       if !footerText.isEmpty then
         emitLn ""
