@@ -9,6 +9,7 @@ prelude
 public import Lean.Compiler.LCNF.Util
 public import Lean.Compiler.LCNF.BaseTypes
 public import Lean.Compiler.LCNF.Irrelevant
+import Lean.Compiler.KotlinAttrs
 
 public section
 
@@ -30,7 +31,8 @@ Return `some fieldIdx` if `declName` is the name of an inductive datatype s.t.
 
 Requires `compileDecls` to have been run for inductive `declName`.
 -/
-def hasTrivialStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) :=
+def hasTrivialStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
+  if Compiler.isMutableKotlinClass (← getEnv) declName then return none
   Irrelevant.hasTrivialStructure? trivialStructureInfoExt declName
 
 def getParamTypes (type : Expr) : Array Expr :=
@@ -113,9 +115,13 @@ miss for those is reported as an error. Other declarations have their mono type 
 signature on demand and cached for the current module.
 -/
 def getOtherDeclMonoType (declName : Name) : CoreM Expr := do
-  if let some type := monoTypeExt.find? (← getEnv) declName then
+  let env ← getEnv
+  if let some (.ctorInfo cv) := env.find? declName then
+    if Compiler.isMutableKotlinClass env cv.induct then
+      return ← toMonoType (← getOtherDeclBaseType declName [])
+  if let some type := monoTypeExt.find? env declName then
     return type
-  if (← getEnv).find? declName matches some (.inductInfo _) | some (.ctorInfo _) then
+  if env.find? declName matches some (.inductInfo _) | some (.ctorInfo _) then
     throwError "`{declName}` was not compiled; `compileDecls` must run on inductive types first"
   let type ← toMonoType (← getOtherDeclBaseType declName [])
   -- avoid `addEntry` for local-only caching
