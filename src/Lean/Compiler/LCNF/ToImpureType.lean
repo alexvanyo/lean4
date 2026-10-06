@@ -13,7 +13,7 @@ import Lean.Compiler.KotlinAttrs
 
 namespace Lean.Compiler.LCNF
 
-register_builtin_option compiler.kotlin.typedArrays : Bool := {
+public register_builtin_option compiler.kotlin.typedArrays : Bool := {
   defValue := false
   descr := "(Kotlin backend) represent `Array α` as a Kotlin array: `LongArray` for `UInt64`, \
     `IntArray` for `UInt32`, `DoubleArray` for `Float`, `FloatArray` for `Float32` and \
@@ -21,7 +21,7 @@ register_builtin_option compiler.kotlin.typedArrays : Bool := {
 }
 
 /-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/
-def kotlinArrayType (elemType : Lean.Expr) : String :=
+public def kotlinArrayType (elemType : Lean.Expr) : String :=
   match elemType with
   | .const ``Int64 _ => "LongArray"
   | .const ``Int32 _ => "IntArray"
@@ -80,6 +80,9 @@ public def setHasTrivialImpureStructure? (declName : Name) : CoreM Unit :=
 public def hasTrivialImpureStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
   let env ← getEnv
   if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName then return none
+  if Compiler.getKotlinClassSpec? env declName matches some _ then
+    if let some iv := isInductiveCore? env declName then
+      if iv.numParams > 0 then return none
   Irrelevant.hasTrivialStructure? impureTrivialStructureInfoExt declName
 
 /--
@@ -154,7 +157,17 @@ public def nameToImpureType (name : Name) : CoreM Expr := do
   if let some type := builtinImpureType? name then return type
   let env ← getEnv
   if let some cls := Compiler.getKotlinClass? env name then
-    return ImpureType.jvmType s!"kotlin:{cls}"
+    let fullCls :=
+      if !cls.contains '<' then
+        match isInductiveCore? env name with
+        | some iv =>
+          if iv.numParams > 0 then
+            let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+            s!"{cls}<{stars}>"
+          else cls
+        | none => cls
+      else cls
+    return ImpureType.jvmType s!"kotlin:{fullCls}"
   let some (.inductInfo _) := env.find? name | do
     if let some desc := getExternNameFor env `kotlin name then
       if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then

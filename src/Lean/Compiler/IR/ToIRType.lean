@@ -30,6 +30,7 @@ def nameToIRType (n : Name) : IRType :=
   | `tobj => .tobject
   | `tagged => .tagged
   | ``lcVoid => .void
+  | `jvmType => .tobject
   | _ => unreachable!
 
 

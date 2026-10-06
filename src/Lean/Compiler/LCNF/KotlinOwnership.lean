@@ -222,7 +222,8 @@ def escape (st : PathState) (i : Nat) : PathState :=
 def isArraySet (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
   fn == ``Array.set || fn == ``Array.set! || fn == ``Array.uset || fn == `Array.setIfInBounds || fn == `Array.fset ||
-    fn == ``Array.swap || fn == ``Array.swapIfInBounds || fn == `Array.uswap
+    fn == ``Array.swap || fn == ``Array.swapIfInBounds || fn == `Array.uswap ||
+    (fn.isStr && fn.getString! == "aset")
 
 def isScalarArraySet (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
@@ -249,7 +250,8 @@ def isArrayAlloc (fn : Name) : Bool :=
     fn == `ByteArray.markLinear || fn == `String.toUTF8 || fn == `String.toByteArray ||
     fn == `FloatArray.emptyWithCapacity || fn == `FloatArray.empty ||
     fn == `FloatArray.mk || fn == `FloatArray.data || fn == `FloatArray.push ||
-    fn == `FloatArray.markLinear
+    fn == `FloatArray.markLinear ||
+    (fn.isStr && (fn.getString!.startsWith "alloc" || fn.getString!.startsWith "empty"))
 
 def isPropagateMark (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn

@@ -32,6 +32,7 @@ import Lean.Compiler.LCNF.ExplicitRC
 import Lean.Compiler.LCNF.CoalesceRC
 public import Lean.Compiler.KotlinSpec
 import Lean.DocString.Extension
+import Lean.AuxRecursor
 import Std.Data.HashSet
 
 namespace Lean.Compiler.LCNF
@@ -251,7 +252,8 @@ partial def toKotlinType (ty : Expr) : String :=
   | _ => "Any?"
 
 def isRichMonoType (e : Expr) : Bool :=
-  e.isForall || e.isConstOf ``Nat || e.isConstOf ``String || e.isConstOf ``ByteArray || e.isConstOf ``FloatArray || e.isAppOfArity ``Prod 2
+  e.isForall || e.isConstOf ``Nat || e.isConstOf ``String || e.isConstOf ``ByteArray || e.isConstOf ``FloatArray || e.isAppOfArity ``Prod 2 ||
+  e.isAppOf `jvmType
 
 def isAdtMonoType (e : Expr) : Bool :=
   let fn := e.getAppFn
@@ -350,9 +352,60 @@ def extractNatLiteralDigits? (s : String) : Option String :=
   else if !s.isEmpty && s.all Char.isDigit then some s
   else none
 
-def stripBigIntSizeToInt? (s : String) : Option String :=
-  if s.startsWith "java.math.BigInteger.valueOf(" && (s.endsWith ".size.toLong())" || s.endsWith ".length.toLong())") then
-    some ((s.drop 29).take (s.length - 39)).toString
+partial def stripOuterParens (s : String) : String := Id.run do
+  let s := s.trimAscii.toString
+  if s.startsWith "(" && s.endsWith ")" && s.length >= 2 then
+    let mut depth := 0
+    let mut matched := true
+    let chars := s.toList
+    for h : i in [:chars.length] do
+      let c := chars[i]
+      if c == '(' then depth := depth + 1
+      else if c == ')' then
+        depth := depth - 1
+        if depth == 0 && i < chars.length - 1 then
+          matched := false
+          break
+    if matched && depth == 0 then
+      stripOuterParens ((s.drop 1).take (s.length - 2)).toString
+    else
+      s
+  else
+    s
+
+def stripBigIntToInt? (s : String) : Option String := Id.run do
+  let sClean := stripOuterParens s
+  if sClean.startsWith "java.math.BigInteger.valueOf(" && sClean.endsWith ")" then
+    let chars := sClean.toList
+    let mut depth := 0
+    let mut closingIdx? : Option Nat := none
+    for h : i in [:chars.length] do
+      let c := chars[i]
+      if c == '(' then depth := depth + 1
+      else if c == ')' then
+        depth := depth - 1
+        if depth == 0 then
+          closingIdx? := some i
+          break
+    if closingIdx? == some (chars.length - 1) then
+      let inner := stripOuterParens ((sClean.drop 29).take (sClean.length - 30)).toString
+      if inner.endsWith ".size.toLong()" then
+        some ((inner.take (inner.length - 14)).toString ++ ".size")
+      else if inner.endsWith ".length.toLong()" then
+        some ((inner.take (inner.length - 16)).toString ++ ".length")
+      else if inner.endsWith ".toLong()" then
+        let base := stripOuterParens (inner.take (inner.length - 9)).toString
+        if base.endsWith ".toUInt()" then
+          some (stripOuterParens (base.take (base.length - 9)).toString)
+        else if base.endsWith ".toInt()" then
+          some (stripOuterParens (base.take (base.length - 8)).toString)
+        else
+          some s!"({base}).toInt()"
+      else
+        some s!"({inner}).toInt()"
+    else none
+  else if let some d := extractNatLiteralDigits? sClean then
+    if d.length <= 9 then some d else none
   else none
 
 def kotlinIntConversionMethod (targetTy : String) : Option String :=
@@ -390,7 +443,7 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
         | "UShort" => return s!"({d}u).toUShort()"
         | _ => pure ()
     if targetTy == "Int" then
-      if let some inner := stripBigIntSizeToInt? s then
+      if let some inner := stripBigIntToInt? s then
         return inner
   if let some actualTy := actualTy? then
     if isKotlinIntType actualTy then
@@ -489,27 +542,6 @@ def formatInt64 (n : UInt64) : String :=
 def formatUInt64 (n : UInt64) : String :=
   s!"{n.toNat}uL"
 
-partial def stripOuterParens (s : String) : String := Id.run do
-  let s := s.trimAscii.toString
-  if s.startsWith "(" && s.endsWith ")" && s.length >= 2 then
-    let mut depth := 0
-    let mut matched := true
-    let chars := s.toList
-    for h : i in [:chars.length] do
-      let c := chars[i]
-      if c == '(' then depth := depth + 1
-      else if c == ')' then
-        depth := depth - 1
-        if depth == 0 && i < chars.length - 1 then
-          matched := false
-          break
-    if matched && depth == 0 then
-      stripOuterParens ((s.drop 1).take (s.length - 2)).toString
-    else
-      s
-  else
-    s
-
 def stripToLong? (s : String) : Option String :=
   let sClean := stripOuterParens s
   if sClean.endsWith ".toLong()" && sClean.length >= 9 then
@@ -524,9 +556,13 @@ def fromNatTo (s : String) (targetTy : String) : EmitM String := do
     if let some d := extractNatLiteralDigits? s then
       if d.length <= 9 then
         return ← castIfNeeded s targetTy
-    if targetTy == "Int" then
-      if let some inner := stripBigIntSizeToInt? s then
-        return inner
+    let st ← get
+    let inner? := match stripBigIntToInt? s with
+      | some inner => some inner
+      | none => st.intSources[s]?
+    if let some inner := inner? then
+      if targetTy == "Int" then return inner
+      else return ← castIfNeeded inner targetTy (some "Int")
   if let some ty := (← get).varTypes[s]? then
     if isKotlinIntType ty || isBigIntType ty then
       return ← castIfNeeded s targetTy (some ty)
@@ -1218,10 +1254,16 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
 
     | ``Bool.decEq => return some s!"({a0} == {a1})"
     | ``Nat.decEq | `Nat.beq =>
+      if let (some i0, some i1) := (stripBigIntToInt? a0, stripBigIntToInt? a1) then
+        return some s!"({i0} == {i1})"
       return some s!"({← castIfNeeded a0 "java.math.BigInteger"} == {← castIfNeeded a1 "java.math.BigInteger"})"
     | ``Nat.decLt | `Nat.blt =>
+      if let (some i0, some i1) := (stripBigIntToInt? a0, stripBigIntToInt? a1) then
+        return some s!"({i0} < {i1})"
       return some s!"({← castIfNeeded a0 "java.math.BigInteger"} < {← castIfNeeded a1 "java.math.BigInteger"})"
     | ``Nat.decLe | `Nat.ble =>
+      if let (some i0, some i1) := (stripBigIntToInt? a0, stripBigIntToInt? a1) then
+        return some s!"({i0} <= {i1})"
       return some s!"({← castIfNeeded a0 "java.math.BigInteger"} <= {← castIfNeeded a1 "java.math.BigInteger"})"
     | `Nat.land =>
       return some s!"({← castIfNeeded a0 "java.math.BigInteger"}.and({← castIfNeeded a1 "java.math.BigInteger"}))"
@@ -1318,9 +1360,10 @@ Reference to field `name` of `recv`. On `this`, the field is referenced unqualif
 parameter of the current function has the same name.
 -/
 def fieldRef (recv name : String) : EmitM String := do
-  if recv != "this" then return s!"{recv}.{name}"
+  let propName := if isKotlinKeyword name then s!"`{name}`" else name
+  if recv != "this" then return s!"{recv}.{propName}"
   let shadowed ← (← read).currParams.anyM fun p => return (← getVarName p.fvarId) == name
-  return if shadowed then s!"this.{name}" else name
+  return if shadowed then s!"this.{propName}" else propName
 
 /-- Kotlin element type of a primitive Kotlin array type; `none` for `Array<Any?>`. -/
 def kotlinArrayElem? (arrTy : String) : Option String :=
@@ -1528,6 +1571,113 @@ def arraySwap? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option (Arg .im
     return some (args[1]!, iStr, jStr, true)
   return none
 
+def toKotlinTypeParamName (n : Name) (idx : Nat) : String :=
+  let s := n.eraseMacroScopes.toString
+  match s with
+  | "α" => if idx == 0 then "T" else "A"
+  | "β" => if idx == 1 then "U" else "B"
+  | "γ" => if idx == 2 then "V" else "C"
+  | "κ" => "K"
+  | "υ" => "V"
+  | "ρ" => "R"
+  | other =>
+    if other.isEmpty || other == "_" then s!"T{idx + 1}"
+    else if other.length == 1 then s!"{other.front.toUpper}"
+    else toPascalCase other
+
+def getDeclTypeParams (env : Environment) (declName : Name) : MetaM (Array (Name × String)) := do
+  let some info := env.find? declName | return #[]
+  Meta.forallTelescopeReducing info.type fun xs _ => do
+    let mut typeParams := #[]
+    let mut idx := 0
+    for x in xs do
+      let type ← Meta.inferType x
+      if type.isSort then
+        let binderName := (← x.fvarId!.getUserName).eraseMacroScopes
+        let ktName := toKotlinTypeParamName binderName idx
+        typeParams := typeParams.push (binderName, ktName)
+        idx := idx + 1
+    return typeParams
+
+def getDeclNumTypeParams (env : Environment) (declName : Name) : MetaM Nat := do
+  let some info := env.find? declName | return 0
+  Meta.forallTelescopeReducing info.type fun xs _ => do
+    let mut count := 0
+    for x in xs do
+      let type ← Meta.inferType x
+      if type.isSort then count := count + 1
+      else break
+    return count
+
+def isCompilerAuxDecl (env : Environment) (n : Name) : Bool :=
+  isAuxRecursor env n || isNoConfusion env n || isRecCore env n ||
+  match n with
+  | .str _ s =>
+    s.endsWith "_redArg" || s.contains "ctorIdx" || s.contains "ctorElim" ||
+    s.endsWith "_elim" || s.startsWith "_cstage" || s.startsWith "_jp"
+  | _ => false
+
+partial def formatGenericKotlinType (env : Environment) (typeParams : Std.HashMap Name String) (type : Expr) : MetaM String := do
+  let type ← Meta.whnf type
+  match (type : Expr) with
+  | .fvar fvarId =>
+    let uName := (← fvarId.getUserName).eraseMacroScopes
+    if let some t := typeParams[uName]? then return t
+    return "Any?"
+  | .bvar .. => return "Any?"
+  | .const declName _ =>
+    if let some t := typeParams[declName]? then return t
+    if declName == ``Bool || declName == ``Decidable then return "Boolean"
+    if declName == ``Nat then return "java.math.BigInteger"
+    if declName == ``String then return "String"
+    if declName == ``Unit || declName == ``PUnit then return "Unit"
+    if declName == ``UInt8 then return "UByte"
+    if declName == ``UInt16 then return "UShort"
+    if declName == ``UInt32 then return "UInt"
+    if declName == ``UInt64 then return "ULong"
+    if declName == ``USize then return "Int"
+    if declName == ``Int8 then return "Byte"
+    if declName == ``Int16 then return "Short"
+    if declName == ``Int32 then return "Int"
+    if declName == ``Int64 then return "Long"
+    if declName == ``ISize then return "Int"
+    if declName == ``Float then return "Double"
+    if declName == ``Float32 then return "Float"
+    if declName == ``ByteArray then return "ByteArray"
+    if declName == ``FloatArray then return "DoubleArray"
+    if let some spec := Compiler.getKotlinClassSpec? env declName then
+      if (← hasTrivialImpureStructure? declName).isSome then return "Any?"
+      return spec.baseClassName
+    return "Any?"
+  | .app .. =>
+    let fn := type.getAppFn
+    let args := type.getAppArgs
+    if fn.isConstOf ``Prod && args.size == 2 then
+      let t0 ← formatGenericKotlinType env typeParams args[0]!
+      let t1 ← formatGenericKotlinType env typeParams args[1]!
+      return s!"Pair<{t0}, {t1}>"
+    if fn.isConstOf ``Array && args.size == 1 then
+      if compiler.kotlin.typedArrays.get (← getOptions) then
+        let kt := kotlinArrayType args[0]!
+        if kt != "Array<Any?>" then return kt
+      return "Array<Any?>"
+    if let .const declName _ := fn then
+      if let some spec := Compiler.getKotlinClassSpec? env declName then
+        if (← hasTrivialImpureStructure? declName).isSome then return "Any?"
+        let base := spec.baseClassName
+        let argTys ← args.mapM (formatGenericKotlinType env typeParams)
+        let relevantArgs := argTys.filter (!·.isEmpty)
+        if relevantArgs.isEmpty then return base
+        else return s!"{base}<{String.intercalate ", " relevantArgs.toList}>"
+    return "Any?"
+  | .forallE .. =>
+    Meta.forallTelescopeReducing type fun xs ret => do
+      let paramTys ← xs.mapM fun x => do formatGenericKotlinType env typeParams (← Meta.inferType x)
+      let retTy ← formatGenericKotlinType env typeParams ret
+      let paramStr := String.intercalate ", " paramTys.toList
+      return s!"({paramStr}) -> {retTy}"
+  | _ => return "Any?"
+
 /-- Kotlin property names and types of a `@[kotlin_class]` structure by runtime position. -/
 structure ClassLayout where
   objs : Std.HashMap Nat String := {}
@@ -1536,25 +1686,31 @@ structure ClassLayout where
   scalars : Std.HashMap Nat String := {}
   usizes : Std.HashMap Nat String := {}
   orderedFields : Array (String × String) := #[]
+  typeParams : Array String := #[]
 
 def ctorClassLayout (ctorName : Name) : EmitM ClassLayout := do
   let env ← getEnv
   let some (.ctorInfo ctorVal) := env.find? ctorName | return {}
   let layout ← getCtorLayout ctorName
-  let (fieldNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+  let (typeParamNames, fieldNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+    let typeParams ← getDeclTypeParams env ctorVal.induct
+    let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
     Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
       let fieldXs := xs.extract ctorVal.numParams xs.size
       let names ← fieldXs.mapM fun x => do
         let n := (← x.fvarId!.getUserName).eraseMacroScopes.toString
         return if n.isEmpty || n == "_" then "field" else n
       let types ← fieldXs.mapM fun x => do
-        let t ← toLCNFType (← Meta.inferType x)
+        let fieldType ← Meta.inferType x
+        let genTy ← formatGenericKotlinType env typeParamMap fieldType
+        if genTy != "Any?" then return genTy
+        let t ← toLCNFType fieldType
         let mt ← toMonoType t
         if isRichMonoType mt then return toKotlinType mt
         let it ← toImpureType mt
         return toKotlinType it
-      return (names, types))
-  let mut r : ClassLayout := {}
+      return (typeParams.map (·.2), names, types) : CoreM (Array String × Array String × Array String))
+  let mut r : ClassLayout := { typeParams := typeParamNames }
   let mut seenFieldNames : Std.HashSet String := {}
   for h : k in [:layout.fieldInfo.size] do
     let rawName := fieldNames[k]?.getD s!"field{k}"
@@ -1595,17 +1751,23 @@ def classLayout (s : Name) : EmitM ClassLayout := do
   let fields := getStructureFields env s
   let ctorVal := getStructureCtor env s
   let layout ← getCtorLayout ctorVal.name
-  let fieldKotlinTypes ← (Meta.MetaM.run' do
+  let (typeParamNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+    let typeParams ← getDeclTypeParams env s
+    let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
     Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
       let fieldXs := xs.extract ctorVal.numParams xs.size
-      fieldXs.mapM fun x => do
-        let t ← toLCNFType (← Meta.inferType x)
+      let fieldTys ← fieldXs.mapM fun x => do
+        let fieldType ← Meta.inferType x
+        let genTy ← formatGenericKotlinType env typeParamMap fieldType
+        if genTy != "Any?" then return genTy
+        let t ← toLCNFType fieldType
         let mt ← toMonoType t
         if isRichMonoType mt then return toKotlinType mt
         let it ← toImpureType mt
-        return toKotlinType it : CoreM (Array String))
+        return toKotlinType it
+      return (typeParams.map (·.2), fieldTys) : CoreM (Array String × Array String))
   let tyOverrides := (Compiler.getKotlinTypes? env s).getD #[]
-  let mut r : ClassLayout := {}
+  let mut r : ClassLayout := { typeParams := typeParamNames }
   let mut relIdx := 0
   for h : k in [:layout.fieldInfo.size] do
     let name := match fields[k]? with
@@ -1813,15 +1975,29 @@ def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Em
     return some (defaultKotlinVal (toKotlinType resTy))
   let env ← getEnv
   let some extStr := getExternNameFor env `kotlin fn | return none
+  let runtimeArgs ← (Meta.MetaM.run' do
+    let some info := env.find? fn | return args
+    Meta.forallTelescopeReducing info.type fun xs _ => do
+      let mut filtered : Array (Arg .impure) := #[]
+      for i in [:min xs.size args.size] do
+        let x := xs[i]!
+        let ty ← Meta.inferType x
+        if ty.isSort then continue
+        if (← Meta.isClass? ty).isSome then continue
+        filtered := filtered.push args[i]!
+      if args.size > xs.size then
+        for i in [xs.size:args.size] do
+          filtered := filtered.push args[i]!
+      return filtered : CoreM (Array (Arg .impure)))
   if extStr.startsWith "kotlin_expr:" then
-    let argStrs ← args.mapM toKotlinArg
+    let argStrs ← runtimeArgs.mapM toKotlinArg
     return some (instantiateKotlinTemplate (extStr.drop 12).toString argStrs)
   if extStr.startsWith "kotlin_inplace:" then
-    let argStrs ← args.mapM toKotlinArg
+    let argStrs ← runtimeArgs.mapM toKotlinArg
     return some (instantiateKotlinTemplate (extStr.drop 15).toString argStrs)
   unless extStr.startsWith "kotlin_op:" do return none
   let op := (extStr.drop 10).toString
-  let argStrs ← args.mapM toKotlinArg
+  let argStrs ← runtimeArgs.mapM toKotlinArg
   match op with
   | "cast" => return some (← castIfNeeded argStrs[0]! (toKotlinType resTy))
   | "id" => return some argStrs[0]!
@@ -1845,9 +2021,12 @@ def memberKotlinName (declName : Name) (info : Compiler.KotlinMemberInfo) : Stri
 def emitMemberCall? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   let some info := Compiler.getKotlinMemberInfo? (← getEnv) fn | return none
   if args.isEmpty then return none
-  let recv ← toKotlinArg args[0]!
+  let numTypeParams ← (Meta.MetaM.run' (getDeclNumTypeParams (← getEnv) fn) : CoreM Nat)
+  let runtimeArgs := args.extract numTypeParams args.size
+  if runtimeArgs.isEmpty then return none
+  let recv ← toKotlinArg runtimeArgs[0]!
   let tyOverrides := (Compiler.getKotlinTypes? (← getEnv) fn).getD #[]
-  let rest ← (args.extract 1 args.size).mapIdxM fun i a => do
+  let rest ← (runtimeArgs.extract 1 runtimeArgs.size).mapIdxM fun i a => do
     let s ← toKotlinArg a
     match tyOverrides[i]? with
     | some t => if t == "_" then pure s else castIfNeeded s t
@@ -1857,7 +2036,7 @@ def emitMemberCall? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option Str
     if (← read).currClass? == some info.className then
       return some call
     return some s!"{← castIfNeeded "this" info.recvType}.{call}"
-  let sameType ← match args[0]! with
+  let sameType ← match runtimeArgs[0]! with
     | .fvar f => do pure (toKotlinType (← getType f) == info.recvType || (← get).varTypes[recv]? == some info.recvType)
     | .erased => pure false
   if sameType then
@@ -1958,15 +2137,29 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       return expr
     let fnName := toKotlinFnName fn
     let monoDecl? ← getMonoDecl? fn
+    let isAux := isCompilerAuxDecl (← getEnv) fn
+    let numTypeParams ← (Meta.MetaM.run' do
+      if isAux then return 0
+      getDeclNumTypeParams (← getEnv) fn : CoreM Nat)
+    let runtimeArgs := args.extract numTypeParams args.size
+    let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[fn]? with
+      | some d => pure (some d.params)
+      | none => (·.map (·.params)) <$> getImpureSignature? fn
     let mut argStrs : Array String := #[]
-    for i in [:args.size] do
-      let aStr ← toKotlinArg args[i]!
-      let aStr ← match monoDecl?.bind (·.params[i]?) with
-        | some mp =>
-          if isRichMonoType mp.type then
-            castIfNeeded aStr (toKotlinType mp.type)
-          else
-            pure aStr
+    for i in [:runtimeArgs.size] do
+      let fullIdx := numTypeParams + i
+      let aStr ← toKotlinArg runtimeArgs[i]!
+      let expectedTy? := match impureParams?.bind (·[fullIdx]?) with
+        | some p =>
+          let kt := toKotlinType p.type
+          if kt != "Any?" then some kt else none
+        | none => none
+      let expectedTy? := expectedTy?.orElse fun _ =>
+        match monoDecl?.bind (·.params[fullIdx]?) with
+        | some mp => if isRichMonoType mp.type then some (toKotlinType mp.type) else none
+        | none => none
+      let aStr ← match expectedTy? with
+        | some expectedTy => castIfNeeded aStr expectedTy
         | none => pure aStr
       argStrs := argStrs.push aStr
     let argStr := String.intercalate ", " argStrs.toList
@@ -1999,6 +2192,11 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       return s!"({fnName} as ({anyParams}) -> Any?)({argStr})"
   | .pap fn args =>
     let targetFn ← unboxedPapFn fn
+    let isAux := isCompilerAuxDecl (← getEnv) targetFn
+    let numTypeParams ← (Meta.MetaM.run' do
+      if isAux then return 0
+      getDeclNumTypeParams (← getEnv) targetFn : CoreM Nat)
+    let runtimeArgs := args.extract numTypeParams args.size
     let monoDecl? ← getMonoDecl? targetFn
     let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[targetFn]? with
       | some d => pure (some d.params)
@@ -2006,23 +2204,29 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     let numParams := match impureParams? with
       | some ps => ps.size
       | none => (monoDecl?.map (·.params.size)).getD args.size
+    let runtimeNumParams := numParams - numTypeParams
     let paramTy (i : Nat) : String :=
-      let impTy := match impureParams?.bind (·[i]?) with
+      let fullIdx := numTypeParams + i
+      let impTy := match impureParams?.bind (·[fullIdx]?) with
         | some p => toKotlinType p.type
         | none => "Any?"
       if impTy != "Any?" then impTy
-      else match monoDecl?.bind (·.params[i]?) with
+      else match monoDecl?.bind (·.params[fullIdx]?) with
         | some mp => if isRichMonoType mp.type then toKotlinType mp.type else "Any?"
         | none => "Any?"
     let mut callArgs : Array String := #[]
-    let mut fullArgs : Array (Arg .impure) := args
-    for i in [:args.size] do
-      let aStr ← toKotlinArg args[i]!
+    let mut fullArgs : Array (Arg .impure) := runtimeArgs
+    for i in [:runtimeArgs.size] do
+      let aStr ← toKotlinArg runtimeArgs[i]!
       let aStr ← castIfNeeded aStr (paramTy i)
       callArgs := callArgs.push aStr
+    let inScope ← (← read).currParams.mapM fun p => getVarName p.fvarId
     let mut lambdaParams : Array String := #[]
-    for i in [args.size:numParams] do
-      let pName := s!"p_{i - args.size}"
+    for i in [runtimeArgs.size:runtimeNumParams] do
+      let idx := i - runtimeArgs.size
+      let mut pName := s!"p_{idx}"
+      if inScope.contains pName then
+        pName := s!"arg_{idx}"
       let pTy := paramTy i
       lambdaParams := lambdaParams.push s!"{pName}: {pTy}"
       callArgs := callArgs.push pName
@@ -2033,7 +2237,9 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     let callStr ← match ← emitPrimitiveOp? targetFn fullArgs with
       | some primExpr => pure primExpr
       | none =>
-        let fnName := toKotlinFnName targetFn
+        let fnName :=
+          if numTypeParams > 0 then s!"{toKotlinFnName targetFn}___redArg"
+          else toKotlinFnName targetFn
         pure s!"{fnName}({String.intercalate ", " callArgs.toList})"
     let paramStr := String.intercalate ", " lambdaParams.toList
     return s!"\{ {paramStr} -> {callStr} }"
@@ -2063,7 +2269,8 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         castIfNeeded s!"({xName} as Array<*>)[{1 + i}]" targetTy
       else
         let prop := if i == 0 then "first" else "second"
-        castIfNeeded s!"(if ({xName} is Pair<*, *>) {xName}.{prop} else ({xName} as Array<*>)[{1 + i}])" targetTy
+        let recv := if xName.all (fun c => c.isAlphanum || c == '_') then xName else s!"({xName} as Pair<*, *>)"
+        castIfNeeded s!"(if ({xName} is Pair<*, *>) {recv}.{prop} else ({xName} as Array<*>)[{1 + i}])" targetTy
   | .sproj n off x =>
     if (← classStructOf? x).isSome then classField x (·.scalars[off]?)
     else
@@ -3096,6 +3303,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
        baseFn == arrOp "uget" || baseFn == arrOp "ugetBorrowed" then
       let arrTy ← arrayType (args[1]?.getD .erased)
       return (kotlinArrayElem? arrTy).getD baseTy
+    if baseFn.isStr && baseFn.getString! == "aget" then
+      let arrTy ← arrayType (args[args.size - 2]?.getD .erased)
+      return (kotlinArrayElem? arrTy).getD baseTy
     if baseFn == arrOp "push" || baseFn == arrOp "pop" then
       return ← arrayType (args[1]?.getD .erased)
     if baseFn == arrOp "propagateMark" || baseFn == `Array.propagateMark._redArg ||
@@ -3154,7 +3364,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
   | .oproj i x =>
     if let some s ← classStructOf? x then
-      if let some fTy := (← classLayout s).objTypes[i]? then
+      let layout ← classLayout s
+      if let some fTy := layout.objTypes[i]? then
+        if layout.typeParams.contains fTy then return "Any?"
         if fTy != "Any?" then return fTy
     let xName ← getVarName x
     if let some xTy := (← get).varTypes[xName]? then
@@ -3233,22 +3445,28 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       if extStr == "kotlin_expr:null" then
         setParamVarName x "null"
         return true
-      if extStr == "kotlin_op:id" && args.size == 1 then
-        setParamVarName x (← toKotlinArg args[0]!)
-        return true
-      if extStr == "kotlin_op:cast" && args.size == 1 then
-        let a0 ← toKotlinArg args[0]!
-        let targetTy := toKotlinType decl.type
-        if targetTy == "Any?" || (← get).varTypes[a0]? == some targetTy then
-          setParamVarName x a0
+      if extStr == "kotlin_op:id" then
+        if let some a := args.back? then
+          setParamVarName x (← toKotlinArg a)
           return true
+      if extStr == "kotlin_op:cast" then
+        if let some a := args.back? then
+          let a0 ← toKotlinArg a
+          let targetTy := toKotlinType decl.type
+          if targetTy == "Any?" || (← get).varTypes[a0]? == some targetTy then
+            setParamVarName x a0
+            return true
     if args.size == 1 then
       let a0 ← toKotlinArg args[0]!
-      if (← get).varTypes[a0]? == some "Int" then
+      let vt := (← get).varTypes[a0]?
+      if vt == some "Int" || vt == some "UInt" then
         match fn with
         | ``Int32.ofInt | ``ISize.ofInt | `Int32.toInt
-        | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32 =>
-          setParamVarName x a0
+        | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32
+        | ``UInt32.toNat | ``Int32.toNatClampNeg | ``USize.toNat =>
+          let intExpr := if vt == some "UInt" then s!"({a0}).toInt()" else a0
+          setParamVarName x intExpr
+          modify fun st => { st with intSources := st.intSources.insert intExpr intExpr }
           return true
         | _ => pure ()
     return false
@@ -3487,7 +3705,8 @@ def mayAliasArg (decl : LetDecl .impure) : EmitM Bool := do
         return true
     match fn with
     | ``Int32.ofInt | ``ISize.ofInt | `Int32.toInt
-    | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32 => return true
+    | `Int.toInt32 | ``Int32.toISize | ``ISize.toInt32
+    | ``UInt32.toNat | ``Int32.toNatClampNeg | ``USize.toNat => return true
     | _ => return false
   | _ => return false
 
@@ -3563,10 +3782,9 @@ def recordIntSource (n : String) (rhs : String) (decl : LetDecl .impure) : EmitM
     modify fun st => { st with intSources := st.intSources.insert n intExpr }
   else if let .fap fn args := decl.value then
     if args.size == 1 && (fn == ``Int32.toInt64 || fn == ``ISize.toInt64 || fn == ``UInt32.toUInt64 ||
-                          fn == ``Int64.ofInt) then
+                          fn == ``Int64.ofInt || fn == ``UInt32.toNat || fn == ``Int32.toNatClampNeg || fn == ``USize.toNat) then
       let a0 ← toKotlinArg args[0]!
-      if (← get).varTypes[a0]? == some "Int" then
-        modify fun st => { st with intSources := st.intSources.insert n a0 }
+      modify fun st => { st with intSources := st.intSources.insert n a0 }
 
 def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
   unless ← isInlineableLet decl do return false
@@ -3764,12 +3982,17 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
               | .object i _ =>
                 let mut vStr := objs[i]?.getD "null"
                 if let some fTy := ctorLayout.objTypes[i]? then
-                  vStr ← castIfNeeded vStr fTy
+                  if !ctorLayout.typeParams.any (fTy.contains ·) then
+                    vStr ← castIfNeeded vStr fTy
                 ctorArgs := ctorArgs.push vStr
               | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
               | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
               | _ => pure ()
-            let rhs := s!"{clsName}.{variantName}({String.intercalate ", " ctorArgs.toList})"
+            let typeArgs :=
+              if !ctorLayout.typeParams.isEmpty then
+                s!"<{String.intercalate ", " (ctorLayout.typeParams.map fun _ => "Any?").toList}>"
+              else ""
+            let rhs := s!"{clsName}.{variantName}{typeArgs}({String.intercalate ", " ctorArgs.toList})"
             if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
               setParamVarName x rhs
               recordVarType rhs clsName
@@ -3789,12 +4012,17 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             | .object i _ =>
               let mut vStr := objs[i]?.getD "null"
               if let some fTy := clsLayout.objTypes[i]? then
-                vStr ← castIfNeeded vStr fTy
+                if !clsLayout.typeParams.any (fTy.contains ·) then
+                  vStr ← castIfNeeded vStr fTy
               ctorArgs := ctorArgs.push vStr
             | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
             | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
             | _ => pure ()
-          let rhs := s!"{clsName}({String.intercalate ", " ctorArgs.toList})"
+          let typeArgs :=
+            if !clsLayout.typeParams.isEmpty && !clsName.contains '<' then
+              s!"<{String.intercalate ", " (clsLayout.typeParams.map fun _ => "Any?").toList}>"
+            else ""
+          let rhs := s!"{clsName}{typeArgs}({String.intercalate ", " ctorArgs.toList})"
           if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
             setParamVarName x rhs
             recordVarType rhs spec.className
@@ -4060,6 +4288,8 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
           let spec := (Compiler.getKotlinClassSpec? env inductName).get!
           let cls := spec.baseClassName
           let isEnum := Compiler.isKotlinEnum env inductName
+          let typeParams ← (Meta.MetaM.run' (getDeclTypeParams env inductName) : CoreM (Array (Name × String)))
+          let starProj := if !typeParams.isEmpty then "<*>" else ""
           emitIndent; emit s!"when ({discrName}) "; emitLn "{"
           withIndent do
             for alt in cs.alts do
@@ -4073,8 +4303,8 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
                     match env.find? info.name with
                     | some (.ctorInfo cv) =>
                       if cv.numFields == 0 then s!"{cls}.{variantName}"
-                      else s!"is {cls}.{variantName}"
-                    | _ => s!"is {cls}.{variantName}"
+                      else s!"is {cls}.{variantName}{starProj}"
+                    | _ => s!"is {cls}.{variantName}{starProj}"
                 emitIndent; emit s!"{cond} -> "; emitLn "{"
                 let savedStructs := (← get).nameStructs
                 modify fun st => { st with nameStructs := st.nameStructs.insert discrName info.name }
@@ -4388,7 +4618,12 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     match tyOverrides[i]? with
     | some t => if t == "_" then none else some t
     | none => none
-  let numEmitted := if member?.isSome then params.size - 1 else params.size
+  let isAux := isCompilerAuxDecl env decl.name
+  let numFnTypeParams ← (Meta.MetaM.run' do
+    if isAux then return 0
+    getDeclNumTypeParams env decl.name : CoreM Nat)
+  let runtimeParams := params.extract numFnTypeParams params.size
+  let numEmitted := if member?.isSome then runtimeParams.size - 1 else runtimeParams.size
   let retCast? := override? numEmitted
   -- A Lean result type of `Unit` becomes a Kotlin `Unit` return type.
   let rec resultType : Expr → Expr
@@ -4412,14 +4647,47 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
           pure (false, t?)
     | none => pure (retUnit, retCast?)
   let monoDecl? ← getMonoDecl? decl.name
-  let defaultRetTy := match monoDecl?.bind monoResultType? with
-    | some r => if isRichMonoType r then toKotlinType r else toKotlinType decl.type
-    | none => toKotlinType decl.type
+  let fnTypeInfo? ← (Meta.MetaM.run' do
+    if isAux then return none
+    let some info := env.find? decl.name | return none
+    let typeParams ← getDeclTypeParams env decl.name
+    let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
+    Meta.forallTelescopeReducing info.type fun xs retType => do
+      let runtimeXs ← xs.filterM fun x => do return !(← Meta.inferType x).isSort
+      let paramTys ← runtimeXs.mapM fun x => do formatGenericKotlinType env typeParamMap (← Meta.inferType x)
+      let retTy ← formatGenericKotlinType env typeParamMap retType
+      return some (typeParams, paramTys, retTy) : CoreM (Option (Array (Name × String) × Array String × String)))
+  let classTypeParams ← match member? with
+    | some info =>
+      match (← read).classStructs[info.className]? with
+      | some s => (Meta.MetaM.run' (getDeclTypeParams env s) : CoreM (Array (Name × String)))
+      | none => pure #[]
+    | none => pure #[]
+  let classTypeParamNames := classTypeParams.map (·.2)
+  let allFnTypeParams := (fnTypeInfo?.map (·.1)).getD #[]
+  let funcTypeParams :=
+    if member?.isSome then
+      allFnTypeParams.filter fun (_, kt) => !classTypeParamNames.contains kt
+    else
+      allFnTypeParams
+  let typeParamStr := if funcTypeParams.isEmpty then "" else s!"<{String.intercalate ", " (funcTypeParams.map (·.2)).toList}> "
+  let genericRetTy? := fnTypeInfo?.map (·.2.2)
+  let defaultRetTy :=
+    if let some gr := genericRetTy? then
+      if gr != "Any?" then gr else match monoDecl?.bind monoResultType? with
+        | some r => if isRichMonoType r then toKotlinType r else toKotlinType decl.type
+        | none => toKotlinType decl.type
+    else match monoDecl?.bind monoResultType? with
+      | some r => if isRichMonoType r then toKotlinType r else toKotlinType decl.type
+      | none => toKotlinType decl.type
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
   let mut seenParamNames : Std.HashSet String := {}
-  for i in [:params.size] do
-    let p := params[i]!
+  for i in [:numFnTypeParams] do
+    setParamVarName params[i]!.fvarId ""
+  for i in [:runtimeParams.size] do
+    let p := runtimeParams[i]!
+    let fullIdx := numFnTypeParams + i
     if i == 0 && member?.isSome then
       setParamVarName p.fvarId "this"
       if let some info := member? then
@@ -4429,7 +4697,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     else
       -- Parameter names are part of the Kotlin API (named arguments, API files), so keep the
       -- binder name when it is a plain identifier. Locals always get a numeric suffix.
-      let raw := (origParamNames[i]?.getD p.binderName).eraseMacroScopes.toString
+      let raw := (origParamNames[fullIdx]?.getD p.binderName).eraseMacroScopes.toString
       let pName :=
         if !raw.isEmpty && raw.all (fun c => c.isAlphanum || c == '_') && !(raw.front.isDigit) &&
            raw != "_" && !isKotlinKeyword raw && !seenParamNames.contains raw then raw
@@ -4437,16 +4705,33 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       seenParamNames := seenParamNames.insert pName
       setParamVarName p.fvarId pName
       let emittedIdx := if member?.isSome then i - 1 else i
-      let defaultParamTy := match monoDecl?.bind (·.params[i]?) with
-        | some mp => if isRichMonoType mp.type then toKotlinType mp.type else toKotlinType p.type
-        | none => toKotlinType p.type
-      let pType := (override? emittedIdx).getD defaultParamTy
+      let genericParamTy? := fnTypeInfo?.bind (·.2.1[i]?)
+      let defaultParamTy :=
+        if let some gp := genericParamTy? then
+          if gp != "Any?" then gp else match monoDecl?.bind (·.params[fullIdx]?) with
+            | some mp => if isRichMonoType mp.type then toKotlinType mp.type else toKotlinType p.type
+            | none => toKotlinType p.type
+        else match monoDecl?.bind (·.params[fullIdx]?) with
+          | some mp => if isRichMonoType mp.type then toKotlinType mp.type else toKotlinType p.type
+          | none => toKotlinType p.type
+      let rawPType := (override? emittedIdx).getD defaultParamTy
+      let (paramAnno, pType) :=
+        if rawPType.startsWith "@" then
+          let chars := rawPType.toList
+          match chars.reverse.findIdx? (· == ')') with
+          | some revIdx =>
+            let idx := chars.length - 1 - revIdx
+            let annos := String.ofList (chars.take (idx + 1))
+            let ty := (String.ofList (chars.drop (idx + 1))).trimAscii.toString
+            (annos ++ " ", ty)
+          | none => ("", rawPType)
+        else ("", rawPType)
       recordVarType pName pType
       if pType == "Any?" then
-        if let some mp := monoDecl?.bind (·.params[i]?) then
+        if let some mp := monoDecl?.bind (·.params[fullIdx]?) then
           if isAdtMonoType mp.type then
             modify fun st => { st with adtVars := st.adtVars.insert pName }
-      paramDecls := paramDecls.push s!"{pName}: {pType}"
+      paramDecls := paramDecls.push s!"{paramAnno}{pName}: {pType}"
   let paramStr := String.intercalate ", " paramDecls.toList
   let codeJP := hasRecursiveJP code
   let isTailRec := !codeJP && hasSelfTailCall decl.name code
@@ -4467,7 +4752,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let modsStr := if mods.isEmpty then "" else mods ++ " "
   if let some (.inl doc) ← findInternalDocString? env decl.name (includeBuiltin := false) then
     for l in kdocLines doc do emitLn l
-  emitIndent; emit s!"{modsStr}{auto}fun {fnName}({paramStr}): {retType} "; emitLn "{"
+  emitIndent; emit s!"{modsStr}{auto}fun {typeParamStr}{fnName}({paramStr}): {retType} "; emitLn "{"
   withIndent do
     withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape? }) do
       for p in params do discard <| classStructOf? p.fvarId
@@ -4718,7 +5003,15 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
   let toEmit := emittedLocal ++ emittedExt
   let classStructs := env.constants.map₂.foldl (init := ({} : Std.HashMap String Name)) fun m n _ =>
     match Compiler.getKotlinClassSpec? env n with
-    | some spec => m.insert spec.className n |>.insert spec.baseClassName n
+    | some spec =>
+      let m := m.insert spec.className n |>.insert spec.baseClassName n
+      match isInductiveCore? env n with
+      | some iv =>
+        if iv.numParams > 0 then
+          let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+          m.insert s!"{spec.baseClassName}<{stars}>" n
+        else m
+      | none => m
     | none =>
       match Compiler.getMutableKotlinClass? env n with
       | some t => m.insert t n |>.insert (({ recvType := t : Compiler.KotlinMemberInfo }).className) n
@@ -4847,19 +5140,42 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
                 emitLn ""
             else
               let isSealedClass := spec.kind? == some "sealed class"
-              let outerHeader := if isSealedClass then s!"sealed class {cls}" else s!"sealed interface {cls}"
-              let extendsClause := if isSealedClass then s!" : {cls}()" else s!" : {cls}"
+              let typeParams ← (Meta.MetaM.run' (getDeclTypeParams env s) : CoreM (Array (Name × String)))
+              let typeParamNames := typeParams.map (·.2)
+              let typeParamStr :=
+                if !typeParamNames.isEmpty && !cls.contains '<' then
+                  s!"<out {String.intercalate ", out " typeParamNames.toList}>"
+                else ""
+              let outerHeader := if isSealedClass then s!"sealed class {cls}{typeParamStr}" else s!"sealed interface {cls}{typeParamStr}"
               let dataMod := if spec.isData then "data " else ""
               emitLn s!"{outerHeader} \{"
               for ctorName in iv.ctors do
                 let some (.ctorInfo cv) := env.find? ctorName | continue
                 let variantName := toPascalCase ctorName.getString!
                 if cv.numFields == 0 then
-                  emitLn s!"    {dataMod}object {variantName}{extendsClause}"
+                  let baseExtends :=
+                    if !typeParamNames.isEmpty then
+                      let nothingArgs := s!"<{String.intercalate ", " (typeParamNames.map fun _ => "Nothing").toList}>"
+                      if isSealedClass then s!" : {cls}{nothingArgs}()" else s!" : {cls}{nothingArgs}"
+                    else
+                      if isSealedClass then s!" : {cls}()" else s!" : {cls}"
+                  emitLn s!"    {dataMod}object {variantName}{baseExtends}"
                 else
                   let ctorLayout ← ctorClassLayout ctorName
-                  let propStr := String.intercalate ", " (ctorLayout.orderedFields.map fun (f, t) => s!"val {f}: {t}").toList
-                  emitLn s!"    {dataMod}class {variantName}({propStr}){extendsClause}"
+                  let propStr := String.intercalate ", " (ctorLayout.orderedFields.map fun (f, t) =>
+                    let propName := if isKotlinKeyword f then s!"`{f}`" else f
+                    s!"val {propName}: {t}").toList
+                  let subTypeParamStr :=
+                    if !typeParamNames.isEmpty then
+                      s!"<out {String.intercalate ", out " typeParamNames.toList}>"
+                    else ""
+                  let subTypeArgs :=
+                    if !typeParamNames.isEmpty then
+                      s!"<{String.intercalate ", " typeParamNames.toList}>"
+                    else ""
+                  let baseExtends :=
+                    if isSealedClass then s!" : {cls}{subTypeArgs}()" else s!" : {cls}{subTypeArgs}"
+                  emitLn s!"    {dataMod}class {variantName}{subTypeParamStr}({propStr}){baseExtends}"
               if !members.isEmpty then
                 emitLn ""
                 emit (reindent "    " members)
@@ -4869,13 +5185,19 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
             let isMut := Compiler.isMutableKotlinClass env s
             let propKw := if isMut then "var" else "val"
             let layout ← classLayout s
-            let propStr := String.intercalate ", " (layout.orderedFields.map fun (f, t) => s!"{propKw} {f}: {t}").toList
+            let propStr := String.intercalate ", " (layout.orderedFields.map fun (f, t) =>
+              let propName := if isKotlinKeyword f then s!"`{f}`" else f
+              s!"{propKw} {propName}: {t}").toList
+            let typeParamStr :=
+              if !layout.typeParams.isEmpty && !cls.contains '<' then
+                s!"<{String.intercalate ", " layout.typeParams.toList}>"
+              else ""
             let dataPrefix := if spec.isData then "data " else ""
             if members.isEmpty then
-              emitLn s!"{dataPrefix}class {cls}({propStr})"
+              emitLn s!"{dataPrefix}class {cls}{typeParamStr}({propStr})"
               emitLn ""
             else
-              emitLn s!"{dataPrefix}class {cls}({propStr}) \{"
+              emitLn s!"{dataPrefix}class {cls}{typeParamStr}({propStr}) \{"
               emit (reindent "    " members)
               emitLn "}"
               emitLn ""
