@@ -78,7 +78,8 @@ public def setHasTrivialImpureStructure? (declName : Name) : CoreM Unit :=
   Irrelevant.setHasTrivialStructure? impureTrivialStructureInfoExt impureIrrelevantType declName
 
 public def hasTrivialImpureStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
-  if Compiler.isMutableKotlinClass (← getEnv) declName then return none
+  let env ← getEnv
+  if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName then return none
   Irrelevant.hasTrivialStructure? impureTrivialStructureInfoExt declName
 
 /--

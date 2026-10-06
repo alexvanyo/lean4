@@ -1,0 +1,525 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+enum class TrafficLight {
+    Red,
+    Green,
+    Yellow;
+}
+
+sealed interface ArithExpr {
+    class Lit(val v: Int) : ArithExpr
+    class Add(val l: ArithExpr, val r: ArithExpr) : ArithExpr
+    class Neg(val e: ArithExpr) : ArithExpr
+
+    public fun eval(): Int {
+        return f_evalArith(this)
+    }
+}
+
+sealed interface Shape {
+    data object Empty : Shape
+    data class Circle(val radius: Double) : Shape
+    data class Rect(val width: Double, val height: Double) : Shape
+}
+
+sealed class JsonValue {
+    data object NullVal : JsonValue()
+    data class BoolVal(val b: Boolean) : JsonValue()
+    data class NumVal(val n: Int) : JsonValue()
+    data class StrVal(val s: String) : JsonValue()
+}
+
+data class Vec2(val x: Int, val y: Int)
+
+@PublishedApi internal fun f_TrafficLight_ctorIdx(x: UByte): java.math.BigInteger {
+    when ((x).toInt())     {
+        0 ->         {
+            return java.math.BigInteger.ZERO
+        }
+        1 ->         {
+            return java.math.BigInteger.ONE
+        }
+        2 ->         {
+            return java.math.BigInteger.TWO
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_TrafficLight_ctorIdx___boxed(x: Any?): Any? {
+    val x_boxed_6_1 = (x as UByte)
+    return f_TrafficLight_ctorIdx(x_boxed_6_1)
+}
+
+@PublishedApi internal fun f_TrafficLight_ctorElim___redArg(k: Any?): Any? {
+    return k
+}
+
+@PublishedApi internal fun f_TrafficLight_ctorElim___redArg___boxed(k: Any?): Any? {
+    return f_TrafficLight_ctorElim___redArg(k)
+}
+
+@PublishedApi internal fun f_TrafficLight_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: UByte, h: Any?, k: Any?): Any? {
+    return k
+}
+
+@PublishedApi internal fun f_TrafficLight_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    val t_boxed_21_1 = (t as UByte)
+    return f_TrafficLight_ctorElim(motive, (ctorIdx as java.math.BigInteger), t_boxed_21_1, h, k)
+}
+
+@PublishedApi internal fun f_TrafficLight_red_elim___redArg(red: Any?): Any? {
+    return red
+}
+
+@PublishedApi internal fun f_TrafficLight_red_elim___redArg___boxed(red: Any?): Any? {
+    return f_TrafficLight_red_elim___redArg(red)
+}
+
+@PublishedApi internal fun f_TrafficLight_red_elim(motive: Any?, t: UByte, h: Any?, red: Any?): Any? {
+    return red
+}
+
+@PublishedApi internal fun f_TrafficLight_red_elim___boxed(motive: Any?, t: Any?, h: Any?, red: Any?): Any? {
+    val t_boxed_34_1 = (t as UByte)
+    return f_TrafficLight_red_elim(motive, t_boxed_34_1, h, red)
+}
+
+@PublishedApi internal fun f_TrafficLight_green_elim___redArg(green: Any?): Any? {
+    return green
+}
+
+@PublishedApi internal fun f_TrafficLight_green_elim___redArg___boxed(green: Any?): Any? {
+    return f_TrafficLight_green_elim___redArg(green)
+}
+
+@PublishedApi internal fun f_TrafficLight_green_elim(motive: Any?, t: UByte, h: Any?, green: Any?): Any? {
+    return green
+}
+
+@PublishedApi internal fun f_TrafficLight_green_elim___boxed(motive: Any?, t: Any?, h: Any?, green: Any?): Any? {
+    val t_boxed_47_1 = (t as UByte)
+    return f_TrafficLight_green_elim(motive, t_boxed_47_1, h, green)
+}
+
+@PublishedApi internal fun f_TrafficLight_yellow_elim___redArg(yellow: Any?): Any? {
+    return yellow
+}
+
+@PublishedApi internal fun f_TrafficLight_yellow_elim___redArg___boxed(yellow: Any?): Any? {
+    return f_TrafficLight_yellow_elim___redArg(yellow)
+}
+
+@PublishedApi internal fun f_TrafficLight_yellow_elim(motive: Any?, t: UByte, h: Any?, yellow: Any?): Any? {
+    return yellow
+}
+
+@PublishedApi internal fun f_TrafficLight_yellow_elim___boxed(motive: Any?, t: Any?, h: Any?, yellow: Any?): Any? {
+    val t_boxed_60_1 = (t as UByte)
+    return f_TrafficLight_yellow_elim(motive, t_boxed_60_1, h, yellow)
+}
+
+@PublishedApi internal fun f_lightToCode(c: TrafficLight): UInt {
+    when (c)     {
+        TrafficLight.Red ->         {
+            return 1u
+        }
+        TrafficLight.Green ->         {
+            return 2u
+        }
+        TrafficLight.Yellow ->         {
+            return 3u
+        }
+    }
+}
+
+@PublishedApi internal fun f_makeLight(tag: UInt): TrafficLight {
+    if (!(tag == 1u))     {
+        if (!(tag == 2u))         {
+            return TrafficLight.Yellow
+        } else         {
+            return TrafficLight.Green
+        }
+    } else     {
+        return TrafficLight.Red
+    }
+}
+
+@PublishedApi internal fun f_ArithExpr_ctorIdx(x: Any?): java.math.BigInteger {
+    when (x)     {
+        is ArithExpr.Lit ->         {
+            return java.math.BigInteger.ZERO
+        }
+        is ArithExpr.Add ->         {
+            return java.math.BigInteger.ONE
+        }
+        is ArithExpr.Neg ->         {
+            return java.math.BigInteger.TWO
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_ArithExpr_ctorIdx___boxed(x: Any?): Any? {
+    return f_ArithExpr_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_ArithExpr_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (t)     {
+        is ArithExpr.Lit ->         {
+            val v_82_1 = t.v
+            return (k as (Any?) -> Any?)(v_82_1)
+        }
+        is ArithExpr.Add ->         {
+            val l_85_2 = t.l
+            val r_86_3 = t.r
+            return (k as (Any?, Any?) -> Any?)(l_85_2, r_86_3)
+        }
+        is ArithExpr.Neg ->         {
+            val e_88_4 = t.e
+            return (k as (Any?) -> Any?)(e_88_4)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_ArithExpr_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_ArithExpr_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_ArithExpr_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
+}
+
+@PublishedApi internal fun f_ArithExpr_lit_elim___redArg(t: Any?, lit: (Int) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, lit)
+}
+
+@PublishedApi internal fun f_ArithExpr_lit_elim(motive: Any?, t: Any?, h: Any?, lit: (Int) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, lit)
+}
+
+@PublishedApi internal fun f_ArithExpr_add_elim___redArg(t: Any?, add: (Any?, Any?) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, add)
+}
+
+@PublishedApi internal fun f_ArithExpr_add_elim(motive: Any?, t: Any?, h: Any?, add: (Any?, Any?) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, add)
+}
+
+@PublishedApi internal fun f_ArithExpr_neg_elim___redArg(t: Any?, neg: (Any?) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, neg)
+}
+
+@PublishedApi internal fun f_ArithExpr_neg_elim(motive: Any?, t: Any?, h: Any?, neg: (Any?) -> Any?): Any? {
+    return f_ArithExpr_ctorElim___redArg(t, neg)
+}
+
+@PublishedApi internal fun f_evalArith(t: ArithExpr): Int {
+    when (t)     {
+        is ArithExpr.Lit ->         {
+            return t.v
+        }
+        is ArithExpr.Add ->         {
+            val l_128_1 = t.l
+            val r_129_2 = t.r
+            val v_x_130_3 = f_evalArith(l_128_1)
+            val v_x_131_4 = f_evalArith(r_129_2)
+            return (v_x_130_3 + v_x_131_4)
+        }
+        is ArithExpr.Neg ->         {
+            val e_133_5 = t.e
+            val v_x_134_6 = f_evalArith(e_133_5)
+            return (-v_x_134_6)
+        }
+    }
+}
+
+@PublishedApi internal fun f_sampleArith(x: Int, y: Int): ArithExpr {
+    return ArithExpr.Add(ArithExpr.Lit(x), ArithExpr.Neg(ArithExpr.Lit(y)))
+}
+
+@PublishedApi internal fun f_Shape_ctorIdx(x: Any?): java.math.BigInteger {
+    when (x)     {
+        Shape.Empty ->         {
+            return java.math.BigInteger.ZERO
+        }
+        is Shape.Circle ->         {
+            return java.math.BigInteger.ONE
+        }
+        is Shape.Rect ->         {
+            return java.math.BigInteger.TWO
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Shape_ctorIdx___boxed(x: Any?): Any? {
+    return f_Shape_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_Shape_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (t)     {
+        Shape.Empty ->         {
+            return k
+        }
+        is Shape.Circle ->         {
+            val radius_152_1 = t.radius
+            return (k as (Any?) -> Any?)(radius_152_1)
+        }
+        is Shape.Rect ->         {
+            val width_155_2 = t.width
+            val height_156_3 = t.height
+            return (k as (Any?, Any?) -> Any?)(width_155_2, height_156_3)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Shape_ctorElim___redArg___boxed(t: Any?, k: Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Shape_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Shape_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Shape_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
+}
+
+@PublishedApi internal fun f_Shape_empty_elim___redArg(t: Any?, empty: Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, empty)
+}
+
+@PublishedApi internal fun f_Shape_empty_elim___redArg___boxed(t: Any?, empty: Any?): Any? {
+    return f_Shape_empty_elim___redArg(t, empty)
+}
+
+@PublishedApi internal fun f_Shape_empty_elim(motive: Any?, t: Any?, h: Any?, empty: Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, empty)
+}
+
+@PublishedApi internal fun f_Shape_empty_elim___boxed(motive: Any?, t: Any?, h: Any?, empty: Any?): Any? {
+    return f_Shape_empty_elim(motive, t, h, empty)
+}
+
+@PublishedApi internal fun f_Shape_circle_elim___redArg(t: Any?, circle: (Double) -> Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, circle)
+}
+
+@PublishedApi internal fun f_Shape_circle_elim___redArg___boxed(t: Any?, circle: Any?): Any? {
+    return f_Shape_circle_elim___redArg(t, (circle as (Double) -> Any?))
+}
+
+@PublishedApi internal fun f_Shape_circle_elim(motive: Any?, t: Any?, h: Any?, circle: (Double) -> Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, circle)
+}
+
+@PublishedApi internal fun f_Shape_circle_elim___boxed(motive: Any?, t: Any?, h: Any?, circle: Any?): Any? {
+    return f_Shape_circle_elim(motive, t, h, (circle as (Double) -> Any?))
+}
+
+@PublishedApi internal fun f_Shape_rect_elim___redArg(t: Any?, rect: (Double, Double) -> Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, rect)
+}
+
+@PublishedApi internal fun f_Shape_rect_elim___redArg___boxed(t: Any?, rect: Any?): Any? {
+    return f_Shape_rect_elim___redArg(t, (rect as (Double, Double) -> Any?))
+}
+
+@PublishedApi internal fun f_Shape_rect_elim(motive: Any?, t: Any?, h: Any?, rect: (Double, Double) -> Any?): Any? {
+    return f_Shape_ctorElim___redArg(t, rect)
+}
+
+@PublishedApi internal fun f_Shape_rect_elim___boxed(motive: Any?, t: Any?, h: Any?, rect: Any?): Any? {
+    return f_Shape_rect_elim(motive, t, h, (rect as (Double, Double) -> Any?))
+}
+
+@PublishedApi internal fun f_area___closed__0(): Double {
+    return 0e-1
+}
+
+@PublishedApi internal fun f_area___closed__1(): Double {
+    return 3141592653589793e-15
+}
+
+@PublishedApi internal fun f_area(s: Shape): Double {
+    when (s)     {
+        Shape.Empty ->         {
+            return f_area___closed__0()
+        }
+        is Shape.Circle ->         {
+            val radius_233_1 = s.radius
+            val v_x_234_2 = f_area___closed__1()
+            return ((v_x_234_2 * radius_233_1) * radius_233_1)
+        }
+        is Shape.Rect ->         {
+            val width_237_3 = s.width
+            val height_238_4 = s.height
+            return (width_237_3 * height_238_4)
+        }
+    }
+}
+
+@PublishedApi internal fun f_makeEmpty(): Shape {
+    return Shape.Empty
+}
+
+@PublishedApi internal fun f_makeCircle(r: Double): Shape {
+    return Shape.Circle(r)
+}
+
+@PublishedApi internal fun f_makeRect(w: Double, h: Double): Shape {
+    return Shape.Rect(w, h)
+}
+
+@PublishedApi internal fun f_JsonValue_ctorIdx(x: Any?): java.math.BigInteger {
+    when (x)     {
+        JsonValue.NullVal ->         {
+            return java.math.BigInteger.ZERO
+        }
+        is JsonValue.BoolVal ->         {
+            return java.math.BigInteger.ONE
+        }
+        is JsonValue.NumVal ->         {
+            return java.math.BigInteger.TWO
+        }
+        is JsonValue.StrVal ->         {
+            return java.math.BigInteger.valueOf(3L)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_JsonValue_ctorIdx___boxed(x: Any?): Any? {
+    return f_JsonValue_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_JsonValue_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (t)     {
+        JsonValue.NullVal ->         {
+            return k
+        }
+        is JsonValue.BoolVal ->         {
+            val b_255_1 = t.b
+            return (k as (Any?) -> Any?)(b_255_1)
+        }
+        is JsonValue.NumVal ->         {
+            val n_258_2 = t.n
+            return (k as (Any?) -> Any?)(n_258_2)
+        }
+        is JsonValue.StrVal ->         {
+            val s_261_3 = t.s
+            return (k as (Any?) -> Any?)(s_261_3)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_JsonValue_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_JsonValue_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_JsonValue_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
+}
+
+@PublishedApi internal fun f_JsonValue_nullVal_elim___redArg(t: Any?, nullVal: Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, nullVal)
+}
+
+@PublishedApi internal fun f_JsonValue_nullVal_elim(motive: Any?, t: Any?, h: Any?, nullVal: Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, nullVal)
+}
+
+@PublishedApi internal fun f_JsonValue_boolVal_elim___redArg(t: Any?, boolVal: (Boolean) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, boolVal)
+}
+
+@PublishedApi internal fun f_JsonValue_boolVal_elim(motive: Any?, t: Any?, h: Any?, boolVal: (Boolean) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, boolVal)
+}
+
+@PublishedApi internal fun f_JsonValue_numVal_elim___redArg(t: Any?, numVal: (Int) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, numVal)
+}
+
+@PublishedApi internal fun f_JsonValue_numVal_elim(motive: Any?, t: Any?, h: Any?, numVal: (Int) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, numVal)
+}
+
+@PublishedApi internal fun f_JsonValue_strVal_elim___redArg(t: Any?, strVal: (String) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, strVal)
+}
+
+@PublishedApi internal fun f_JsonValue_strVal_elim(motive: Any?, t: Any?, h: Any?, strVal: (String) -> Any?): Any? {
+    return f_JsonValue_ctorElim___redArg(t, strVal)
+}
+
+@PublishedApi internal fun f_jsonToString___closed__0(): String {
+    return "null"
+}
+
+@PublishedApi internal fun f_jsonToString___closed__1(): String {
+    return "false"
+}
+
+@PublishedApi internal fun f_jsonToString___closed__2(): String {
+    return "true"
+}
+
+@PublishedApi internal fun f_jsonToString___closed__3(): String {
+    return "\""
+}
+
+@PublishedApi internal fun f_jsonToString(j: JsonValue): String {
+    when (j)     {
+        JsonValue.NullVal ->         {
+            return "null"
+        }
+        is JsonValue.BoolVal ->         {
+            val b_313_1 = j.b
+            if (!b_313_1)             {
+                return "false"
+            } else             {
+                return "true"
+            }
+        }
+        is JsonValue.NumVal ->         {
+            val n_316_2 = j.n
+            return (n_316_2).toString()
+        }
+        is JsonValue.StrVal ->         {
+            val s_319_3 = j.s
+            val v_x_320_4 = "\""
+            return ((v_x_320_4 + s_319_3) + v_x_320_4)
+        }
+    }
+}
+
+@PublishedApi internal fun f_makeJsonNull(): JsonValue {
+    return JsonValue.NullVal
+}
+
+@PublishedApi internal fun f_makeJsonBool(b: Boolean): JsonValue {
+    return JsonValue.BoolVal(b)
+}
+
+@PublishedApi internal fun f_makeJsonNum(n: Int): JsonValue {
+    return JsonValue.NumVal(n)
+}
+
+@PublishedApi internal fun f_makeJsonStr(s: String): JsonValue {
+    return JsonValue.StrVal(s)
+}
+
+@PublishedApi internal fun f_addVec2(a: Vec2, b: Vec2): Vec2 {
+    val x_332_1 = a.x
+    val y_333_2 = a.y
+    val x_334_3 = b.x
+    val y_335_4 = b.y
+    return Vec2((x_332_1 + x_334_3), (y_333_2 + y_335_4))
+}
+

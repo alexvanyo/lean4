@@ -32,7 +32,8 @@ Return `some fieldIdx` if `declName` is the name of an inductive datatype s.t.
 Requires `compileDecls` to have been run for inductive `declName`.
 -/
 def hasTrivialStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
-  if Compiler.isMutableKotlinClass (← getEnv) declName then return none
+  let env ← getEnv
+  if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName then return none
   Irrelevant.hasTrivialStructure? trivialStructureInfoExt declName
 
 def getParamTypes (type : Expr) : Array Expr :=

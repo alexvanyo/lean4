@@ -174,7 +174,8 @@ partial def lowerLet (decl : LetDecl .pure) (k : Code .pure) : ToImpureM (Code .
             | some .erased => loop (i + 1)
             | none => k.toImpure
           loop 0
-        let decl := ⟨decl.fvarId, decl.binderName, ctorInfo.type, .ctor ctorInfo objArgs⟩
+        let declType := if (getJvmTypeDesc? type).isSome then type else ctorInfo.type
+        let decl := ⟨decl.fvarId, decl.binderName, declType, .ctor ctorInfo objArgs⟩
         modifyLCtx fun lctx => lctx.addLetDecl decl
         return .let decl (← lowerNonObjectFields)
     | some (.defnInfo ..) | some (.opaqueInfo ..) => mkFap name irArgs

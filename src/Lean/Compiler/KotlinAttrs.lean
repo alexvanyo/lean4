@@ -8,6 +8,7 @@ module
 prelude
 public import Lean.Attributes
 public import Lean.Parser.Attr
+public import Lean.MonadEnv
 public import Lean.Structure
 
 public section
@@ -110,19 +111,76 @@ end Lean.Parser.Attr
 
 namespace Lean.Compiler
 
+/-- Parsed specification of a `@[kotlin_class]` attribute. -/
+structure KotlinClassSpec where
+  /-- Raw string argument from attribute, e.g. `"data sealed interface Shape"`. -/
+  raw : String
+  /-- Extracted Kotlin type/class name (e.g. `"Shape"` or `"Foo<*, *>"`). -/
+  className : String
+  /-- Whether `data` modifier was specified. -/
+  isData : Bool := false
+  /-- Explicit kind override: `"enum class"`, `"sealed interface"`, `"sealed class"`, `"class"`, or none. -/
+  kind? : Option String := none
+  deriving Inhabited
+
+/-- Splits a string into words separated by spaces. -/
+def splitWords (s : String) : List String :=
+  let (acc, cur) := s.foldl (init := (([] : List String), "")) fun (acc, cur) c =>
+    if c == ' ' then (if cur.isEmpty then acc else cur :: acc, "") else (acc, cur.push c)
+  (if cur.isEmpty then acc else cur :: acc).reverse
+
+/-- Parses a `@[kotlin_class]` string argument into modifiers and class name. -/
+def parseKotlinClassSpec (raw : String) : KotlinClassSpec := Id.run do
+  let tokens := splitWords raw
+  let mut isData := false
+  let mut kindTokens : List String := []
+  let mut remTokens : List String := tokens
+  if remTokens.head? == some "data" then
+    isData := true
+    remTokens := remTokens.tail
+  if remTokens.take 2 == ["sealed", "interface"] then
+    kindTokens := ["sealed", "interface"]
+    remTokens := remTokens.drop 2
+  else if remTokens.take 2 == ["sealed", "class"] then
+    kindTokens := ["sealed", "class"]
+    remTokens := remTokens.drop 2
+  else if remTokens.take 2 == ["enum", "class"] then
+    kindTokens := ["enum", "class"]
+    remTokens := remTokens.drop 2
+  else if remTokens.head? == some "class" then
+    kindTokens := ["class"]
+    remTokens := remTokens.tail
+  let kind? := if kindTokens.isEmpty then none else some (String.intercalate " " kindTokens)
+  let clsName := String.intercalate " " remTokens
+  { raw, className := clsName, isData, kind? }
+
+/-- Base Kotlin class name without type arguments (`"Foo<*, *>"` ↦ `"Foo"`). -/
+def KotlinClassSpec.baseClassName (spec : KotlinClassSpec) : String :=
+  String.ofList (spec.className.toList.takeWhile (· != '<') |>.filter (· != ' '))
+
 /--
-`@[kotlin_class "Type"]` on a structure makes the Kotlin backend represent values of the structure
-as instances of the immutable Kotlin class `Type` (e.g. `"Foo<*, *>"`), whose properties have the
-names of the structure fields and whose constructor takes the fields in declaration order.
+`@[kotlin_class "Type"]` on a structure or inductive type makes the Kotlin backend represent
+values as instances of a Kotlin class, sealed hierarchy, or enum class.
 -/
 builtin_initialize kotlinClassAttr : ParametricAttribute String ←
   registerParametricAttribute {
     name := `kotlin_class
-    descr := "represent this structure as an immutable Kotlin class (Kotlin backend)"
+    descr := "represent this structure or inductive type as a Kotlin class/interface/enum (Kotlin backend)"
     getParam := fun declName stx => do
       let some s := stx[1].isStrLit? | throwError "`kotlin_class` expects a string argument"
-      unless isStructure (← getEnv) declName do
-        throwError "`kotlin_class` can only be used on structures"
+      let env ← getEnv
+      unless isStructure env declName || isInductiveCore env declName do
+        throwError "`kotlin_class` can only be used on structures or inductive types"
+      let spec := parseKotlinClassSpec s
+      if isInductiveCore env declName && !isStructure env declName then
+        if spec.kind? == some "enum class" then
+          let some iv := isInductiveCore? env declName | unreachable!
+          for ctorName in iv.ctors do
+            let some (.ctorInfo cv) := env.find? ctorName | unreachable!
+            if cv.numFields > 0 then
+              throwError "`enum class` can only be used on inductive types whose constructors take no arguments (constructor `{ctorName}` has {cv.numFields} field(s))"
+        else if spec.kind? == some "class" then
+          throwError "`class` without `sealed` can only be used on structures"
       return s
   }
 
@@ -143,14 +201,35 @@ builtin_initialize mutableKotlinClassAttr : ParametricAttribute String ←
       return s
   }
 
+def getKotlinClassSpec? (env : Environment) (n : Name) : Option KotlinClassSpec :=
+  (kotlinClassAttr.getParam? env n).map parseKotlinClassSpec
+
+def isKotlinInductive (env : Environment) (n : Name) : Bool :=
+  isInductiveCore env n && !isStructure env n && (kotlinClassAttr.getParam? env n).isSome
+
+def isKotlinEnum (env : Environment) (n : Name) : Bool :=
+  match isInductiveCore? env n with
+  | some iv =>
+    if isStructure env n then false
+    else
+      match (getKotlinClassSpec? env n).bind (·.kind?) with
+      | some "enum class" => true
+      | some "sealed class" | some "sealed interface" | some "class" => false
+      | _ =>
+        !iv.ctors.isEmpty && iv.ctors.all fun ctorName =>
+          match env.find? ctorName with
+          | some (.ctorInfo cv) => cv.numFields == 0
+          | _ => false
+  | none => false
+
 def getImmutableKotlinClass? (env : Environment) (n : Name) : Option String :=
-  kotlinClassAttr.getParam? env n
+  (getKotlinClassSpec? env n).map (·.className)
 
 def getMutableKotlinClass? (env : Environment) (n : Name) : Option String :=
   mutableKotlinClassAttr.getParam? env n
 
 def getKotlinClass? (env : Environment) (n : Name) : Option String :=
-  (kotlinClassAttr.getParam? env n).orElse fun _ => mutableKotlinClassAttr.getParam? env n
+  (getKotlinClassSpec? env n).map (·.className) |>.orElse fun _ => mutableKotlinClassAttr.getParam? env n
 
 def isMutableKotlinClass (env : Environment) (n : Name) : Bool :=
   (mutableKotlinClassAttr.getParam? env n).isSome
