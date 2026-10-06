@@ -445,7 +445,9 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
     if targetTy == "Int" then
       if let some inner := stripBigIntToInt? s then
         return inner
-  if let some actualTy := actualTy? then
+  let varTypes := (← get).varTypes
+  let effActualTy? := actualTy?.orElse fun _ => varTypes[stripOuterParens s]?
+  if let some actualTy := effActualTy? then
     if isKotlinIntType actualTy then
       if let some conv := kotlinIntConversionMethod targetTy then
         return s!"({s}).{conv}"
@@ -467,6 +469,12 @@ def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := n
       | "Double" => return s!"({s}).toDouble()"
       | "Float" => return s!"({s}).toFloat()"
       | _ => pure ()
+  if isBigIntType targetTy then
+    let sTrim := stripOuterParens s
+    let isIntExpr := sTrim.endsWith ".toInt()" || sTrim.endsWith ".toByte()" || sTrim.endsWith ".toShort()" || sTrim.endsWith ".toLong()" ||
+                     (!sTrim.isEmpty && sTrim.all (fun c => c.isDigit || c == '-'))
+    if isIntExpr then
+      return s!"java.math.BigInteger.valueOf(({s}).toLong())"
   return s!"({s} as {targetTy})"
 
 def isKotlinKeyword (s : String) : Bool :=
@@ -2578,7 +2586,7 @@ def emitReturn (valStr : String) (valTy? : Option String := none) : EmitM Unit :
       | none => pure valStr
     emitLn s!"return@{lbl} {rhs}"
   | .threaded successExit failureLbl =>
-    if valStr == "(-1)" || valStr == "-1" || valStr == "4294967295L" || valStr == "4294967295" then
+    if valStr == "(-1)" || valStr == "-1" || valStr == "4294967295L" || valStr == "4294967295" || valStr == "null" then
       emitLn s!"break@{failureLbl}"
     else
       match successExit with
@@ -2657,16 +2665,19 @@ def emitReturnVar (x : FVarId) : EmitM Unit := do
   match (← read).retShape? with
   | some (.param _) => emitReturnUnit
   | some shape@(.prod _) =>
-    let some comps := (← get).tuples[n]?
-      | throwError "Kotlin backend: in `{(← read).currFn}`: expected a `Prod.mk` result"
-    match keptComps shape with
-    | #[] => emitReturnUnit
-    | #[c] =>
-      let comp ← resolveKnownBool comps[c]!
-      emitReturn comp (← get).varTypes[comp]?
-    | _ =>
-      let (pairExpr, pairTy) ← formatKotlinPair comps (← read).retCast?
-      emitReturn pairExpr (some pairTy)
+    if let some comps := (← get).tuples[n]? then
+      match keptComps shape with
+      | #[] => emitReturnUnit
+      | #[c] =>
+        let comp ← resolveKnownBool comps[c]!
+        emitReturn comp (← get).varTypes[comp]?
+      | _ =>
+        let (pairExpr, pairTy) ← formatKotlinPair comps (← read).retCast?
+        emitReturn pairExpr (some pairTy)
+    else
+      match keptComps shape with
+      | #[_] => emitReturn n (← get).varTypes[n]?
+      | _ => throwError "Kotlin backend: in `{(← read).currFn}`: expected a `Prod.mk` result"
   | _ =>
     if let some comps := (← get).tuples[n]? then
       if !(← get).materializedTuples.contains n then
@@ -3400,6 +3411,12 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       recordVarType s (litKotlinType v decl.type)
       setParamVarName x s
       return true
+  | .fvar fvarId #[] =>
+    let src ← getVarName fvarId
+    if let some vt := (← get).varTypes[src]? then
+      recordVarType src vt
+    setParamVarName x src
+    return true
   | .erased =>
     setParamVarName x "null"
     return true
@@ -3412,6 +3429,27 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
     if (← get).varTypes[src]? == some targetTy then
       setParamVarName x src
       return true
+    return false
+  | .oproj i var =>
+    let n ← getVarName var
+    if let some comps := (← get).tuples[n]? then
+      if let some c := comps[i]? then
+        setParamVarName x c
+        return true
+    return false
+  | .sproj _ _ var =>
+    let n ← getVarName var
+    if let some comps := (← get).tuples[n]? then
+      if let some c := comps[0]? then
+        setParamVarName x c
+        return true
+    return false
+  | .uproj _ var =>
+    let n ← getVarName var
+    if let some comps := (← get).tuples[n]? then
+      if let some c := comps[0]? then
+        setParamVarName x c
+        return true
     return false
   | .fap fn args =>
     let baseFn := match fn with | .str p "_boxed" => p | _ => fn
@@ -3485,6 +3523,9 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     modify fun st => { st with projSrc := st.projSrc.insert n y }
     unless ← isUsed x do return
     let lhs ← classField y pos
+    if let some prevVar := (← get).fieldVals[lhs]? then
+      setParamVarName x prevVar
+      return
     emitLn s!"val {n} = {lhs}"
     modify fun st => { st with fieldVals := st.fieldVals.insert lhs n }
   else
@@ -3797,13 +3838,32 @@ def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM B
   setParamVarName decl.fvarId rhs
   return true
 
+partial def retYieldsFv (fv : FVarId) (c : Code .impure) : Bool :=
+  match skipRC c with
+  | .return r => r == fv
+  | .let d k =>
+    match d.value with
+    | .box _ f =>
+      if f == fv then retYieldsFv d.fvarId k
+      else retYieldsFv fv k
+    | .ctor info args =>
+      if info.name == ``Prod.mk then
+        if args.any (fun a => match a with | .fvar f => f == fv | _ => false) then
+          match skipRC k with
+          | .return r => r == d.fvarId
+          | _ => retYieldsFv fv k
+        else retYieldsFv fv k
+      else retYieldsFv fv k
+    | _ => retYieldsFv fv k
+  | _ => false
+
 /--
 Detects if `code` tests `fv >= 0` and returns `fv` on success:
 `let _x := decLe 0 fv; cases _x | false => contCode | true => return fv`
 Returns `some contCode` if matched, where `contCode` does not use `fv`.
 -/
 partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure) : Option (Code .impure) :=
-  match code with
+  match skipRC code with
   | .let _ k =>
     if countUsesCode fv k > 0 then
       isNonNegEarlyExit? fv k
@@ -3813,12 +3873,10 @@ partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure) : Option (Cod
       let alt0 := cs.alts[0]!
       let alt1 := cs.alts[1]!
       let checkAlt (retAlt contAlt : Alt .impure) : Option (Code .impure) := do
-        match skipRC retAlt.getCode with
-        | .return r =>
-          if r == fv && countUsesCode fv contAlt.getCode == 0 then
-            some contAlt.getCode
+        if countUsesCode fv contAlt.getCode != 0 then none
+        else
+          if retYieldsFv fv retAlt.getCode then some contAlt.getCode
           else none
-        | _ => none
       checkAlt alt1 alt0 <|> checkAlt alt0 alt1
     else none
   | _ => none

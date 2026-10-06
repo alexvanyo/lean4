@@ -2,7 +2,7 @@
 // DO NOT EDIT DIRECTLY.
 @file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
 @PublishedApi internal fun f_testConversions(n: java.math.BigInteger, i: Any?, u64: ULong, i64: Long): java.math.BigInteger {
-    return (((((java.math.BigInteger.valueOf(((n).toByte().toUByte()).toLong()).add(java.math.BigInteger.valueOf(((n).toShort().toUShort()).toLong()))).add(java.math.BigInteger.valueOf(((n).toInt().toUInt()).toLong()))).add((run { val l = (u64).toLong(); if (l >= 0L) java.math.BigInteger.valueOf(l) else java.math.BigInteger.valueOf(l and Long.MAX_VALUE).setBit(63) }))).add(java.math.BigInteger.valueOf(maxOf(0, ((i).toByte()).toInt()).toLong()))).add(java.math.BigInteger.valueOf(maxOf(0, (i64).toInt()).toLong())))
+    return (((((java.math.BigInteger.valueOf(((n).toByte().toUByte()).toLong()).add(java.math.BigInteger.valueOf(((n).toShort().toUShort()).toLong()))).add(java.math.BigInteger.valueOf((((n).toInt().toUInt()).toInt()).toLong()))).add((run { val l = (u64).toLong(); if (l >= 0L) java.math.BigInteger.valueOf(l) else java.math.BigInteger.valueOf(l and Long.MAX_VALUE).setBit(63) }))).add(java.math.BigInteger.valueOf(maxOf(0, ((i).toByte()).toInt()).toLong()))).add(java.math.BigInteger.valueOf(maxOf(0, (i64).toInt()).toLong())))
 }
 
 @PublishedApi internal fun f_testConversions___boxed(n: Any?, i: Any?, u64: Any?, i64: Any?): Any? {
@@ -12,7 +12,7 @@
 }
 
 @PublishedApi internal fun f_testDirectCast(a: UInt, b: Int): ULong {
-    return ((a).toULong() + (java.math.BigInteger.valueOf(maxOf(0, b).toLong())).toLong().toULong())
+    return ((a).toULong() + ((maxOf(0, b)).toInt()).toULong())
 }
 
 @PublishedApi internal fun f_testDirectCast___boxed(a: Any?, b: Any?): Any? {

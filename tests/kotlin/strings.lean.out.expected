@@ -118,7 +118,7 @@
 
 @PublishedApi internal fun f_testCharOps(n: java.math.BigInteger): java.math.BigInteger {
     val c_86_1 = (run { val b = n; val cp = if (b.bitLength() <= 21) b.toInt().toUInt() else 0x110000u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
-    val v_x_89_2 = (java.math.BigInteger.valueOf((c_86_1).toLong()).add(java.math.BigInteger.valueOf((run { val cp = c_86_1; if (cp <= 0x7Fu) 1L else if (cp <= 0x7FFu) 2L else if (cp <= 0xFFFFu) 3L else 4L }))))
+    val v_x_89_2 = (java.math.BigInteger.valueOf(((c_86_1).toInt()).toLong()).add(java.math.BigInteger.valueOf((run { val cp = c_86_1; if (cp <= 0x7Fu) 1L else if (cp <= 0x7FFu) 2L else if (cp <= 0xFFFFu) 3L else 4L }))))
     val v_x_90_3 = ""
     return (v_x_89_2.add(java.math.BigInteger.valueOf(((v_x_90_3 + Character.toString((c_86_1).toInt()))).encodeToByteArray().size.toLong())))
 }
