@@ -572,14 +572,14 @@ private fun f_IO_Error_fopenErrorToString(gist: String, fn: String, code: UInt, 
             val v_x_533_1 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
             val v_x_534_2 = " (error code: "
             val v_x_539_3 = ")\n  file: "
-            return ((((v_x_533_1 + v_x_534_2) + (java.math.BigInteger.valueOf((code).toLong())).toString()) + v_x_539_3) + fn)
+            return ((((v_x_533_1 + v_x_534_2) + ((code).toInt()).toString()) + v_x_539_3) + fn)
         }
         1 ->         {
             val val_542_4 = (p_3 as Array<*>)[1]
             val v_x_543_5 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
             val v_x_544_6 = " (error code: "
             val v_x_549_7 = ", "
-            val v_x_550_8 = (((v_x_543_5 + v_x_544_6) + (java.math.BigInteger.valueOf((code).toLong())).toString()) + v_x_549_7)
+            val v_x_550_8 = (((v_x_543_5 + v_x_544_6) + ((code).toInt()).toString()) + v_x_549_7)
             val v_x_551_9 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((val_542_4 as String))
             val v_x_553_10 = ")\n  file: "
             return (((v_x_550_8 + v_x_551_9) + v_x_553_10) + fn)
@@ -610,14 +610,14 @@ private fun f_IO_Error_otherErrorToString(gist: String, code: UInt, p_2: Any?): 
             val v_x_572_1 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
             val v_x_573_2 = " (error code: "
             val v_x_578_3 = ")"
-            return (((v_x_572_1 + v_x_573_2) + (java.math.BigInteger.valueOf((code).toLong())).toString()) + v_x_578_3)
+            return (((v_x_572_1 + v_x_573_2) + ((code).toInt()).toString()) + v_x_578_3)
         }
         1 ->         {
             val val_580_4 = (p_2 as Array<*>)[1]
             val v_x_581_5 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
             val v_x_582_6 = " (error code: "
             val v_x_587_7 = ", "
-            val v_x_588_8 = (((v_x_581_5 + v_x_582_6) + (java.math.BigInteger.valueOf((code).toLong())).toString()) + v_x_587_7)
+            val v_x_588_8 = (((v_x_581_5 + v_x_582_6) + ((code).toInt()).toString()) + v_x_587_7)
             val v_x_589_9 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((val_580_4 as String))
             val v_x_591_10 = ")"
             return ((v_x_588_8 + v_x_589_9) + v_x_591_10)
@@ -724,7 +724,7 @@ private fun f_IO_FS_Stream_ofBuffer___lam__0(r: Any?, n: Int, p_2: Any?): Any? {
     val v_x_680_1 = (r as Array<Any?>)[0]
     val data_681_2 = (v_x_680_1 as Array<*>)[1]
     val pos_682_3 = (v_x_680_1 as Array<*>)[2]
-    val data_685_4 = (run { val bs = (data_681_2 as ByteArray); val start = (((pos_682_3 as java.math.BigInteger)).toInt()).coerceIn(0, bs.size); val stop = ((((pos_682_3 as java.math.BigInteger).add(java.math.BigInteger.valueOf((n).toUInt().toLong())))).toInt()).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
+    val data_685_4 = (run { val bs = (data_681_2 as ByteArray); val start = (((pos_682_3 as java.math.BigInteger)).toInt()).coerceIn(0, bs.size); val stop = ((((pos_682_3 as java.math.BigInteger).add(java.math.BigInteger.valueOf((n).toLong())))).toInt()).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
     (r as Array<Any?>)[0] = arrayOf<Any?>(0, data_681_2, ((pos_682_3 as java.math.BigInteger).add(java.math.BigInteger.valueOf((data_685_4).size.toLong()))))
     return arrayOf<Any?>(0, data_685_4)
 }

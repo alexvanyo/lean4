@@ -240,7 +240,7 @@
     val eq_224_7 = (if ((b as Int) == 0) 0 else if ((b as Int) > 0) Math.floorDiv((a as Int), (b as Int)) else -Math.floorDiv((a as Int), -(b as Int)))
     val er_225_8 = (if ((b as Int) == 0) (a as Int) else Math.floorMod((a as Int), kotlin.math.abs((b as Int))))
     val neg_226_9 = (-(prod_221_5 / (v_x_218_2 as Int)))
-    val absVal_228_10 = (java.math.BigInteger.valueOf(kotlin.math.abs(((a as Int)).toLong()))).toInt()
+    val absVal_228_10 = (kotlin.math.abs(((a as Int)).toLong())).toInt()
     if (!((a as Int) == (b as Int)))     {
         if (!((a as Int) < (b as Int)))         {
             if (!((a as Int) <= (b as Int)))             {
