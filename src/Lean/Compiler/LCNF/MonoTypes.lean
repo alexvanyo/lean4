@@ -34,6 +34,9 @@ Requires `compileDecls` to have been run for inductive `declName`.
 def hasTrivialStructure? (declName : Name) : CoreM (Option TrivialStructureInfo) := do
   let env ← getEnv
   if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName then return none
+  if Compiler.getKotlinClassSpec? env declName matches some _ then
+    if let some iv := isInductiveCore? env declName then
+      if iv.numParams > 0 then return none
   Irrelevant.hasTrivialStructure? trivialStructureInfoExt declName
 
 def getParamTypes (type : Expr) : Array Expr :=
