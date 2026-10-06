@@ -424,6 +424,10 @@ def isKotlinKeyword (s : String) : Bool :=
   | "var" | "when" | "while" => true
   | _ => false
 
+def toPascalCase (s : String) : String :=
+  if s.isEmpty then s
+  else s!"{s.front.toUpper}{s.drop 1}"
+
 def sanitizeIdent (s : String) : String :=
   s.foldl (init := "") fun acc c =>
     if c.isAlphanum || c == '_' then acc.push c else acc.push '_'
@@ -1533,8 +1537,61 @@ structure ClassLayout where
   usizes : Std.HashMap Nat String := {}
   orderedFields : Array (String × String) := #[]
 
+def ctorClassLayout (ctorName : Name) : EmitM ClassLayout := do
+  let env ← getEnv
+  let some (.ctorInfo ctorVal) := env.find? ctorName | return {}
+  let layout ← getCtorLayout ctorName
+  let (fieldNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+    Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
+      let fieldXs := xs.extract ctorVal.numParams xs.size
+      let names ← fieldXs.mapM fun x => do
+        let n := (← x.fvarId!.getUserName).eraseMacroScopes.toString
+        return if n.isEmpty || n == "_" then "field" else n
+      let types ← fieldXs.mapM fun x => do
+        let t ← toLCNFType (← Meta.inferType x)
+        let mt ← toMonoType t
+        if isRichMonoType mt then return toKotlinType mt
+        let it ← toImpureType mt
+        return toKotlinType it
+      return (names, types))
+  let mut r : ClassLayout := {}
+  let mut seenFieldNames : Std.HashSet String := {}
+  for h : k in [:layout.fieldInfo.size] do
+    let rawName := fieldNames[k]?.getD s!"field{k}"
+    let baseName :=
+      if isKotlinKeyword rawName then s!"`{rawName}`"
+      else rawName
+    let mut name := baseName
+    if seenFieldNames.contains name then
+      name := s!"{baseName}_{k}"
+    seenFieldNames := seenFieldNames.insert name
+    let kotlinTy := fieldKotlinTypes[k]?.getD "Any?"
+    match layout.fieldInfo[k] with
+    | .object i _ =>
+      r := { r with
+        objs := r.objs.insert i name
+        objTypes := r.objTypes.insert i kotlinTy
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+    | .scalar _ off _ =>
+      r := { r with
+        scalars := r.scalars.insert off name
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+    | .usize i =>
+      r := { r with
+        usizes := r.usizes.insert i name
+        orderedFields := r.orderedFields.push (name, kotlinTy)
+      }
+    | _ => pure ()
+  return r
+
 def classLayout (s : Name) : EmitM ClassLayout := do
   let env ← getEnv
+  if env.find? s matches some (.ctorInfo _) then
+    return ← ctorClassLayout s
+  unless isStructure env s do
+    return {}
   let fields := getStructureFields env s
   let ctorVal := getStructureCtor env s
   let layout ← getCtorLayout ctorVal.name
@@ -1589,11 +1646,14 @@ def classLayout (s : Name) : EmitM ClassLayout := do
 /-- The `@[kotlin_class]` or `@[mutable_kotlin_class]` structure of variable `x`, from its Kotlin type. -/
 def classStructOf? (x : FVarId) : EmitM (Option Name) := do
   let n ← getVarName x
+  if let some s := (← get).nameStructs[n]? then
+    return some s
   if let some t ← kotlinTypeOf? (.fvar x) then
     if let some s := (← read).classStructs[t]? then
-      modify fun st => { st with nameStructs := st.nameStructs.insert n s }
-      return some s
-  -- Variables aliased to a `@[mutable_kotlin_class]` value (e.g. by `reset`) share its Kotlin name.
+      let env ← getEnv
+      if isStructure env s then
+        modify fun st => { st with nameStructs := st.nameStructs.insert n s }
+        return some s
   return (← get).nameStructs[n]?
 
 def mutableClassStructOf? (x : FVarId) : EmitM (Option Name) := do
@@ -2021,8 +2081,27 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       let elem := if xTy == "Array<Any?>" then s!"{xName}[{1 + i}]" else s!"({xName} as Array<*>)[{1 + i}]"
       castIfNeeded elem targetTy
   | .ctor info args =>
-    if Compiler.isMutableKotlinClass (← getEnv) info.name.getPrefix then
-      throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{info.name.getPrefix}` (`@[mutable_kotlin_class]` values are only updated in place)"
+    let env ← getEnv
+    let inductName := match env.find? info.name with
+      | some (.ctorInfo cv) => cv.induct
+      | _ => info.name.getPrefix
+    if Compiler.isMutableKotlinClass env inductName then
+      throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{inductName}` (`@[mutable_kotlin_class]` values are only updated in place)"
+    if let some spec := Compiler.getKotlinClassSpec? env inductName then
+      let clsName := spec.baseClassName
+      let variantName := toPascalCase info.name.getString!
+      if Compiler.isKotlinEnum env inductName then
+        return s!"{clsName}.{variantName}"
+      else if Compiler.isKotlinInductive env inductName then
+        let some (.ctorInfo cv) := env.find? info.name | unreachable!
+        if cv.numFields == 0 then
+          return s!"{clsName}.{variantName}"
+        else
+          let ctorArgs ← args.mapM toKotlinArg
+          return s!"{clsName}.{variantName}({String.intercalate ", " ctorArgs.toList})"
+      else
+        let ctorArgs ← args.mapM toKotlinArg
+        return s!"{clsName}({String.intercalate ", " ctorArgs.toList})"
     formatAdtCtor info (← args.mapM toKotlinArg) {} {}
   | _ => return "null"
 
@@ -3646,32 +3725,85 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             vStr ← castIfNeeded vStr fTy
           emitFieldWrite y (·.objs[k]?) vStr
         setParamVarName x (← getVarName y)
-      else if let some cls := Compiler.getImmutableKotlinClass? (← getEnv) info.name.getPrefix then
-        let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
-        let layout ← getCtorLayout info.name
-        let clsLayout ← classLayout info.name.getPrefix
-        let mut ctorArgs : Array String := #[]
-        for fi in layout.fieldInfo do
-          match fi with
-          | .object i _ =>
-            let mut vStr := objs[i]?.getD "null"
-            if let some fTy := clsLayout.objTypes[i]? then
-              vStr ← castIfNeeded vStr fTy
-            ctorArgs := ctorArgs.push vStr
-          | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
-          | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
-          | _ => pure ()
-        let clsName := ({ recvType := cls : Compiler.KotlinMemberInfo }).className
-        let rhs := s!"{clsName}({String.intercalate ", " ctorArgs.toList})"
-        if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
-          setParamVarName x rhs
-          recordVarType rhs cls
+      else if let some spec := Compiler.getKotlinClassSpec? (← getEnv) (match (← getEnv).find? info.name with | some (.ctorInfo cv) => cv.induct | _ => info.name.getPrefix) then
+        let env ← getEnv
+        let inductName := match env.find? info.name with | some (.ctorInfo cv) => cv.induct | _ => info.name.getPrefix
+        let clsName := spec.baseClassName
+        let variantName := toPascalCase info.name.getString!
+        if Compiler.isKotlinEnum env inductName then
+          let rhs := s!"{clsName}.{variantName}"
+          if !(← get).aliases.values.contains x && countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
+            setParamVarName x rhs
+            recordVarType rhs clsName
+          else
+            let n ← getVarName x
+            recordVarType n clsName
+            emitLn s!"val {n} = {rhs}"
+          emitCode k
+          return
+        else if Compiler.isKotlinInductive env inductName then
+          let some (.ctorInfo cv) := env.find? info.name | unreachable!
+          if cv.numFields == 0 then
+            let rhs := s!"{clsName}.{variantName}"
+            if !(← get).aliases.values.contains x && countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
+              setParamVarName x rhs
+              recordVarType rhs clsName
+            else
+              let n ← getVarName x
+              recordVarType n clsName
+              emitLn s!"val {n} = {rhs}"
+            emitCode k
+            return
+          else
+            let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
+            let layout ← getCtorLayout info.name
+            let ctorLayout ← ctorClassLayout info.name
+            let mut ctorArgs : Array String := #[]
+            for fi in layout.fieldInfo do
+              match fi with
+              | .object i _ =>
+                let mut vStr := objs[i]?.getD "null"
+                if let some fTy := ctorLayout.objTypes[i]? then
+                  vStr ← castIfNeeded vStr fTy
+                ctorArgs := ctorArgs.push vStr
+              | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
+              | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
+              | _ => pure ()
+            let rhs := s!"{clsName}.{variantName}({String.intercalate ", " ctorArgs.toList})"
+            if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+              setParamVarName x rhs
+              recordVarType rhs clsName
+            else
+              let n ← getVarName x
+              recordVarType n clsName
+              emitLn s!"val {n} = {rhs}"
+            emitCode k'
+            return
         else
-          let n ← getVarName x
-          recordVarType n cls
-          emitLn s!"val {n} = {rhs}"
-        emitCode k'
-        return
+          let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
+          let layout ← getCtorLayout info.name
+          let clsLayout ← classLayout inductName
+          let mut ctorArgs : Array String := #[]
+          for fi in layout.fieldInfo do
+            match fi with
+            | .object i _ =>
+              let mut vStr := objs[i]?.getD "null"
+              if let some fTy := clsLayout.objTypes[i]? then
+                vStr ← castIfNeeded vStr fTy
+              ctorArgs := ctorArgs.push vStr
+            | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
+            | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
+            | _ => pure ()
+          let rhs := s!"{clsName}({String.intercalate ", " ctorArgs.toList})"
+          if !(← get).aliases.values.contains x && countUsesCode x k' == 1 && (← usedBeforeSideEffect x k') then
+            setParamVarName x rhs
+            recordVarType rhs spec.className
+          else
+            let n ← getVarName x
+            recordVarType n spec.className
+            emitLn s!"val {n} = {rhs}"
+          emitCode k'
+          return
       else
         let { objs, usizes, scalars, cont := k' } ← collectCtorFieldSets x (args.mapM toKotlinArg) k
         let rhs ← formatAdtCtor info objs usizes scalars
@@ -3898,35 +4030,92 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
         modify fun st => { st with adtVars := st.adtVars.insert discrName }
       if cs.alts.isEmpty then
         emitLn "error(\"unreachable\")"
-      else if cs.alts.size == 1 then
-        withFieldVals (emitCode cs.alts[0]!.getCode)
       else
+        let env ← getEnv
         let discrTy? := (← get).varTypes[discrName]?
-        let discrExpr ←
-          if cs.typeName == `obj || cs.typeName == `tobj || discrTy? == some "Array<Any?>" then
-            if discrTy? == some "Array<Any?>" then
-              pure s!"({discrName}[0] as Int)"
+        let inductFromAlts? : Option Name :=
+          cs.alts.findSome? fun
+            | .ctorAlt info _ =>
+              match env.find? info.name with
+              | some (.ctorInfo cv) => some cv.induct
+              | _ => some info.name.getPrefix
+            | _ => none
+        let discrInduct? := inductFromAlts?.filter (Compiler.isKotlinInductive env ·)
+        if cs.alts.size == 1 then
+          match cs.alts[0]! with
+          | .ctorAlt info altCode =>
+            if discrInduct?.isSome then
+              let savedStructs := (← get).nameStructs
+              modify fun st => { st with nameStructs := st.nameStructs.insert discrName info.name }
+              withFieldVals (emitCode altCode)
+              modify fun st => { st with nameStructs := savedStructs }
             else
-              pure s!"(({discrName} as Array<*>)[0] as Int)"
-          else if discrTy? == some "UByte" || discrTy? == some "UShort" || discrTy? == some "UInt" then
-            pure s!"({discrName}).toInt()"
-          else
-            pure discrName
-        emitIndent; emit s!"when ({discrExpr}) "; emitLn "{"
-        withIndent do
-          for alt in cs.alts do
-            match alt with
-            | .ctorAlt info altCode =>
-              emitIndent; emit s!"{info.cidx} -> "; emitLn "{"
-              withFieldVals <| withIndent (emitCode altCode)
-              emitLn "}"
-            | .default altCode =>
-              emitIndent; emit "else -> "; emitLn "{"
-              withFieldVals <| withIndent (emitCode altCode)
-              emitLn "}"
-          unless cs.alts.any (· matches .default _) do
-            emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
-        emitLn "}"
+              withFieldVals (emitCode altCode)
+          | .default altCode =>
+            withFieldVals (emitCode altCode)
+        else if let some inductName := discrInduct?.filter (fun n =>
+          if Compiler.isKotlinEnum env n then
+            discrTy? != some "UByte" && discrTy? != some "UShort" && discrTy? != some "UInt"
+          else true) then
+          let spec := (Compiler.getKotlinClassSpec? env inductName).get!
+          let cls := spec.baseClassName
+          let isEnum := Compiler.isKotlinEnum env inductName
+          emitIndent; emit s!"when ({discrName}) "; emitLn "{"
+          withIndent do
+            for alt in cs.alts do
+              match alt with
+              | .ctorAlt info altCode =>
+                let variantName := toPascalCase info.name.getString!
+                let cond :=
+                  if isEnum then
+                    s!"{cls}.{variantName}"
+                  else
+                    match env.find? info.name with
+                    | some (.ctorInfo cv) =>
+                      if cv.numFields == 0 then s!"{cls}.{variantName}"
+                      else s!"is {cls}.{variantName}"
+                    | _ => s!"is {cls}.{variantName}"
+                emitIndent; emit s!"{cond} -> "; emitLn "{"
+                let savedStructs := (← get).nameStructs
+                modify fun st => { st with nameStructs := st.nameStructs.insert discrName info.name }
+                withFieldVals <| withIndent (emitCode altCode)
+                modify fun st => { st with nameStructs := savedStructs }
+                emitLn "}"
+              | .default altCode =>
+                emitIndent; emit "else -> "; emitLn "{"
+                withFieldVals <| withIndent (emitCode altCode)
+                emitLn "}"
+            unless cs.alts.any (· matches .default _) do
+              let some iv := isInductiveCore? env inductName | pure ()
+              if cs.alts.size < iv.ctors.length || discrTy? != some cls then
+                emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
+          emitLn "}"
+        else
+          let discrExpr ←
+            if cs.typeName == `obj || cs.typeName == `tobj || discrTy? == some "Array<Any?>" then
+              if discrTy? == some "Array<Any?>" then
+                pure s!"({discrName}[0] as Int)"
+              else
+                pure s!"(({discrName} as Array<*>)[0] as Int)"
+            else if discrTy? == some "UByte" || discrTy? == some "UShort" || discrTy? == some "UInt" then
+              pure s!"({discrName}).toInt()"
+            else
+              pure discrName
+          emitIndent; emit s!"when ({discrExpr}) "; emitLn "{"
+          withIndent do
+            for alt in cs.alts do
+              match alt with
+              | .ctorAlt info altCode =>
+                emitIndent; emit s!"{info.cidx} -> "; emitLn "{"
+                withFieldVals <| withIndent (emitCode altCode)
+                emitLn "}"
+              | .default altCode =>
+                emitIndent; emit "else -> "; emitLn "{"
+                withFieldVals <| withIndent (emitCode altCode)
+                emitLn "}"
+            unless cs.alts.any (· matches .default _) do
+              emitIndent; emit "else -> "; emitLn "{ error(\"unreachable\") }"
+          emitLn "}"
   | .return fvarId =>
     emitReturnVar fvarId
   | .oset x i y k =>
@@ -4528,9 +4717,12 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       applied.contains d.name
   let toEmit := emittedLocal ++ emittedExt
   let classStructs := env.constants.map₂.foldl (init := ({} : Std.HashMap String Name)) fun m n _ =>
-    match Compiler.getKotlinClass? env n with
-    | some t => m.insert t n
-    | none => m
+    match Compiler.getKotlinClassSpec? env n with
+    | some spec => m.insert spec.className n |>.insert spec.baseClassName n
+    | none =>
+      match Compiler.getMutableKotlinClass? env n with
+      | some t => m.insert t n |>.insert (({ recvType := t : Compiler.KotlinMemberInfo }).className) n
+      | none => m
   -- In-place updates must be justified by exclusive ownership.
   let papTargets := allDecls.foldl (init := ({} : Std.HashSet Name)) fun acc d =>
     match d.value with
@@ -4616,7 +4808,8 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       let (hdr, usedH) := spliceMembers headerText memberBufs
       let (ftr, usedF) := spliceMembers footerText memberBufs
       let hasClassDecl (text cls : String) : Bool :=
-        text.contains s!"class {cls}(" || text.contains s!"class {cls} " || text.contains s!"class {cls}\{"
+        text.contains s!"class {cls}(" || text.contains s!"class {cls} " || text.contains s!"class {cls}\{" ||
+        text.contains s!"interface {cls} " || text.contains s!"interface {cls}\{"
       let localClassStructs :=
         (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
         (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
@@ -4630,22 +4823,62 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
            hasClassDecl headerText cls || hasClassDecl footerText cls then
           continue
         synthClasses := synthClasses.insert cls
-        let isMut := Compiler.isMutableKotlinClass env s
-        let propKw := if isMut then "var" else "val"
-        let layout ← classLayout s
-        let propStr := String.intercalate ", " (layout.orderedFields.map fun (f, t) => s!"{propKw} {f}: {t}").toList
+        let spec := (Compiler.getKotlinClassSpec? env s).getD { raw := rawCls, className := rawCls }
+        let members := memberBufs.getD cls ""
         let clsBuf ← captureBuf do
           if let some (.inl doc) ← findInternalDocString? env s (includeBuiltin := false) then
             for l in kdocLines doc do emitLn l
-          let members := memberBufs.getD cls ""
-          if members.isEmpty then
-            emitLn s!"class {cls}({propStr})"
-            emitLn ""
+          if Compiler.isKotlinInductive env s then
+            let some iv := isInductiveCore? env s | return
+            if Compiler.isKotlinEnum env s then
+              let entries := iv.ctors.map fun ctorName => toPascalCase ctorName.getString!
+              let entriesStr := String.intercalate ",\n    " entries
+              if members.isEmpty then
+                emitLn s!"enum class {cls} \{"
+                emitLn s!"    {entriesStr};"
+                emitLn "}"
+                emitLn ""
+              else
+                emitLn s!"enum class {cls} \{"
+                emitLn s!"    {entriesStr};"
+                emitLn ""
+                emit (reindent "    " members)
+                emitLn "}"
+                emitLn ""
+            else
+              let isSealedClass := spec.kind? == some "sealed class"
+              let outerHeader := if isSealedClass then s!"sealed class {cls}" else s!"sealed interface {cls}"
+              let extendsClause := if isSealedClass then s!" : {cls}()" else s!" : {cls}"
+              let dataMod := if spec.isData then "data " else ""
+              emitLn s!"{outerHeader} \{"
+              for ctorName in iv.ctors do
+                let some (.ctorInfo cv) := env.find? ctorName | continue
+                let variantName := toPascalCase ctorName.getString!
+                if cv.numFields == 0 then
+                  emitLn s!"    {dataMod}object {variantName}{extendsClause}"
+                else
+                  let ctorLayout ← ctorClassLayout ctorName
+                  let propStr := String.intercalate ", " (ctorLayout.orderedFields.map fun (f, t) => s!"val {f}: {t}").toList
+                  emitLn s!"    {dataMod}class {variantName}({propStr}){extendsClause}"
+              if !members.isEmpty then
+                emitLn ""
+                emit (reindent "    " members)
+              emitLn "}"
+              emitLn ""
           else
-            emitLn s!"class {cls}({propStr}) \{"
-            emit (reindent "    " members)
-            emitLn "}"
-            emitLn ""
+            let isMut := Compiler.isMutableKotlinClass env s
+            let propKw := if isMut then "var" else "val"
+            let layout ← classLayout s
+            let propStr := String.intercalate ", " (layout.orderedFields.map fun (f, t) => s!"{propKw} {f}: {t}").toList
+            let dataPrefix := if spec.isData then "data " else ""
+            if members.isEmpty then
+              emitLn s!"{dataPrefix}class {cls}({propStr})"
+              emitLn ""
+            else
+              emitLn s!"{dataPrefix}class {cls}({propStr}) \{"
+              emit (reindent "    " members)
+              emitLn "}"
+              emitLn ""
         synthBuf := synthBuf ++ clsBuf
       for cls in memberBufs.keys do
         unless usedH.contains cls || usedF.contains cls || synthClasses.contains cls do
