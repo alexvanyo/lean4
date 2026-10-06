@@ -21,6 +21,10 @@ class KotlinClassesTest {
         val p3 = f_makePoint(3, 7)
         assertEquals(3, p3.x)
         assertEquals(7, p3.y)
+
+        assertEquals(60, p.sumCoords())
+        assertEquals(20, f_testPointReads(true, p))
+        assertEquals(10, f_testPointReads(false, p))
     }
 
     @Test
@@ -68,6 +72,10 @@ class KotlinClassesTest {
         assertEquals(15, c.readCount())
         c.inc(-3)
         assertEquals(12, c.count)
+
+        val res = c.incAndRead(8)
+        assertEquals(20, res)
+        assertEquals(20, c.count)
     }
 
     @Test

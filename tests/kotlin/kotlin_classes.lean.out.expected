@@ -12,50 +12,63 @@ public fun getXCoord(): Int {
     return x
 }
 
+public fun sumCoords(): Int {
+    val x_18_1 = x
+    val y_19_2 = y
+    return (((x_18_1 + x_18_1) + y_19_2) + y_19_2)
+}
+
 
 }
 
 class Person(val name: String, val age: java.math.BigInteger, val score: Int) {
     public fun withScore(newScore: Int): Person {
-        val name_22_1 = name
-        val age_23_2 = age
-        return Person(name_22_1, age_23_2, newScore)
+        val name_28_1 = name
+        val age_29_2 = age
+        return Person(name_28_1, age_29_2, newScore)
     }
 
     public fun birthday(): Person {
-        val name_32_1 = name
-        val age_33_2 = age
-        val score_34_3 = score
-        val v_x_39_4 = (age_33_2.add(java.math.BigInteger.ONE))
-        return Person(name_32_1, v_x_39_4, score_34_3)
+        val name_38_1 = name
+        val age_39_2 = age
+        val score_40_3 = score
+        val v_x_45_4 = (age_39_2.add(java.math.BigInteger.ONE))
+        return Person(name_38_1, v_x_45_4, score_40_3)
     }
 
     public fun summary(): String {
-        val name_46_1 = name
-        val age_47_2 = age
-        val score_48_3 = score
-        val v_x_49_4 = ":"
-        return ((((name_46_1 + v_x_49_4) + (age_47_2).toString()) + v_x_49_4) + (score_48_3).toString())
+        val name_52_1 = name
+        val age_53_2 = age
+        val score_54_3 = score
+        val v_x_55_4 = ":"
+        return ((((name_52_1 + v_x_55_4) + (age_53_2).toString()) + v_x_55_4) + (score_54_3).toString())
     }
 }
 
 class Counter(var count: Int) {
     public fun inc(delta: Int): Unit {
-        val count_81_1 = count
-        count = (count_81_1 + delta)
+        val count_87_1 = count
+        count = (count_87_1 + delta)
         return
     }
 
     public fun readCount(): Int {
         return count
     }
+
+    public fun incAndRead(delta: Int): Int {
+        val count_100_1 = count
+        val v_x_104_2 = (count_100_1 + delta)
+        count = v_x_104_2
+        return v_x_104_2
+    }
 }
 
 class MutablePerson(var name: String, var age: java.math.BigInteger) {
     public fun birthday(): Unit {
-        val age_94_2 = age
-        val v_x_99_3 = (age_94_2.add(java.math.BigInteger.ONE))
-        age = v_x_99_3
+        val age_118_2 = age
+        val v_x_123_3 = (age_118_2.add(java.math.BigInteger.ONE))
+        age = v_x_123_3
         return
     }
 
@@ -82,10 +95,10 @@ class MutablePerson(var name: String, var age: java.math.BigInteger) {
 }
 
 @PublishedApi internal fun f_addMeters___boxed(a: Any?, b: Any?): Any? {
-    val a_boxed_66_1 = (a as Int)
-    val b_boxed_67_2 = (b as Int)
-    val res_68_3 = f_addMeters(a_boxed_66_1, b_boxed_67_2)
-    return res_68_3
+    val a_boxed_72_1 = (a as Int)
+    val b_boxed_73_2 = (b as Int)
+    val res_74_3 = f_addMeters(a_boxed_72_1, b_boxed_73_2)
+    return res_74_3
 }
 
 @PublishedApi internal fun f_scaleMeters(m: Int, factor: Int): Int {
@@ -93,9 +106,18 @@ class MutablePerson(var name: String, var age: java.math.BigInteger) {
 }
 
 @PublishedApi internal fun f_scaleMeters___boxed(m: Any?, factor: Any?): Any? {
-    val m_boxed_75_1 = (m as Int)
-    val factor_boxed_76_2 = (factor as Int)
-    val res_77_3 = f_scaleMeters(m_boxed_75_1, factor_boxed_76_2)
-    return res_77_3
+    val m_boxed_81_1 = (m as Int)
+    val factor_boxed_82_2 = (factor as Int)
+    val res_83_3 = f_scaleMeters(m_boxed_81_1, factor_boxed_82_2)
+    return res_83_3
+}
+
+@PublishedApi internal fun f_testPointReads(cond: Boolean, p: Point): Int {
+    if (!cond)     {
+        return p.x
+    } else     {
+        val x_114_1 = p.x
+        return (x_114_1 + x_114_1)
+    }
 }
 

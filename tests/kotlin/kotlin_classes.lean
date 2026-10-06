@@ -20,6 +20,10 @@ def Point.translate (p : Point) (dx dy : Int32) : Point :=
 def Point.getXCoord (p : Point) : Int32 :=
   p.x
 
+@[kotlin_member "Point" "public" "sumCoords"]
+def Point.sumCoords (p : Point) : Int32 :=
+  p.x + p.x + p.y + p.y
+
 @[export lean_make_point]
 def makePoint (x y : Int32) : Point :=
   { x, y }
@@ -69,6 +73,18 @@ def Counter.inc (c : Counter) (delta : Int32) : Counter :=
 @[kotlin_member "Counter" "public" "readCount"]
 def Counter.readCount (c : Counter) : Int32 :=
   c.count
+
+@[kotlin_member "Counter" "public" "incAndRead"]
+def Counter.incAndRead (c : Counter) (delta : Int32) : Int32 × Counter :=
+  let c' := { c with count := c.count + delta }
+  (c'.count, c')
+
+def testPointReads (cond : Bool) (p : Point) : Int32 :=
+  let x1 := p.x
+  if cond then
+    x1 + p.x
+  else
+    p.x
 
 -- Multi-field @[mutable_kotlin_class] with object fields (String, Nat) synthesized and updated in-place
 @[mutable_kotlin_class "MutablePerson"]

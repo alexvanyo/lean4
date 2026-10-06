@@ -160,6 +160,11 @@ structure State where
   variable back to the field is skipped.
   -/
   fieldVals : Std.HashMap String String := {}
+  /--
+  Previously read fields of immutable `@[kotlin_class]` values (by Kotlin lvalue, e.g. `p.x` or `x`).
+  Subsequent reads of the same field reuse the existing Kotlin local variable.
+  -/
+  fieldReads : Std.HashMap String String := {}
   /-- Variables used by the code being emitted, other than by RC instructions. -/
   used : Std.HashSet FVarId := {}
   /-- Kotlin variables read from a field of a `@[kotlin_class]` value: that value. -/
@@ -2728,15 +2733,16 @@ def emitFieldWrite (x : FVarId) (pos : ClassLayout → Option String) (v : Strin
     emitLn s!"{lhs} = {v}"
     modify fun st => { st with fieldVals := st.fieldVals.insert lhs v }
 
-/-- Forgets all known field values (see `State.fieldVals`). -/
+/-- Forgets all known field values (see `State.fieldVals` and `State.fieldReads`). -/
 def forgetFieldVals : EmitM Unit :=
-  modify fun st => { st with fieldVals := {} }
+  modify fun st => { st with fieldVals := {}, fieldReads := {} }
 
 /-- Runs `act` with the current known field values, and restores them afterwards. -/
 def withFieldVals (act : EmitM α) : EmitM α := do
-  let saved := (← get).fieldVals
+  let savedVals := (← get).fieldVals
+  let savedReads := (← get).fieldReads
   let r ← act
-  modify fun st => { st with fieldVals := saved }
+  modify fun st => { st with fieldVals := savedVals, fieldReads := savedReads }
   return r
 
 /-- A class field projection: kind (0 object, 1 scalar, 2 usize), position, and source value. -/
@@ -3511,8 +3517,10 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
   | _ => return false
 
 /--
-`val x = y.f` for a projection of `y`. For a `@[kotlin_class]` value, the read is dropped if `x` is
-unused, and the field is recorded as held by `x` (see `State.fieldVals`).
+`val x = y.f` for a projection of `y`. For an immutable `@[kotlin_class]` value, subsequent reads
+of the same field reuse the existing Kotlin local variable (see `State.fieldReads`). For a mutable
+`@[mutable_kotlin_class]` value, reads are never deduplicated, but the field is recorded in
+`State.fieldVals` so that writing the variable back to the field can be skipped.
 -/
 def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : LetDecl .impure) :
     EmitM Unit := do
@@ -3523,11 +3531,16 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     modify fun st => { st with projSrc := st.projSrc.insert n y }
     unless ← isUsed x do return
     let lhs ← classField y pos
-    if let some prevVar := (← get).fieldVals[lhs]? then
-      setParamVarName x prevVar
-      return
+    let isMut ← isMutableClassFVar y
+    if !isMut then
+      if let some prevVar := (← get).fieldReads[lhs]? then
+        setParamVarName x prevVar
+        return
     emitLn s!"val {n} = {lhs}"
-    modify fun st => { st with fieldVals := st.fieldVals.insert lhs n }
+    if isMut then
+      modify fun st => { st with fieldVals := st.fieldVals.insert lhs n }
+    else
+      modify fun st => { st with fieldReads := st.fieldReads.insert lhs n }
   else
     unless ← isUsed x do return
     let n ← getVarName x
@@ -4660,7 +4673,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let decl ← decl.internalize (uniqueIdents := true)
   let initKnownBools := ({} : Std.HashMap String Bool).insert "true" true |>.insert "false" false
   let initVarTypes := ({} : Std.HashMap String String).insert "true" "Boolean" |>.insert "false" "Boolean" |>.insert "Unit" "Unit"
-  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
+  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, fieldReads := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
   markUsed code
