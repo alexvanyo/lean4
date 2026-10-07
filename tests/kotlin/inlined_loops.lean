@@ -30,3 +30,29 @@ partial def findIndexLoop (limit : UInt32) (target : UInt32) (idx : UInt32) : In
 
 def searchWithEarlyReturn (limit : UInt32) (target : UInt32) : Int32 :=
   findIndexLoop limit target 0
+
+@[inline]
+partial def scanRowAll (pred : UInt32 → Bool) (base : UInt32) (cols : UInt32) (j : UInt32) : Bool :=
+  if j < cols then
+    if pred (base + j) then
+      scanRowAll pred base cols (j + 1)
+    else
+      false
+  else
+    true
+
+@[inline]
+partial def scanGridAll (pred : UInt32 → Bool) (rows : UInt32) (cols : UInt32) (i : UInt32) : Bool :=
+  if i >= rows then
+    true
+  else if scanRowAll pred (i * cols) cols 0 then
+    scanGridAll pred rows cols (i + 1)
+  else
+    false
+
+def allBelowLimit (rows : UInt32) (cols : UInt32) (limit : UInt32) : Bool :=
+  scanGridAll (fun x => x < limit) rows cols 0
+
+def anyEquals (rows : UInt32) (cols : UInt32) (target : UInt32) : Bool :=
+  !scanGridAll (fun x => x != target) rows cols 0
+

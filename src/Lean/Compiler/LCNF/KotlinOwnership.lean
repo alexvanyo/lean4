@@ -191,7 +191,7 @@ fields). Returns `false` after reporting an error or requesting a parameter to b
 -/
 partial def claim (st : PathState) (i : Nat) (deep : Bool) (what : MessageData) : M Bool := do
   let o := st.objs[i]!
-  if o.immutable then return true
+  if o.immutable && (deep || o.rc == .exact 1) then return true
   if let some j := o.pristine? then
     modify fun out => { out with requireExclusive := out.requireExclusive.insert j }
     return false
@@ -503,6 +503,9 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
         discard <| claim st i false m!"`{fn}`"
         let st ← consumeArgs st none ((args.extract 0 ai) ++ (args.extract (ai + 1) args.size))
         return bind st x i
+    if args.isEmpty && (getExternNameFor (← getEnv) `kotlin fn).any (·.startsWith "kotlin_expr:") then
+      let (st, i) := newObj st { rc := .top, isMutableClass := isMut, immutable := true }
+      return bind st x i
     if isArrayAlloc fn then
       let st ← consumeArgs st none args
       let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }

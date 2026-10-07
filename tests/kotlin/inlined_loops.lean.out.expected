@@ -134,3 +134,249 @@
     return res_98_3
 }
 
+@PublishedApi internal tailrec fun f_scanRowAll(pred: (UInt) -> Boolean, base: UInt, cols: UInt, j: UInt): Boolean {
+    if (!(j < cols))     {
+        return true
+    } else     {
+        val v_x_106_1 = (base + j)
+        val v_x_108_2 = pred(v_x_106_1)
+        if (!v_x_108_2)         {
+            return false
+        } else         {
+            var j_117_3: UInt = (j + 1u)
+            loop_1@ while (true)             {
+                if (!(j_117_3 < cols))                 {
+                    return true
+                } else                 {
+                    val v_x_120_4 = (base + j_117_3)
+                    val v_x_122_5 = pred(v_x_120_4)
+                    if (!v_x_122_5)                     {
+                        return false
+                    } else                     {
+                        j_117_3 = (j_117_3 + 1u)
+                        continue@loop_1
+                    }
+                }
+            }
+        }
+    }
+}
+
+@PublishedApi internal fun f_scanRowAll___boxed(pred: Any?, base: Any?, cols: Any?, j: Any?): Any? {
+    val base_boxed_132_1 = (base as UInt)
+    val cols_boxed_133_2 = (cols as UInt)
+    val j_boxed_134_3 = (j as UInt)
+    var j_140_5: UInt = j_boxed_134_3
+    val res_135_4: Boolean
+    loop_1@ while (true)     {
+        if (!(j_140_5 < cols_boxed_133_2))         {
+            res_135_4 = true
+            break@loop_1
+        } else         {
+            val v_x_143_6 = (base_boxed_132_1 + j_140_5)
+            val v_x_145_7 = (pred as (Any?) -> Any?)(v_x_143_6)
+            val v_x_146_8 = (v_x_145_7 as Boolean)
+            if (!v_x_146_8)             {
+                res_135_4 = (v_x_145_7 as Boolean)
+                break@loop_1
+            } else             {
+                j_140_5 = (j_140_5 + 1u)
+                continue@loop_1
+            }
+        }
+    }
+    return res_135_4
+}
+
+@PublishedApi internal tailrec fun f_scanGridAll(pred: (UInt) -> Boolean, rows: UInt, cols: UInt, i: UInt): Boolean {
+    if (!(rows <= i))     {
+        val base_163_1: UInt = (i * cols)
+        var j_165_2: UInt = 0u
+        loop_1@ while (true)         {
+            if (!(j_165_2 < cols))             {
+                break@loop_1
+            } else             {
+                val v_x_168_3 = (base_163_1 + j_165_2)
+                val v_x_170_4 = pred(v_x_168_3)
+                if (!v_x_170_4)                 {
+                    return false
+                } else                 {
+                    j_165_2 = (j_165_2 + 1u)
+                    continue@loop_1
+                }
+            }
+        }
+        var i_179_5: UInt = (i + 1u)
+        loop_2@ while (true)         {
+            if (!(rows <= i_179_5))             {
+                val base_188_6: UInt = (i_179_5 * cols)
+                var j_190_7: UInt = 0u
+                loop_3@ while (true)                 {
+                    if (!(j_190_7 < cols))                     {
+                        break@loop_3
+                    } else                     {
+                        val v_x_193_8 = (base_188_6 + j_190_7)
+                        val v_x_195_9 = pred(v_x_193_8)
+                        if (!v_x_195_9)                         {
+                            return false
+                        } else                         {
+                            j_190_7 = (j_190_7 + 1u)
+                            continue@loop_3
+                        }
+                    }
+                }
+                i_179_5 = (i_179_5 + 1u)
+                continue@loop_2
+            } else             {
+                return true
+            }
+        }
+    } else     {
+        return true
+    }
+}
+
+@PublishedApi internal fun f_scanGridAll___boxed(pred: Any?, rows: Any?, cols: Any?, i: Any?): Any? {
+    val rows_boxed_205_1 = (rows as UInt)
+    val cols_boxed_206_2 = (cols as UInt)
+    val i_boxed_207_3 = (i as UInt)
+    var i_213_5: UInt = i_boxed_207_3
+    val res_208_4: Boolean
+    loop_1@ while (true)     {
+        if (!(rows_boxed_205_1 <= i_213_5))         {
+            val base_222_6: UInt = (i_213_5 * cols_boxed_206_2)
+            var j_224_7: UInt = 0u
+            loop_2@ while (true)             {
+                if (!(j_224_7 < cols_boxed_206_2))                 {
+                    break@loop_2
+                } else                 {
+                    val v_x_227_8 = (base_222_6 + j_224_7)
+                    val v_x_229_9 = (pred as (Any?) -> Any?)(v_x_227_8)
+                    val v_x_230_10 = (v_x_229_9 as Boolean)
+                    if (!v_x_230_10)                     {
+                        res_208_4 = (v_x_229_9 as Boolean)
+                        break@loop_1
+                    } else                     {
+                        j_224_7 = (j_224_7 + 1u)
+                        continue@loop_2
+                    }
+                }
+            }
+            i_213_5 = (i_213_5 + 1u)
+            continue@loop_1
+        } else         {
+            res_208_4 = true
+            break@loop_1
+        }
+    }
+    return res_208_4
+}
+
+@PublishedApi internal fun f_allBelowLimit___lam__0(limit: UInt, x: UInt): Boolean {
+    return (x < limit)
+}
+
+@PublishedApi internal fun f_allBelowLimit___lam__0___boxed(limit: Any?, x: Any?): Any? {
+    val limit_boxed_240_1 = (limit as UInt)
+    val x_boxed_241_2 = (x as UInt)
+    val res_242_3 = f_allBelowLimit___lam__0(limit_boxed_240_1, x_boxed_241_2)
+    return res_242_3
+}
+
+@PublishedApi internal fun f_allBelowLimit(rows: UInt, cols: UInt, limit: UInt): Boolean {
+    var i_254_2: UInt = 0u
+    loop_1@ while (true)     {
+        if (!(rows <= i_254_2))         {
+            val base_263_3: UInt = (i_254_2 * cols)
+            var j_265_4: UInt = 0u
+            loop_2@ while (true)             {
+                if (!(j_265_4 < cols))                 {
+                    break@loop_2
+                } else                 {
+                    val x_277_5: Any? = (base_263_3 + j_265_4)
+                    val x_boxed_279_6 = (x_277_5 as UInt)
+                    val res_280_7 = f_allBelowLimit___lam__0(limit, x_boxed_279_6)
+                    if (!res_280_7)                     {
+                        return false
+                    } else                     {
+                        j_265_4 = (j_265_4 + 1u)
+                        continue@loop_2
+                    }
+                }
+            }
+            i_254_2 = (i_254_2 + 1u)
+            continue@loop_1
+        } else         {
+            return true
+        }
+    }
+}
+
+@PublishedApi internal fun f_allBelowLimit___boxed(rows: Any?, cols: Any?, limit: Any?): Any? {
+    val rows_boxed_285_1 = (rows as UInt)
+    val cols_boxed_286_2 = (cols as UInt)
+    val limit_boxed_287_3 = (limit as UInt)
+    val res_288_4 = f_allBelowLimit(rows_boxed_285_1, cols_boxed_286_2, limit_boxed_287_3)
+    return res_288_4
+}
+
+@PublishedApi internal fun f_anyEquals___lam__0(target: UInt, x: UInt): Boolean {
+    if (!(x == target))     {
+        return true
+    } else     {
+        return false
+    }
+}
+
+@PublishedApi internal fun f_anyEquals___lam__0___boxed(target: Any?, x: Any?): Any? {
+    val target_boxed_297_1 = (target as UInt)
+    val x_boxed_298_2 = (x as UInt)
+    val res_299_3 = f_anyEquals___lam__0(target_boxed_297_1, x_boxed_298_2)
+    return res_299_3
+}
+
+@PublishedApi internal fun f_anyEquals(rows: UInt, cols: UInt, target: UInt): Boolean {
+    var i_313_3: UInt = 0u
+    val v_x_307_2: Boolean
+    loop_1@ while (true)     {
+        if (!(rows <= i_313_3))         {
+            val base_322_4: UInt = (i_313_3 * cols)
+            var j_324_5: UInt = 0u
+            loop_2@ while (true)             {
+                if (!(j_324_5 < cols))                 {
+                    break@loop_2
+                } else                 {
+                    val x_336_6: Any? = (base_322_4 + j_324_5)
+                    val x_boxed_338_7 = (x_336_6 as UInt)
+                    val res_339_8 = f_anyEquals___lam__0(target, x_boxed_338_7)
+                    if (!res_339_8)                     {
+                        v_x_307_2 = false
+                        break@loop_1
+                    } else                     {
+                        j_324_5 = (j_324_5 + 1u)
+                        continue@loop_2
+                    }
+                }
+            }
+            i_313_3 = (i_313_3 + 1u)
+            continue@loop_1
+        } else         {
+            v_x_307_2 = true
+            break@loop_1
+        }
+    }
+    if (!v_x_307_2)     {
+        return true
+    } else     {
+        return false
+    }
+}
+
+@PublishedApi internal fun f_anyEquals___boxed(rows: Any?, cols: Any?, target: Any?): Any? {
+    val rows_boxed_344_1 = (rows as UInt)
+    val cols_boxed_345_2 = (cols as UInt)
+    val target_boxed_346_3 = (target as UInt)
+    val res_347_4 = f_anyEquals(rows_boxed_344_1, cols_boxed_345_2, target_boxed_346_3)
+    return res_347_4
+}
+
