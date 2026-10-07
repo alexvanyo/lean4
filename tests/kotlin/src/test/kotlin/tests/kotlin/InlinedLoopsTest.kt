@@ -19,4 +19,15 @@ class InlinedLoopsTest {
         assertEquals(-1, f_searchWithEarlyReturn(10u, 10u))
         assertEquals(-1, f_searchWithEarlyReturn(10u, 100u))
     }
+
+    @Test
+    fun testNestedBooleanLoops() {
+        assertEquals(true, f_allBelowLimit(3u, 4u, 12u))
+        assertEquals(false, f_allBelowLimit(3u, 4u, 11u))
+        assertEquals(false, f_allBelowLimit(3u, 4u, 5u))
+        assertEquals(true, f_anyEquals(3u, 4u, 0u))
+        assertEquals(true, f_anyEquals(3u, 4u, 7u))
+        assertEquals(true, f_anyEquals(3u, 4u, 11u))
+        assertEquals(false, f_anyEquals(3u, 4u, 12u))
+    }
 }

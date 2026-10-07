@@ -85,13 +85,13 @@ inductive LoopExit where
   | assignAndBreak (varName : String) (varTy : String) (loopLbl : String)
   | breakOnly (loopLbl : String)
   | returnLbl (lbl : String) (varTy? : Option String)
-  | threaded (successExit : LoopExit) (failureLbl : String)
+  | threaded (successExit : LoopExit) (failureLbl : String) (contBool? : Option Bool := none)
 
 /-- Destination of an inlined loop expansion (`emitLoopExpansion`). -/
 inductive LoopDest where
   | tail
   | assign (fv : FVarId) (ty : Expr)
-  | threaded (outerExit : LoopExit)
+  | threaded (outerExit : LoopExit) (contBool? : Option Bool := none)
 
 /-- State of a self-tail-recursive function whose body is being emitted as a `while (true)` loop. -/
 structure LoopCtx where
@@ -2559,70 +2559,51 @@ def recordPap? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
 def currentExit : EmitM LoopExit := do
   return (← read).loop?.map (·.exit) |>.getD .funcReturn
 
-def emitReturn (valStr : String) (valTy? : Option String := none) : EmitM Unit := do
-  match ← currentExit with
-  | .funcReturn =>
-    if (← read).retUnit then
-      -- Evaluate the value for its effects unless it is a plain variable or constant.
-      unless valStr == "null" || valStr.all (fun c => c.isAlphanum || c == '_') do
+def isTrivialReturnExpr (s : String) : Bool :=
+  s == "null" || s == "Unit" || s == "arrayOf<Any?>(0)" || s.all (fun c => c.isAlphanum || c == '_')
+
+partial def emitReturn (valStr : String) (valTy? : Option String := none) : EmitM Unit := do
+  let rec go (exit : LoopExit) : EmitM Unit := do
+    match exit with
+    | .funcReturn =>
+      if (← read).retUnit then
+        -- Evaluate the value for its effects unless it is a plain variable or constant.
+        unless isTrivialReturnExpr valStr do
+          emitLn valStr
+        emitLn "return"
+      else
+        match (← read).retCast? with
+        | some t => emitLn s!"return {← castIfNeeded valStr t valTy?}"
+        | none => emitLn s!"return {valStr}"
+    | .inlineAlias fv =>
+      if let some t := valTy? then recordVarType valStr t
+      setParamVarName fv valStr
+    | .assignOnly x xTy =>
+      emitLn s!"{x} = {← castIfNeeded valStr xTy valTy?}"
+    | .assignAndBreak x xTy loopLbl =>
+      let rhs ← castIfNeeded valStr xTy valTy?
+      modify fun st => { st with loopExits := st.loopExits.insert loopLbl ((st.loopExits.getD loopLbl #[]).push rhs) }
+      emitLn s!"{x} = {rhs}"
+      emitLn s!"break@{loopLbl}"
+    | .breakOnly loopLbl =>
+      unless isTrivialReturnExpr valStr do
         emitLn valStr
-      emitLn "return"
-    else
-      match (← read).retCast? with
-      | some t => emitLn s!"return {← castIfNeeded valStr t valTy?}"
-      | none => emitLn s!"return {valStr}"
-  | .inlineAlias fv =>
-    if let some t := valTy? then recordVarType valStr t
-    setParamVarName fv valStr
-  | .assignOnly x xTy =>
-    emitLn s!"{x} = {← castIfNeeded valStr xTy valTy?}"
-  | .assignAndBreak x xTy loopLbl =>
-    let rhs ← castIfNeeded valStr xTy valTy?
-    modify fun st => { st with loopExits := st.loopExits.insert loopLbl ((st.loopExits.getD loopLbl #[]).push rhs) }
-    emitLn s!"{x} = {rhs}"
-    emitLn s!"break@{loopLbl}"
-  | .breakOnly loopLbl =>
-    unless valStr == "null" || valStr.all (fun c => c.isAlphanum || c == '_') do
-      emitLn valStr
-    emitLn s!"break@{loopLbl}"
-  | .returnLbl lbl retTy? =>
-    let rhs ← match retTy? with
-      | some t => castIfNeeded valStr t valTy?
-      | none => pure valStr
-    emitLn s!"return@{lbl} {rhs}"
-  | .threaded successExit failureLbl =>
-    if valStr == "(-1)" || valStr == "-1" || valStr == "4294967295L" || valStr == "4294967295" || valStr == "null" then
-      emitLn s!"break@{failureLbl}"
-    else
-      match successExit with
-      | .funcReturn =>
-        if (← read).retUnit then
-          unless valStr == "null" || valStr.all (fun c => c.isAlphanum || c == '_') do
-            emitLn valStr
-          emitLn "return"
-        else
-          match (← read).retCast? with
-          | some t => emitLn s!"return {← castIfNeeded valStr t valTy?}"
-          | none => emitLn s!"return {valStr}"
-      | .assignAndBreak x xTy loopLbl =>
-        let rhs ← castIfNeeded valStr xTy valTy?
-        modify fun st => { st with loopExits := st.loopExits.insert loopLbl ((st.loopExits.getD loopLbl #[]).push rhs) }
-        emitLn s!"{x} = {rhs}"
-        emitLn s!"break@{loopLbl}"
-      | .assignOnly x xTy =>
-        emitLn s!"{x} = {← castIfNeeded valStr xTy valTy?}"
-      | .breakOnly loopLbl =>
-        emitLn s!"break@{loopLbl}"
-      | .inlineAlias fv =>
-        if let some t := valTy? then recordVarType valStr t
-        setParamVarName fv valStr
-      | .returnLbl lbl retTy? =>
-        let rhs ← match retTy? with
-          | some t => castIfNeeded valStr t valTy?
-          | none => pure valStr
-        emitLn s!"return@{lbl} {rhs}"
-      | .threaded .. =>
-        emitLn s!"return {valStr}"
+      emitLn s!"break@{loopLbl}"
+    | .returnLbl lbl retTy? =>
+      let rhs ← match retTy? with
+        | some t => castIfNeeded valStr t valTy?
+        | none => pure valStr
+      emitLn s!"return@{lbl} {rhs}"
+    | .threaded successExit failureLbl contBool? =>
+      let isCont := match contBool? with
+        | some true => valStr == "true"
+        | some false => valStr == "false"
+        | none => valStr == "(-1)" || valStr == "-1" || valStr == "4294967295L" || valStr == "4294967295" || valStr == "null"
+      if isCont then
+        emitLn s!"break@{failureLbl}"
+      else
+        go successExit
+  go (← currentExit)
 
 /-- Returns from the current `return` target without a value. -/
 def emitReturnUnit : EmitM Unit := do
@@ -2633,7 +2614,7 @@ def emitReturnUnit : EmitM Unit := do
   | .assignAndBreak _ _ loopLbl => emitLn s!"break@{loopLbl}"
   | .breakOnly loopLbl => emitLn s!"break@{loopLbl}"
   | .returnLbl lbl _ => emitLn s!"return@{lbl} Unit"
-  | .threaded _ failureLbl => emitLn s!"break@{failureLbl}"
+  | .threaded _ failureLbl _ => emitLn s!"break@{failureLbl}"
 
 def resolveKnownBool (s : String) : EmitM String := do
   match (← get).knownBools[s]? with
@@ -3486,8 +3467,8 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
               return true
     let env ← getEnv
     if let some extStr := getExternNameFor env `kotlin fn then
-      if extStr == "kotlin_expr:null" then
-        setParamVarName x "null"
+      if args.isEmpty && extStr.startsWith "kotlin_expr:" then
+        setParamVarName x (extStr.drop 12).toString
         return true
       if extStr == "kotlin_op:id" then
         if let some a := args.back? then
@@ -3871,26 +3852,49 @@ partial def retYieldsFv (fv : FVarId) (c : Code .impure) : Bool :=
   | _ => false
 
 /--
-Detects if `code` tests `fv >= 0` and returns `fv` on success:
-`let _x := decLe 0 fv; cases _x | false => contCode | true => return fv`
-Returns `some contCode` if matched, where `contCode` does not use `fv`.
+Detects if `code` tests `fv >= 0` (or branches directly on a boolean `fv`) and returns `fv` on early
+exit:
+- `let _x := decLe 0 fv; cases _x | false => contCode | true => return fv` (`contBool? = none`)
+- `cases fv | false => return fv | true => contCode` (`contBool? = some true`)
+Returns `some (contCode, contBool?)` if matched, where `contCode` does not use `fv`.
 -/
-partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure) : Option (Code .impure) :=
+partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure)
+    (skippedLets : Array FVarId := #[]) : Option (Code .impure × Option Bool) :=
   match skipRC code with
-  | .let _ k =>
-    if countUsesCode fv k > 0 then
-      isNonNegEarlyExit? fv k
-    else none
+  | .let d k =>
+    match d.value with
+    | .unbox f =>
+      if f == fv && countUsesCode fv k == 0 then
+        isNonNegEarlyExit? d.fvarId k skippedLets
+      else none
+    | .lit _ =>
+      if countUsesCode fv k > 0 then
+        isNonNegEarlyExit? fv k (skippedLets.push d.fvarId)
+      else none
+    | .fap fn args =>
+      if isPrimitiveOp fn args.size && countUsesCode fv k > 0 then
+        isNonNegEarlyExit? fv k (skippedLets.push d.fvarId)
+      else none
+    | _ => none
   | .cases cs =>
     if cs.alts.size == 2 then
       let alt0 := cs.alts[0]!
       let alt1 := cs.alts[1]!
-      let checkAlt (retAlt contAlt : Alt .impure) : Option (Code .impure) := do
+      let alt0Bool : Bool := match alt0 with
+        | .ctorAlt info _ => info.cidx == 1
+        | .default _ => true
+      let checkAlt (retAlt contAlt : Alt .impure) (contBool : Bool) : Option (Code .impure × Option Bool) := do
         if countUsesCode fv contAlt.getCode != 0 then none
-        else
-          if retYieldsFv fv retAlt.getCode then some contAlt.getCode
+        else if skippedLets.any (fun x => countUsesCode x contAlt.getCode != 0 || countUsesCode x retAlt.getCode != 0) then none
+        else if retYieldsFv fv retAlt.getCode then
+          if cs.discr == fv then
+            if skippedLets.isEmpty then some (contAlt.getCode, some contBool)
+            else none
+          else if !contBool && skippedLets.contains cs.discr then
+            some (contAlt.getCode, none)
           else none
-      checkAlt alt1 alt0 <|> checkAlt alt0 alt1
+        else none
+      checkAlt alt1 alt0 alt0Bool <|> checkAlt alt0 alt1 (!alt0Bool)
     else none
   | _ => none
 
@@ -3904,9 +3908,9 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
          !(curExit matches .inlineAlias _ | .assignOnly ..) then
         emitLoopExpansion callee args .tail
         return
-    if let some contCode := isNonNegEarlyExit? decl.fvarId k then
+    if let some (contCode, contBool?) := isNonNegEarlyExit? decl.fvarId k then
       if !(curExit matches .inlineAlias _ | .assignOnly ..) then
-        emitLoopExpansion callee args (.threaded curExit)
+        emitLoopExpansion callee args (.threaded curExit contBool?)
         emitCode contCode
         return
     if let .let d2 k2 := skipRC k then
@@ -3930,9 +3934,9 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
          !(curExit matches .inlineAlias _ | .assignOnly ..) then
         emitLoopExpansion lam args .tail
         return
-    if let some contCode := isNonNegEarlyExit? decl.fvarId k then
+    if let some (contCode, contBool?) := isNonNegEarlyExit? decl.fvarId k then
       if !(curExit matches .inlineAlias _ | .assignOnly ..) then
-        emitLoopExpansion lam args (.threaded curExit)
+        emitLoopExpansion lam args (.threaded curExit contBool?)
         emitCode contCode
         return
     -- Closures return boxed values; fuse `let y := unbox x` so the inlined body yields `y` directly.
@@ -4177,9 +4181,11 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         emitLn (← emitLetValue decl)
         setParamVarName x (← toKotlinArg args[ai]!)
       else
-        -- A callee that updates values in place may write fields.
+        -- A callee that updates values in place or invokes a callback may write fields.
         if let some s := (← read).summaries[fn]? then
           if s.exclusive.any id then forgetFieldVals
+        if getExternNameFor (← getEnv) `kotlin fn == some "kotlin_op:invoke" then
+          forgetFieldVals
         if let some shape ← dropShape? fn then
           let call ← emitLetValue decl
           if isUnitShape shape then
@@ -4224,6 +4230,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
               recordIntSource n rhs decl
               emitLn s!"val {n} = {rhs}"
     | _ =>
+      if decl.value matches .fvar .. then forgetFieldVals
       if !(← isUsed x) && (← isPureConstantLet decl) then
         pure ()
       else
@@ -4578,9 +4585,9 @@ partial def emitLoopExpansion (callee : Decl .impure) (args : Array (Arg .impure
       emitLn "}"
     else
       withReader (fun ctx => { ctx with loop? := some lc }) (emitCode body)
-  | .threaded outerExit =>
+  | .threaded outerExit contBool? =>
     let names ← emitParams
-    let lc : LoopCtx := { fnName := callee.name, varNames := names, variant, loopLbl, exit := .threaded outerExit loopLbl }
+    let lc : LoopCtx := { fnName := callee.name, varNames := names, variant, loopLbl, exit := .threaded outerExit loopLbl contBool? }
     if isLoop then
       forgetFieldVals
       emitIndent; emit s!"{loopLbl}@ while (true) "; emitLn "{"
@@ -4668,6 +4675,204 @@ def kdocLines (doc : String) : List String :=
   if lines.isEmpty then []
   else ["/**"] ++ lines.map (fun l => if isBlank l then " *" else " * " ++ l) ++ [" */"]
 
+partial def substCode (s : Std.HashMap FVarId FVarId) (c : Code .impure) : Code .impure :=
+  if s.isEmpty then c else go c
+where
+  go (c : Code .impure) : Code .impure :=
+    match c with
+    | .inc x n ch p k u => .inc (substFVar s x) n ch p (go k) u
+    | .dec x n ch p o k u => .dec (substFVar s x) n ch p o (go k) u
+    | .del x k u => .del (substFVar s x) (go k) u
+    | .let d k => .let { d with value := substLetValue s d.value } (go k)
+    | .oset x i y k u => .oset (substFVar s x) i (substArg s y) (go k) u
+    | .sset x i off y ty k u => .sset (substFVar s x) i off (substFVar s y) ty (go k) u
+    | .uset x i y k u => .uset (substFVar s x) i (substFVar s y) (go k) u
+    | .setTag x cidx k u => .setTag (substFVar s x) cidx (go k) u
+    | .return x => .return (substFVar s x)
+    | .unreach ty => .unreach ty
+    | .jmp fn args => .jmp (substFVar s fn) (args.map (substArg s))
+    | .fun d k u => .fun (.mk d.fvarId d.binderName d.params d.type (go d.value)) (go k) u
+    | .jp d k => .jp (.mk d.fvarId d.binderName d.params d.type (go d.value)) (go k)
+    | .cases cs =>
+      let alts' := cs.alts.map fun
+        | .ctorAlt info c => .ctorAlt info (go c)
+        | .default c => .default (go c)
+      .cases (.mk cs.typeName cs.resultType (substFVar s cs.discr) alts')
+
+def isInvokeLetValue (env : Environment) (v : LetValue .impure) : Bool :=
+  match v with
+  | .fvar .. => true
+  | .fap fn _ => getExternNameFor env `kotlin fn == some "kotlin_op:invoke"
+  | _ => false
+
+def canSinkMutableProjPast (env : Environment) (v : LetValue .impure) : Bool :=
+  match v with
+  | .lit _ | .erased | .box .. | .unbox .. | .isShared .. | .reset ..
+  | .oproj .. | .sproj .. | .uproj .. | .pap .. | .fvar .. => true
+  | .ctor info _ | .reuse _ info _ _ =>
+    !Compiler.isMutableKotlinClass env info.name.getPrefix
+  | .fap fn args =>
+    let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+    if isPrimitiveOp fn args.size || baseFn.getPrefix == `Array || baseFn.getPrefix == `ByteArray || baseFn.getPrefix == `FloatArray then true
+    else match getExternNameFor env `kotlin fn with
+      | some extStr => !extStr.startsWith "kotlin_op:set:"
+      | none => false
+
+partial def countNonWriteBackUsesCode (env : Environment) (x : FVarId) (code : Code .impure)
+    (mutCtors : Std.HashSet FVarId := {}) : Nat :=
+  match code with
+  | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. =>
+    countNonWriteBackUsesCode env x k mutCtors
+  | .let decl k =>
+    match decl.value with
+    | .ctor info _ =>
+      if Compiler.isMutableKotlinClass env info.name.getPrefix then
+        countNonWriteBackUsesCode env x k (mutCtors.insert decl.fvarId)
+      else
+        countUsesLetValue x decl.value + countNonWriteBackUsesCode env x k mutCtors
+    | .reuse y info _ _ =>
+      if Compiler.isMutableKotlinClass env info.name.getPrefix then
+        (if y == x then 1 else 0) + countNonWriteBackUsesCode env x k (mutCtors.insert decl.fvarId)
+      else
+        countUsesLetValue x decl.value + countNonWriteBackUsesCode env x k mutCtors
+    | v => countUsesLetValue x v + countNonWriteBackUsesCode env x k mutCtors
+  | .jp decl k | .fun decl k _ =>
+    countNonWriteBackUsesCode env x decl.value mutCtors + countNonWriteBackUsesCode env x k mutCtors
+  | .cases cs =>
+    (if cs.discr == x then 1 else 0) +
+    cs.alts.foldl (fun acc alt => acc + countNonWriteBackUsesCode env x alt.getCode mutCtors) 0
+  | .jmp fn args =>
+    (if fn == x then 1 else 0) + args.foldl (fun acc a => acc + countUsesArg x a) 0
+  | .return f => if f == x then 1 else 0
+  | .unreach _ => 0
+  | .oset y _ a k _ =>
+    (if y == x then 1 else 0) +
+    (if mutCtors.contains y then 0 else countUsesArg x a) +
+    countNonWriteBackUsesCode env x k mutCtors
+  | .sset y _ _ z _ k _ | .uset y _ z k _ =>
+    (if y == x then 1 else 0) +
+    (if mutCtors.contains y then 0 else if z == x then 1 else 0) +
+    countNonWriteBackUsesCode env x k mutCtors
+  | .setTag y _ k _ =>
+    (if y == x then 1 else 0) + countNonWriteBackUsesCode env x k mutCtors
+
+partial def hasInvokeBeforeNonWriteBackUse (env : Environment) (x : FVarId) (code : Code .impure)
+    (seenInvoke : Bool := false) : Bool :=
+  match code with
+  | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) ..
+  | .oset (k := k) .. | .sset (k := k) .. | .uset (k := k) .. | .setTag (k := k) .. =>
+    hasInvokeBeforeNonWriteBackUse env x k seenInvoke
+  | .let d k =>
+    if seenInvoke then
+      countNonWriteBackUsesCode env x (.let d k) > 0
+    else if isInvokeLetValue env d.value then
+      hasInvokeBeforeNonWriteBackUse env x k true
+    else
+      countNonWriteBackUsesCode env x (.let d (.unreach default)) == 0 &&
+      hasInvokeBeforeNonWriteBackUse env x k false
+  | .jp d k | .fun d k _ =>
+    hasInvokeBeforeNonWriteBackUse env x d.value seenInvoke ||
+    hasInvokeBeforeNonWriteBackUse env x k seenInvoke
+  | .cases cs =>
+    if seenInvoke && cs.discr == x then true
+    else cs.alts.any fun alt => hasInvokeBeforeNonWriteBackUse env x alt.getCode seenInvoke
+  | .jmp fn args => seenInvoke && (fn == x || args.any (· == .fvar x))
+  | .return f => seenInvoke && f == x
+  | .unreach _ => false
+
+partial def sinkMutableProj (decl : LetDecl .impure) (code : Code .impure) : EmitM (Code .impure) := do
+  let env ← getEnv
+  let x := decl.fvarId
+  if countNonWriteBackUsesCode env x code == 0 then
+    return .let decl code
+  match code with
+  | .inc y n ch p k u => return .inc y n ch p (← sinkMutableProj decl k) u
+  | .dec y n ch p o k u => return .dec y n ch p o (← sinkMutableProj decl k) u
+  | .del y k u => return .del y (← sinkMutableProj decl k) u
+  | .let d2 k2 =>
+    if !canSinkMutableProjPast env d2.value then
+      return .let decl code
+    else if countUsesLetValue x d2.value == 0 then
+      return .let d2 (← sinkMutableProj decl k2)
+    else if hasInvokeBeforeNonWriteBackUse env x k2 then
+      let decl' ← mkLetDecl decl.binderName decl.type decl.value
+      let k2' := substCode (({} : Std.HashMap FVarId FVarId).insert x decl'.fvarId) k2
+      return .let decl (.let d2 (← sinkMutableProj decl' k2'))
+    else
+      return .let decl code
+  | .cases cs =>
+    if cs.discr == x then
+      return .let decl code
+    else
+      let alts' ← cs.alts.mapM fun alt => do
+        let c := alt.getCode
+        if countUsesCode x c == 0 then
+          return alt
+        else
+          let decl' ← mkLetDecl decl.binderName decl.type decl.value
+          let c' := substCode (({} : Std.HashMap FVarId FVarId).insert x decl'.fvarId) c
+          let c'' ← sinkMutableProj decl' c'
+          return alt.updateCode c''
+      return .cases (cs.updateAlts alts')
+  | .jp d k =>
+    if countUsesCode x d.value == 0 then
+      return .jp d (← sinkMutableProj decl k)
+    else
+      return .let decl code
+  | .oset y i a k u =>
+    if y != x && a != .fvar x then
+      return .oset y i a (← sinkMutableProj decl k) u
+    else
+      return .let decl code
+  | .sset y i off z ty k u =>
+    if y != x && z != x then
+      return .sset y i off z ty (← sinkMutableProj decl k) u
+    else
+      return .let decl code
+  | .uset y i z k u =>
+    if y != x && z != x then
+      return .uset y i z (← sinkMutableProj decl k) u
+    else
+      return .let decl code
+  | .setTag y cidx k u =>
+    if y != x then
+      return .setTag y cidx (← sinkMutableProj decl k) u
+    else
+      return .let decl code
+  | _ => return .let decl code
+
+partial def sinkMutableClassProjs (code : Code .impure) : EmitM (Code .impure) := do
+  match code with
+  | .inc x n ch p k u => return .inc x n ch p (← sinkMutableClassProjs k) u
+  | .dec x n ch p o k u => return .dec x n ch p o (← sinkMutableClassProjs k) u
+  | .del x k u => return .del x (← sinkMutableClassProjs k) u
+  | .let decl k =>
+    let k' ← sinkMutableClassProjs k
+    match decl.value with
+    | .oproj _ y | .sproj _ _ y | .uproj _ y =>
+      if ← isMutableClassFVar y then
+        sinkMutableProj decl k'
+      else
+        return .let decl k'
+    | _ => return .let decl k'
+  | .jp d k =>
+    let val' ← sinkMutableClassProjs d.value
+    let k' ← sinkMutableClassProjs k
+    return .jp (.mk d.fvarId d.binderName d.params d.type val') k'
+  | .fun d k u =>
+    let val' ← sinkMutableClassProjs d.value
+    let k' ← sinkMutableClassProjs k
+    return .fun (.mk d.fvarId d.binderName d.params d.type val') k' u
+  | .cases cs =>
+    let alts' ← cs.alts.mapM fun alt => do
+      return alt.updateCode (← sinkMutableClassProjs alt.getCode)
+    return .cases (cs.updateAlts alts')
+  | .oset x i y k u => return .oset x i y (← sinkMutableClassProjs k) u
+  | .sset x i off y ty k u => return .sset x i off y ty (← sinkMutableClassProjs k) u
+  | .uset x i y k u => return .uset x i y (← sinkMutableClassProjs k) u
+  | .setTag x cidx k u => return .setTag x cidx (← sinkMutableClassProjs k) u
+  | .return .. | .unreach .. | .jmp .. => return code
+
 def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let origParamNames := decl.params.map (·.binderName)
   let decl ← decl.internalize (uniqueIdents := true)
@@ -4676,6 +4881,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, fieldReads := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
+  let code ← sinkMutableClassProjs code
   markUsed code
   let fnAliases ← collectAliases decl.params code
   modify fun st => { st with aliases := fnAliases }
