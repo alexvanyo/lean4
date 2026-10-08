@@ -656,7 +656,7 @@ whose parameters cannot be required to be exclusive except for a Kotlin member r
 def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExternal : Name → Bool) :
     CompilerM Result := do
   let env ← getEnv
-  let mutableClasses := env.constants.map₂.foldl (init := ({} : Std.HashSet String)) fun s n _ =>
+  let mutableClasses := env.constants.fold (init := ({} : Std.HashSet String)) fun s n _ =>
     match getMutableKotlinClass? env n with
     | some t => s.insert t
     | none => s

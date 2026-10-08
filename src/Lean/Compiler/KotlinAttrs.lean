@@ -99,6 +99,33 @@ end Lean.Compiler
 
 namespace Lean.Parser.Attr
 
+/-- `@[kotlin_contract "clause₁" … "clauseₙ"]`: see `Lean.Compiler.kotlinContractAttr`. -/
+@[builtin_attr_parser] def kotlin_contract := leading_parser
+  nonReservedSymbol "kotlin_contract" >> many1 (ppSpace >> strLit)
+
+end Lean.Parser.Attr
+
+namespace Lean.Compiler
+
+/--
+`@[kotlin_contract "clause₁" … "clauseₙ"]` emits a `contract { clause₁; …; clauseₙ }` block
+in the body of the function.
+-/
+builtin_initialize kotlinContractAttr : ParametricAttribute (Array String) ←
+  registerParametricAttribute {
+    name := `kotlin_contract
+    descr := "emit a Kotlin contract block in the function body (Kotlin backend)"
+    getParam := fun _ stx => do
+      return stx[1].getArgs.filterMap (·.isStrLit?)
+  }
+
+def getKotlinContracts? (env : Environment) (n : Name) : Option (Array String) :=
+  kotlinContractAttr.getParam? env n
+
+end Lean.Compiler
+
+namespace Lean.Parser.Attr
+
 /-- `@[kotlin_class "Type"]`: see `Lean.Compiler.kotlinClassAttr`. -/
 @[builtin_attr_parser] def kotlin_class := leading_parser
   nonReservedSymbol "kotlin_class" >> ppSpace >> strLit
@@ -235,3 +262,32 @@ def isMutableKotlinClass (env : Environment) (n : Name) : Bool :=
   (mutableKotlinClassAttr.getParam? env n).isSome
 
 end Lean.Compiler
+
+namespace Lean.Parser.Attr
+
+/-- `@[kotlin_expr "template"]`: see `Lean.Compiler.kotlinExprAttr`. -/
+@[builtin_attr_parser] def kotlin_expr := leading_parser
+  nonReservedSymbol "kotlin_expr" >> ppSpace >> strLit
+
+end Lean.Parser.Attr
+
+namespace Lean.Compiler
+
+/--
+`@[kotlin_expr "template"]` replaces calls to this declaration with the inlined Kotlin expression
+template, e.g. `@[kotlin_expr "#1 == #2"]`. Arguments `#1`, `#2`, etc. are substituted.
+-/
+builtin_initialize kotlinExprAttr : ParametricAttribute String ←
+  registerParametricAttribute {
+    name := `kotlin_expr
+    descr := "inline Kotlin expression template for this declaration (Kotlin backend)"
+    getParam := fun _ stx => do
+      let some s := stx[1].isStrLit? | throwError "`kotlin_expr` expects a string argument"
+      return s
+  }
+
+def getKotlinExpr? (env : Environment) (n : Name) : Option String :=
+  kotlinExprAttr.getParam? env n
+
+end Lean.Compiler
+

@@ -168,11 +168,10 @@ public def nameToImpureType (name : Name) : CoreM Expr := do
         | none => cls
       else cls
     return ImpureType.jvmType s!"kotlin:{fullCls}"
-  let some (.inductInfo _) := env.find? name | do
-    if let some desc := getExternNameFor env `kotlin name then
-      if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
-        return ImpureType.jvmType desc
-    return ImpureType.tobject
+  if let some desc := getExternNameFor env `kotlin name then
+    if desc.startsWith "L" || desc.startsWith "[" || desc == "V" || desc.startsWith "kotlin:" then
+      return ImpureType.jvmType desc
+  let some (.inductInfo _) := env.find? name | return ImpureType.tobject
   let some type := impureTypeExt.find? env name
     | throwError "`{name}` was not compiled; `compileDecls` must run on inductive types first"
   return type

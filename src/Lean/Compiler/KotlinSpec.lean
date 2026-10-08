@@ -46,6 +46,8 @@ instance : Inhabited ClassSpec := ⟨{ name := "", header := "" }⟩
 /-- A top-level item of a Kotlin file, emitted in order. -/
 inductive FileItem where
   | cls (spec : ClassSpec)
+  /-- Synthesized classes from `@[kotlin_class]` that are not explicitly specified as `.cls`. -/
+  | classes
   /-- All top-level (non-member) declarations emitted by the backend. -/
   | topLevel
   /-- Kotlin source emitted as is. -/
