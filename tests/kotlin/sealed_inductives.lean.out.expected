@@ -168,17 +168,17 @@ data class Vec2(val x: Int, val y: Int)
 @PublishedApi internal fun f_ArithExpr_ctorElim___redArg(t: Any?, k: Any?): Any? {
     when (t)     {
         is ArithExpr.Lit ->         {
-            val v_82_1 = t.v
-            return (k as (Any?) -> Any?)(v_82_1)
+            val v_82_2 = t.v
+            return (k as (Any?) -> Any?)(v_82_2)
         }
         is ArithExpr.Add ->         {
-            val l_85_2 = t.l
-            val r_86_3 = t.r
-            return (k as (Any?, Any?) -> Any?)(l_85_2, r_86_3)
+            val l_85_3 = t.l
+            val r_86_4 = t.r
+            return (k as (Any?, Any?) -> Any?)(l_85_3, r_86_4)
         }
         is ArithExpr.Neg ->         {
-            val e_88_4 = t.e
-            return (k as (Any?) -> Any?)(e_88_4)
+            val e_88_5 = t.e
+            return (k as (Any?) -> Any?)(e_88_5)
         }
         else ->         { error("unreachable") }
     }
@@ -265,13 +265,13 @@ data class Vec2(val x: Int, val y: Int)
             return k
         }
         is Shape.Circle ->         {
-            val radius_152_1 = t.radius
-            return (k as (Any?) -> Any?)(radius_152_1)
+            val radius_152_2 = t.radius
+            return (k as (Any?) -> Any?)(radius_152_2)
         }
         is Shape.Rect ->         {
-            val width_155_2 = t.width
-            val height_156_3 = t.height
-            return (k as (Any?, Any?) -> Any?)(width_155_2, height_156_3)
+            val width_155_3 = t.width
+            val height_156_4 = t.height
+            return (k as (Any?, Any?) -> Any?)(width_155_3, height_156_4)
         }
         else ->         { error("unreachable") }
     }
@@ -403,16 +403,16 @@ data class Vec2(val x: Int, val y: Int)
             return k
         }
         is JsonValue.BoolVal ->         {
-            val b_255_1 = t.b
-            return (k as (Any?) -> Any?)(b_255_1)
+            val b_255_2 = t.b
+            return (k as (Any?) -> Any?)(b_255_2)
         }
         is JsonValue.NumVal ->         {
-            val n_258_2 = t.n
-            return (k as (Any?) -> Any?)(n_258_2)
+            val n_258_3 = t.n
+            return (k as (Any?) -> Any?)(n_258_3)
         }
         is JsonValue.StrVal ->         {
-            val s_261_3 = t.s
-            return (k as (Any?) -> Any?)(s_261_3)
+            val s_261_4 = t.s
+            return (k as (Any?) -> Any?)(s_261_4)
         }
         else ->         { error("unreachable") }
     }

@@ -165,27 +165,27 @@
 }
 
 @PublishedApi internal fun f_testOption(x: UInt): UInt {
-    val v_y_109_1: UInt
+    val v_y_109_3: UInt
     val v_x_118_2 = f_optionMapInc(arrayOf<Any?>(1, x))
     when (((v_x_118_2 as Array<*>)[0] as Int))     {
         0 ->         {
-            v_y_109_1 = 0u
+            v_y_109_3 = 0u
         }
         1 ->         {
-            val val_120_3 = (v_x_118_2 as Array<*>)[1]
-            val v_x_121_4 = (val_120_3 as UInt)
-            v_y_109_1 = v_x_121_4
+            val val_120_4 = (v_x_118_2 as Array<*>)[1]
+            val v_x_121_5 = (val_120_4 as UInt)
+            v_y_109_3 = v_x_121_5
         }
         else ->         { error("unreachable") }
     }
-    val v_x_110_5 = f_testOption___closed__0()
-    when (((v_x_110_5 as Array<*>)[0] as Int))     {
+    val v_x_110_1 = f_testOption___closed__0()
+    when (((v_x_110_1 as Array<*>)[0] as Int))     {
         0 ->         {
-            return (v_y_109_1 + 10u)
+            return (v_y_109_3 + 10u)
         }
         1 ->         {
-            val v_x_114_6 = ((v_x_110_5 as Array<*>)[1] as UInt)
-            return (v_y_109_1 + v_x_114_6)
+            val v_x_114_6 = ((v_x_110_1 as Array<*>)[1] as UInt)
+            return (v_y_109_3 + v_x_114_6)
         }
         else ->         { error("unreachable") }
     }
@@ -203,10 +203,10 @@
             return 0u
         }
         1 ->         {
-            val head_128_1 = (xs as Array<*>)[1]
-            val v_x_130_2 = f_sumList((xs as Array<*>)[2])
-            val v_x_131_3 = (head_128_1 as UInt)
-            return (v_x_131_3 + v_x_130_2)
+            val head_128_2 = (xs as Array<*>)[1]
+            val v_x_130_3 = f_sumList((xs as Array<*>)[2])
+            val v_x_131_4 = (head_128_2 as UInt)
+            return (v_x_131_4 + v_x_130_3)
         }
         else ->         { error("unreachable") }
     }
@@ -336,17 +336,17 @@
 @PublishedApi internal fun f_ExprTree_ctorElim___redArg(t: Any?, k: Any?): Any? {
     when (((t as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_222_1 = ((t as Array<*>)[1] as Int)
-            return (k as (Any?) -> Any?)(v_222_1)
+            val v_222_2 = ((t as Array<*>)[1] as Int)
+            return (k as (Any?) -> Any?)(v_222_2)
         }
         1 ->         {
-            val l_225_2 = (t as Array<*>)[1]
-            val r_226_3 = (t as Array<*>)[2]
-            return (k as (Any?, Any?) -> Any?)(l_225_2, r_226_3)
+            val l_225_3 = (t as Array<*>)[1]
+            val r_226_4 = (t as Array<*>)[2]
+            return (k as (Any?, Any?) -> Any?)(l_225_3, r_226_4)
         }
         2 ->         {
-            val e_228_4 = (t as Array<*>)[1]
-            return (k as (Any?) -> Any?)(e_228_4)
+            val e_228_5 = (t as Array<*>)[1]
+            return (k as (Any?) -> Any?)(e_228_5)
         }
         else ->         { error("unreachable") }
     }
@@ -390,14 +390,14 @@
             return ((t as Array<*>)[1] as Int)
         }
         1 ->         {
-            val r_269_1 = (t as Array<*>)[2]
-            val v_x_270_2 = f_evalTree((t as Array<*>)[1])
-            val v_x_271_3 = f_evalTree(r_269_1)
-            return (v_x_270_2 + v_x_271_3)
+            val r_269_2 = (t as Array<*>)[2]
+            val v_x_270_3 = f_evalTree((t as Array<*>)[1])
+            val v_x_271_4 = f_evalTree(r_269_2)
+            return (v_x_270_3 + v_x_271_4)
         }
         2 ->         {
-            val v_x_274_4 = f_evalTree((t as Array<*>)[1])
-            return (-v_x_274_4)
+            val v_x_274_5 = f_evalTree((t as Array<*>)[1])
+            return (-v_x_274_5)
         }
         else ->         { error("unreachable") }
     }
@@ -490,8 +490,8 @@
             return p_0
         }
         1 ->         {
-            val v_x_353_1 = ((p_1 as Array<*>)[1] as UInt)
-            return f_List_foldl___at___00foldlListSum_spec__0((p_0 + v_x_353_1), (p_1 as Array<*>)[2])
+            val v_x_353_2 = ((p_1 as Array<*>)[1] as UInt)
+            return f_List_foldl___at___00foldlListSum_spec__0((p_0 + v_x_353_2), (p_1 as Array<*>)[2])
         }
         else ->         { error("unreachable") }
     }
@@ -518,8 +518,8 @@
             return defaultVal
         }
         1 ->         {
-            val v_x_371_1 = ((o as Array<*>)[1] as UInt)
-            return (v_x_371_1 shl 1)
+            val v_x_371_2 = ((o as Array<*>)[1] as UInt)
+            return (v_x_371_2 shl 1)
         }
         else ->         { error("unreachable") }
     }

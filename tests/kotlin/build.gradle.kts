@@ -76,6 +76,10 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    targetCompatibility = "26"
+}
+
 tasks.test {
     useJUnitPlatform()
 }

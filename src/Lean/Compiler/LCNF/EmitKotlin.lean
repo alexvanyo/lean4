@@ -128,6 +128,8 @@ structure Context where
   classStructs : Std.HashMap String Name := {}
   /-- External cross-module declarations emitted as file-private helpers. -/
   extDeclNames : Std.HashSet Name := {}
+  /-- Variable types from the mono phase, by variable binder name. -/
+  monoVarTypes : Std.HashMap String Expr := {}
 
 structure State where
   buf : String := ""
@@ -154,6 +156,8 @@ structure State where
   materializedTuples : Std.HashSet String := {}
   /-- `@[kotlin_class]` structure of Kotlin variables. -/
   nameStructs : Std.HashMap String Name := {}
+  /-- Option element structure of Kotlin variables holding Option values. -/
+  optionElemStructs : Std.HashMap String Name := {}
   /--
   Fields of `@[kotlin_class]` values (by Kotlin lvalue, e.g. `keys` or `other.keys`) whose current
   value is known to be held by a Kotlin variable at this point of the emitted code. Writing that
@@ -1661,6 +1665,8 @@ partial def formatGenericKotlinType (env : Environment) (typeParams : Std.HashMa
     if let some spec := Compiler.getKotlinClassSpec? env declName then
       if (← hasTrivialImpureStructure? declName).isSome then return "Any?"
       return spec.baseClassName
+    if let some desc := getExternNameFor env `kotlin declName then
+      if desc.startsWith "kotlin:" then return (desc.drop 7).toString
     return "Any?"
   | .app .. =>
     let fn := type.getAppFn
@@ -1824,11 +1830,26 @@ def classStructOf? (x : FVarId) : EmitM (Option Name) := do
   if let some s := (← get).nameStructs[n]? then
     return some s
   if let some t ← kotlinTypeOf? (.fvar x) then
-    if let some s := (← read).classStructs[t]? then
+    let base := String.ofList (t.toList.takeWhile (· != '<') |>.filter (· != ' '))
+    if let some s := (← read).classStructs[base]? <|> (← read).classStructs[t]? then
       let env ← getEnv
       if isStructure env s then
         modify fun st => { st with nameStructs := st.nameStructs.insert n s }
         return some s
+  let monoTypes := (← read).monoVarTypes
+  let baseName := String.ofList (n.toList.takeWhile (· != '_'))
+  let monoTy? := monoTypes[n]?.orElse fun _ => monoTypes[baseName]?
+  if let some monoTy := monoTy? then
+    let env ← getEnv
+    if let some s := monoTy.getAppFn.constName? then
+      if (Compiler.getKotlinClassSpec? env s).isSome && isStructure env s then
+        modify fun st => { st with nameStructs := st.nameStructs.insert n s }
+        return some s
+      let sBase := s.getString!
+      if let some s' := (← read).classStructs[sBase]? then
+        if isStructure env s' then
+          modify fun st => { st with nameStructs := st.nameStructs.insert n s' }
+          return some s'
   return (← get).nameStructs[n]?
 
 def mutableClassStructOf? (x : FVarId) : EmitM (Option Name) := do
@@ -1983,11 +2004,16 @@ Calls to `@[extern]` declarations with a Kotlin rendering:
 * `kotlin_op:get:<field>` / `kotlin_op:set:<field>`: reads / writes a property of the first
   argument (unqualified on `this` unless shadowed by a parameter).
 -/
+def getKotlinExtStr? (env : Environment) (fn : Name) : Option String :=
+  (Compiler.getKotlinExpr? env fn).map (s!"kotlin_expr:{·}") <|>
+  (Compiler.getKotlinExpr? env fn.getPrefix).map (s!"kotlin_expr:{·}") <|>
+  getExternNameFor env `kotlin fn
+
 def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : EmitM (Option String) := do
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited") then
     return some (defaultKotlinVal (toKotlinType resTy))
   let env ← getEnv
-  let some extStr := getExternNameFor env `kotlin fn | return none
+  let some extStr := getKotlinExtStr? env fn | return none
   let runtimeArgs ← (Meta.MetaM.run' do
     let some info := env.find? fn | return args
     Meta.forallTelescopeReducing info.type fun xs _ => do
@@ -3466,7 +3492,7 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
               setParamVarName x s
               return true
     let env ← getEnv
-    if let some extStr := getExternNameFor env `kotlin fn then
+    if let some extStr := getKotlinExtStr? env fn then
       if args.isEmpty && extStr.startsWith "kotlin_expr:" then
         setParamVarName x (extStr.drop 12).toString
         return true
@@ -3510,6 +3536,17 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     let n ← getVarName x
     recordVarType n ty
     modify fun st => { st with projSrc := st.projSrc.insert n y }
+    if let some s ← classStructOf? y then
+      let layout ← classLayout s
+      if let some prop := pos layout then
+        let env ← getEnv
+        let projFn := s.str prop
+        if let some info := env.find? projFn then
+          let retTy : Expr ← (Meta.MetaM.run' (Meta.forallTelescopeReducing info.type fun _ ret => pure ret) : CoreM Expr)
+          if retTy.isAppOf ``Option && retTy.getAppArgs.size == 1 then
+            let elemTy := retTy.getAppArgs[0]!
+            if let some elemStruct := elemTy.getAppFn.constName? then
+              modify fun st => { st with optionElemStructs := st.optionElemStructs.insert n elemStruct }
     unless ← isUsed x do return
     let lhs ← classField y pos
     let isMut ← isMutableClassFVar y
@@ -3525,6 +3562,9 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
   else
     unless ← isUsed x do return
     let n ← getVarName x
+    let yName ← getVarName y
+    if let some elemStruct := (← get).optionElemStructs[yName]? then
+      modify fun st => { st with nameStructs := st.nameStructs.insert n elemStruct }
     let ty ← inferLetKotlinType decl
     recordVarType n ty
     emitLn s!"val {n} = {← emitLetValue decl}"
@@ -3716,7 +3756,7 @@ def isPureLet (decl : LetDecl .impure) : EmitM Bool := do
      baseFn == arrOp "uget" || baseFn == arrOp "ugetBorrowed" then
     return true
   let env ← getEnv
-  if let some extStr := getExternNameFor env `kotlin fn then
+  if let some extStr := getKotlinExtStr? env fn then
     if extStr.startsWith "kotlin_expr:" then return true
     if extStr == "kotlin_op:cast" || extStr == "kotlin_op:id" ||
        extStr.startsWith "kotlin_op:is:" || extStr.startsWith "kotlin_op:get:" then
@@ -3735,7 +3775,7 @@ def mayAliasArg (decl : LetDecl .impure) : EmitM Bool := do
   | .fap fn args =>
     if args.size != 1 then return false
     let env ← getEnv
-    if let some extStr := getExternNameFor env `kotlin fn then
+    if let some extStr := getKotlinExtStr? env fn then
       if extStr == "kotlin_op:id" || extStr == "kotlin_op:cast" then
         return true
     match fn with
@@ -4714,7 +4754,7 @@ def canSinkMutableProjPast (env : Environment) (v : LetValue .impure) : Bool :=
   | .fap fn args =>
     let baseFn := match fn with | .str p "_boxed" => p | _ => fn
     if isPrimitiveOp fn args.size || baseFn.getPrefix == `Array || baseFn.getPrefix == `ByteArray || baseFn.getPrefix == `FloatArray then true
-    else match getExternNameFor env `kotlin fn with
+    else match getKotlinExtStr? env fn with
       | some extStr => !extStr.startsWith "kotlin_op:set:"
       | none => false
 
@@ -4873,12 +4913,39 @@ partial def sinkMutableClassProjs (code : Code .impure) : EmitM (Code .impure) :
   | .setTag x cidx k u => return .setTag x cidx (← sinkMutableClassProjs k) u
   | .return .. | .unreach .. | .jmp .. => return code
 
+partial def collectMonoVarTypes (code : Code .pure) (m : Std.HashMap String Expr := {}) : Std.HashMap String Expr :=
+  match code with
+  | .let decl k =>
+    let name := decl.binderName.eraseMacroScopes.toString
+    let m := if !name.isEmpty then m.insert name decl.type else m
+    collectMonoVarTypes k m
+  | .fun decl k =>
+    let m := decl.params.foldl (fun m p =>
+      let name := p.binderName.eraseMacroScopes.toString
+      if !name.isEmpty then m.insert name p.type else m) m
+    collectMonoVarTypes k (collectMonoVarTypes decl.value m)
+  | .jp decl k =>
+    let m := decl.params.foldl (fun m p =>
+      let name := p.binderName.eraseMacroScopes.toString
+      if !name.isEmpty then m.insert name p.type else m) m
+    collectMonoVarTypes k (collectMonoVarTypes decl.value m)
+  | .cases cs =>
+    cs.alts.foldl (fun m alt =>
+      match alt with
+      | .default k => collectMonoVarTypes k m
+      | .alt _ params k =>
+        let m := params.foldl (fun m p =>
+          let name := p.binderName.eraseMacroScopes.toString
+          if !name.isEmpty then m.insert name p.type else m) m
+        collectMonoVarTypes k m) m
+  | _ => m
+
 def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let origParamNames := decl.params.map (·.binderName)
   let decl ← decl.internalize (uniqueIdents := true)
   let initKnownBools := ({} : Std.HashMap String Bool).insert "true" true |>.insert "false" false
   let initVarTypes := ({} : Std.HashMap String String).insert "true" "Boolean" |>.insert "false" "Boolean" |>.insert "Unit" "Unit"
-  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, fieldVals := {}, fieldReads := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
+  modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, optionElemStructs := {}, fieldVals := {}, fieldReads := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
   let code ← sinkMutableClassProjs code
@@ -4923,11 +4990,16 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
             | none => pure none
           pure (false, t?)
     | none => pure (retUnit, retCast?)
-  let monoDecl? ← getMonoDecl? decl.name
+  let baseDeclName := match decl.name with
+    | .str p "_redArg" => p
+    | _ => decl.name
+  let monoDecl? ← match ← getMonoDecl? decl.name with
+    | some md => pure (some md)
+    | none => getMonoDecl? baseDeclName
   let fnTypeInfo? ← (Meta.MetaM.run' do
     if isAux then return none
-    let some info := env.find? decl.name | return none
-    let typeParams ← getDeclTypeParams env decl.name
+    let some info := (env.find? decl.name).orElse (fun _ => env.find? baseDeclName) | return none
+    let typeParams ← getDeclTypeParams env baseDeclName
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
     Meta.forallTelescopeReducing info.type fun xs retType => do
       let runtimeXs ← xs.filterM fun x => do return !(← Meta.inferType x).isSort
@@ -4942,8 +5014,14 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | none => pure #[]
   let classTypeParamNames := classTypeParams.map (·.2)
   let allFnTypeParams := (fnTypeInfo?.map (·.1)).getD #[]
+  let isExtension := match member? with
+    | some info => (identTokens info.modifiers).contains "extension"
+    | none => false
+  let isVal := match member? with
+    | some info => (identTokens info.modifiers).contains "val"
+    | none => false
   let funcTypeParams :=
-    if member?.isSome then
+    if member?.isSome && !isExtension then
       allFnTypeParams.filter fun (_, kt) => !classTypeParamNames.contains kt
     else
       allFnTypeParams
@@ -5016,22 +5094,52 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let isExt := extDeclNames.contains decl.name
   let callsExt := (collectCalls env (← read).declMap code #[]).any (extDeclNames.contains ·)
   let isInline := !codeJP && !hasSelfCall decl.name code && !callsExt && Compiler.hasInlineAttribute env decl.name
+  let contracts? := Compiler.getKotlinContracts? env decl.name
+  let cleanMods (m : String) : String :=
+    let toks := (identTokens m).filter (fun t => t != "extension" && t != "val")
+    if toks.isEmpty then "" else String.intercalate " " toks.toList ++ " "
   let (mods, fnName) := match member? with
-    | some info => (info.modifiers, memberKotlinName decl.name info)
+    | some info =>
+      let m := cleanMods info.modifiers
+      let n := memberKotlinName decl.name info
+      let recv :=
+        if isExtension && !classTypeParamNames.isEmpty then
+          s!"{info.recvType}<{String.intercalate ", " classTypeParamNames.toList}>"
+        else
+          info.recvType
+      let n := if isExtension then s!"{recv}.{n}" else n
+      (m, n)
     | none =>
       let m := if isExt then "private" else compiler.kotlin.topLevelModifiers.get opts
+      let m := if m.isEmpty then "" else m ++ " "
       (m, toKotlinFnName decl.name)
   let explicitInline := (identTokens mods).contains "inline"
   let auto :=
     if isTailRec then "tailrec "
     else if isInline && !explicitInline then "inline "
     else ""
-  let modsStr := if mods.isEmpty then "" else mods ++ " "
+  let modsStr := mods
   if let some (.inl doc) ← findInternalDocString? env decl.name (includeBuiltin := false) then
     for l in kdocLines doc do emitLn l
-  emitIndent; emit s!"{modsStr}{auto}fun {typeParamStr}{fnName}({paramStr}): {retType} "; emitLn "{"
+  if contracts?.isSome then
+    emitIndent; emitLn "@OptIn(kotlin.contracts.ExperimentalContracts::class)"
+  if isVal then
+    emitIndent; emit s!"{modsStr}val {typeParamStr}{fnName}: {retType} get() "; emitLn "{"
+  else
+    emitIndent; emit s!"{modsStr}{auto}fun {typeParamStr}{fnName}({paramStr}): {retType} "; emitLn "{"
   withIndent do
-    withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape? }) do
+    if let some clauses := contracts? then
+      emitIndent; emitLn "kotlin.contracts.contract {"
+      withIndent do
+        for c in clauses do
+          emitIndent; emitLn s!"{c}"
+      emitIndent; emitLn "}"
+    let monoVarTypes := match monoDecl? with
+      | some md => match md.value with
+        | .code c => collectMonoVarTypes c
+        | _ => {}
+      | none => {}
+    withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape?, monoVarTypes }) do
       for p in params do discard <| classStructOf? p.fvarId
       emitCode code
   emitLn "}"
@@ -5099,7 +5207,7 @@ def fileSpecTexts (spec : _root_.Lean.Compiler.Kotlin.FileSpec) : Array String :
         | .field d | .init d | .verbatim d => out := out.push d
         | .members => pure ()
     | .verbatim code => out := out.push code
-    | .topLevel => pure ()
+    | .classes | .topLevel => pure ()
   return out
 
 def isBuiltinArrayFn (fn : Name) : Bool :=
@@ -5130,7 +5238,7 @@ def isBuiltinFap (fn : Name) (arity : Nat) : CoreM Bool := do
   let env ← getEnv
   if isBuiltinArrayFn fn then return true
   if fn.isStr && (fn.getString!.startsWith "instInhabited" || fn.getString!.contains "inhabited") then return true
-  if (getExternNameFor env `kotlin fn).isSome then return true
+  if (getKotlinExtStr? env fn).isSome then return true
   if (Compiler.getKotlinMemberInfo? env fn).isSome then return true
   let prim? ← (emitPrimitiveOp? fn (Array.replicate arity .erased)).run { modName := default, localDecls := #[] } |>.run' {} |>.run (phase := .impure)
   return prim?.isSome
@@ -5278,7 +5386,7 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     visited.contains d.name && !isLoopExpandable env d && (isInlinedConstDecl? d).isNone &&
       applied.contains d.name
   let toEmit := emittedLocal ++ emittedExt
-  let classStructs := env.constants.map₂.foldl (init := ({} : Std.HashMap String Name)) fun m n _ =>
+  let classStructs := env.constants.fold (init := ({} : Std.HashMap String Name)) fun m n _ =>
     match Compiler.getKotlinClassSpec? env n with
     | some spec =>
       let m := m.insert spec.className n |>.insert spec.baseClassName n
@@ -5312,7 +5420,11 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     for d in toEmit do
       let s ← captureBuf (emitFnDecl d)
       match Compiler.getKotlinMemberInfo? env d.name with
-      | some info => memberBufs := memberBufs.insert info.className (memberBufs.getD info.className "" ++ s)
+      | some info =>
+        if (identTokens info.modifiers).contains "extension" then
+          topBuf := topBuf ++ s
+        else
+          memberBufs := memberBufs.insert info.className (memberBufs.getD info.className "" ++ s)
       | none => topBuf := topBuf ++ s
     let pkg := compiler.kotlin.package.get opts
     let pkgName :=
@@ -5328,69 +5440,17 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       memberBufs.values.any (fun s => s.contains "UByteArray" || s.contains "UShortArray" || s.contains "UIntArray" || s.contains "ULongArray")
     let optInUnsigned := if hasUnsignedArrays then "\n@file:OptIn(ExperimentalUnsignedTypes::class)" else ""
     let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\")" ++ optInUnsigned
-    match fileSpec? with
-    | some spec =>
-      let classNames := spec.items.filterMap fun | .cls c => some c.name | _ => none
-      for cls in memberBufs.keys do
-        unless classNames.contains cls do
-          throwError "Kotlin backend: `@[kotlin_member]` of class `{cls}`, which is not declared in the `@[kotlin_file]` spec"
-      if !spec.preamble.isEmpty then
-        emit (reindent "" spec.preamble)
-        emitLn ""
-      emitLn "// Generated automatically by the Lean 4 Kotlin backend. DO NOT EDIT DIRECTLY."
-      emitLn suppress
-      for a in spec.fileAnnotations do emitLn a
-      emitLn ""
-      if !pkgName.isEmpty then
-        emitLn s!"package {pkgName}"
-        emitLn ""
-      if !spec.imports.isEmpty then
-        for i in spec.imports do emitLn i
-        emitLn ""
-      let mut first := true
-      for item in spec.items do
-        let text : String := match item with
-          | .verbatim code => reindent "" code
-          | .topLevel => topBuf
-          | .cls c => Id.run do
-            let mut body := ""
-            let mut prevField := false
-            let mut firstItem := true
-            for i in c.body do
-              let isField := match i with | .field _ => true | _ => false
-              let piece := match i with
-                | .field d => reindent "    " d
-                | .init b => "    init {\n" ++ reindent "        " b ++ "    }\n"
-                | .members => reindent "    " (memberBufs.getD c.name "")
-                | .verbatim code => reindent "    " code
-              if piece.isEmpty then continue
-              unless firstItem || (isField && prevField) do body := body ++ "\n"
-              body := body ++ piece
-              firstItem := false
-              prevField := isField
-            let hdr := String.intercalate "\n" (trimBlankLines c.header)
-            return hdr ++ " {\n" ++ body ++ "}\n"
-        if text.isEmpty then continue
-        unless first do emitLn ""
-        emit text
-        first := false
-    | none =>
-      let (hdr, usedH) := spliceMembers headerText memberBufs
-      let (ftr, usedF) := spliceMembers footerText memberBufs
-      let hasClassDecl (text cls : String) : Bool :=
-        text.contains s!"class {cls}(" || text.contains s!"class {cls} " || text.contains s!"class {cls}\{" ||
-        text.contains s!"interface {cls} " || text.contains s!"interface {cls}\{"
-      let localClassStructs :=
-        (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
-        (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
+    let localClassStructs :=
+      (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
+      (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
+    let synthClassesFn (exclude : String → Bool) : EmitM (String × Std.HashSet String) := do
       let mut synthClasses : Std.HashSet String := {}
       let mut synthBuf := ""
       for s in localClassStructs do
         if (← hasTrivialImpureStructure? s).isSome then continue
         let some rawCls := Compiler.getKotlinClass? env s | continue
         let cls := ({ recvType := rawCls : Compiler.KotlinMemberInfo }).className
-        if usedH.contains cls || usedF.contains cls || synthClasses.contains cls ||
-           hasClassDecl headerText cls || hasClassDecl footerText cls then
+        if exclude cls || synthClasses.contains cls then
           continue
         synthClasses := synthClasses.insert cls
         let spec := (Compiler.getKotlinClassSpec? env s).getD { raw := rawCls, className := rawCls }
@@ -5479,6 +5539,74 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
               emitLn "}"
               emitLn ""
         synthBuf := synthBuf ++ clsBuf
+      return (synthBuf, synthClasses)
+    match fileSpec? with
+    | some spec =>
+      let classNames := spec.items.filterMap fun | .cls c => some c.name | _ => none
+      let (synthBuf, synthClasses) ← synthClassesFn (fun cls => classNames.contains cls)
+      for cls in memberBufs.keys do
+        unless classNames.contains cls || synthClasses.contains cls do
+          throwError "Kotlin backend: `@[kotlin_member]` of class `{cls}`, which is not declared in the `@[kotlin_file]` spec"
+      if !spec.preamble.isEmpty then
+        emit (reindent "" spec.preamble)
+        emitLn ""
+      emitLn "// Generated automatically by the Lean 4 Kotlin backend. DO NOT EDIT DIRECTLY."
+      emitLn suppress
+      for a in spec.fileAnnotations do emitLn a
+      emitLn ""
+      if !pkgName.isEmpty then
+        emitLn s!"package {pkgName}"
+        emitLn ""
+      if !spec.imports.isEmpty then
+        for i in spec.imports do emitLn i
+        emitLn ""
+      let hasExplicitClasses := spec.items.any (· matches .classes)
+      let mut emittedSynth := hasExplicitClasses
+      let mut first := true
+      for item in spec.items do
+        if !emittedSynth && (item matches .topLevel) then
+          if !synthBuf.isEmpty then
+            unless first do emitLn ""
+            emit synthBuf
+            first := false
+          emittedSynth := true
+        let text : String := match item with
+          | .classes => synthBuf
+          | .verbatim code => reindent "" code
+          | .topLevel => topBuf
+          | .cls c => Id.run do
+            let mut body := ""
+            let mut prevField := false
+            let mut firstItem := true
+            for i in c.body do
+              let isField := match i with | .field _ => true | _ => false
+              let piece := match i with
+                | .field d => reindent "    " d
+                | .init b => "    init {\n" ++ reindent "        " b ++ "    }\n"
+                | .members => reindent "    " (memberBufs.getD c.name "")
+                | .verbatim code => reindent "    " code
+              if piece.isEmpty then continue
+              unless firstItem || (isField && prevField) do body := body ++ "\n"
+              body := body ++ piece
+              firstItem := false
+              prevField := isField
+            let hdr := String.intercalate "\n" (trimBlankLines c.header)
+            return hdr ++ " {\n" ++ body ++ "}\n"
+        if text.isEmpty then continue
+        unless first do emitLn ""
+        emit text
+        first := false
+      if !emittedSynth && !synthBuf.isEmpty then
+        unless first do emitLn ""
+        emit synthBuf
+    | none =>
+      let (hdr, usedH) := spliceMembers headerText memberBufs
+      let (ftr, usedF) := spliceMembers footerText memberBufs
+      let hasClassDecl (text cls : String) : Bool :=
+        text.contains s!"class {cls}(" || text.contains s!"class {cls} " || text.contains s!"class {cls}\{" ||
+        text.contains s!"interface {cls} " || text.contains s!"interface {cls}\{"
+      let (synthBuf, synthClasses) ← synthClassesFn (fun cls =>
+        usedH.contains cls || usedF.contains cls || hasClassDecl headerText cls || hasClassDecl footerText cls)
       for cls in memberBufs.keys do
         unless usedH.contains cls || usedF.contains cls || synthClasses.contains cls do
           throwError "Kotlin backend: no `// @LeanMembers({cls})` marker in the preamble or footer"
