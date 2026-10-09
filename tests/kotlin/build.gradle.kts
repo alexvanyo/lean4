@@ -35,7 +35,10 @@ val generateLean by tasks.registering {
         outDir.mkdirs()
 
         val leanFiles = projectDir.listFiles { file ->
-            file.extension == "lean" && file.name != "ownership_fail.lean"
+            if (file.extension != "lean") return@listFiles false
+            val initFile = File(projectDir, "${file.nameWithoutExtension}.lean.init.sh")
+            if (initFile.exists() && initFile.readText().contains("TEST_EXPECT_FAIL=1")) return@listFiles false
+            file.name != "ownership_fail.lean"
         } ?: emptyArray()
 
         for (leanFile in leanFiles) {

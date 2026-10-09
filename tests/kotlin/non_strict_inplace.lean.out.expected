@@ -1,0 +1,8 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_testNonStrictArray(a: Array<Any?>): Pair<Array<Any?>, Array<Any?>> {
+    val a__4_1 = a.copyOf().also { it[0] = java.math.BigInteger.valueOf(42L) }
+    return Pair(a, a__4_1)
+}
+
