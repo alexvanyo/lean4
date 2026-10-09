@@ -257,7 +257,16 @@ public partial def kotlinTypeForNonNullable? (env : Environment) (ty : Expr) : C
     if declName == ``ByteArray then return some "ByteArray"
     if declName == ``FloatArray then return some "DoubleArray"
     if declName == ``Unit || declName == ``PUnit then return some "Unit"
-    if let some spec := Compiler.getKotlinClassSpec? env declName then return some spec.baseClassName
+    if let some cls := Compiler.getKotlinClass? env declName then
+      if !cls.contains '<' then
+        match isInductiveCore? env declName with
+        | some iv =>
+          if iv.numParams > 0 then
+            let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+            return some s!"{cls}<{stars}>"
+          else return some cls
+        | none => return some cls
+      else return some cls
     if let some desc := getExternNameFor env `kotlin declName then
       if desc.startsWith "kotlin:" then return some (desc.drop 7).toString
     let impTy ← nameToImpureType declName
@@ -290,8 +299,21 @@ public partial def kotlinTypeForNonNullable? (env : Environment) (ty : Expr) : C
         return none
       | _ => return none
     if let .const declName _ := fn then
-      if let some spec := Compiler.getKotlinClassSpec? env declName then
-        return some spec.baseClassName
+      if let some cls := Compiler.getKotlinClass? env declName then
+        if !cls.contains '<' then
+          match isInductiveCore? env declName with
+          | some iv =>
+            if iv.numParams > 0 then
+              let argTys ← args.mapM (kotlinTypeForNonNullable? env)
+              if argTys.all (·.isSome) && argTys.size == iv.numParams then
+                let formattedArgs := argTys.map (·.get!)
+                return some s!"{cls}<{String.intercalate ", " formattedArgs.toList}>"
+              else
+                let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+                return some s!"{cls}<{stars}>"
+            else return some cls
+          | none => return some cls
+        else return some cls
     return none
   | _ => return none
 
