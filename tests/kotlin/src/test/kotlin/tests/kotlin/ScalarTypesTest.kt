@@ -69,9 +69,9 @@ class ScalarTypesTest {
 
     @Test
     fun testPanicOpt() {
-        assertEquals(42.toBigInteger(), f_testPanicOpt(arrayOf<Any?>(1, 42.toBigInteger())))
+        assertEquals(42.toBigInteger(), f_testPanicOpt(42.toBigInteger()))
         assertFailsWith<IllegalStateException> {
-            f_testPanicOpt(arrayOf<Any?>(0))
+            f_testPanicOpt(null)
         }
     }
 }

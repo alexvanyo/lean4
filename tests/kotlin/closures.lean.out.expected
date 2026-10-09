@@ -214,7 +214,7 @@
 }
 
 @PublishedApi internal fun f_testSTRefModifyGet(n: java.math.BigInteger): Pair<java.math.BigInteger, java.math.BigInteger> {
-    return (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefModifyGet___lam__0(n, p_0, p_1) }) as Pair<java.math.BigInteger, java.math.BigInteger>)
+    return (run { val _p = (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefModifyGet___lam__0(n, p_0, p_1) })) as Pair<*, *>; Pair((_p.first as java.math.BigInteger), (_p.second as java.math.BigInteger)) })
 }
 
 @PublishedApi internal fun f_testSTRefPtrEq___lam__0(x: java.math.BigInteger, p_1: Any?, p_2: Any?): Any? {
@@ -230,7 +230,7 @@
 }
 
 @PublishedApi internal fun f_testSTRefPtrEq(x: java.math.BigInteger): Pair<Boolean, Boolean> {
-    return (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefPtrEq___lam__0(x, p_0, p_1) }) as Pair<Boolean, Boolean>)
+    return (run { val _p = (f_runST___redArg({ p_0: Any?, p_1: Any? -> f_testSTRefPtrEq___lam__0(x, p_0, p_1) })) as Pair<*, *>; Pair((_p.first as Boolean), (_p.second as Boolean)) })
 }
 
 private fun f_runST___redArg(x: (Any?, Any?) -> Any?): Any? {

@@ -321,21 +321,13 @@
     return ("PANIC at " + v_x_296_2 + " " + v_x_297_3 + ":" + (java.math.BigInteger.valueOf(22L)).toString() + ":" + (java.math.BigInteger.valueOf(14L)).toString() + ": " + v_x_293_1)
 }
 
-@PublishedApi internal fun f_testPanicOpt(x: Any?): java.math.BigInteger {
-    when (((x as Array<*>)[0] as Int))     {
-        0 ->         {
-            val v_x_300_2 = f_testPanicOpt___closed__3()
-            return error(v_x_300_2)
-        }
-        1 ->         {
-            return ((x as Array<*>)[1] as java.math.BigInteger)
-        }
-        else ->         { error("unreachable") }
+@PublishedApi internal fun f_testPanicOpt(x: java.math.BigInteger?): java.math.BigInteger {
+    if (x == null)     {
+        val v_x_300_2 = f_testPanicOpt___closed__3()
+        return error(v_x_300_2)
+    } else     {
+        return (x as java.math.BigInteger)
     }
-}
-
-@PublishedApi internal fun f_testPanicOpt___boxed(x: Any?): Any? {
-    return f_testPanicOpt(x)
 }
 
 /**

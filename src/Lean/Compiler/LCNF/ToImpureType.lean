@@ -20,6 +20,11 @@ public register_builtin_option compiler.kotlin.typedArrays : Bool := {
     `Array<Any?>` otherwise"
 }
 
+public register_builtin_option compiler.kotlin.nullableOption : Bool := {
+  defValue := true
+  descr := "(Kotlin backend) represent `Option α` as Kotlin nullable `α?` when `α` is not nullable"
+}
+
 /-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/
 public def kotlinArrayType (elemType : Lean.Expr) : String :=
   match elemType with
@@ -182,6 +187,114 @@ def isAnyProducingType (type : Expr) : Bool :=
   | .forallE _ _ b _ => isAnyProducingType b
   | _ => false
 
+/-- Whether `ty` represents a type that is non-nullable in Kotlin. -/
+public partial def isNonNullableKotlinType (env : Environment) (ty : Expr) : Bool :=
+  match ty with
+  | .const declName _ =>
+    if declName == ``Option || declName == ``lcAny || declName == ``lcErased || declName == ``lcVoid then
+      false
+    else if declName == ``Bool || declName == ``Decidable ||
+            declName == ``UInt8 || declName == ``UInt16 || declName == ``UInt32 || declName == ``UInt64 ||
+            declName == ``Int8 || declName == ``Int16 || declName == ``Int32 || declName == ``Int64 ||
+            declName == ``USize || declName == ``ISize || declName == ``Float || declName == ``Float32 ||
+            declName == ``Nat || declName == ``Int || declName == ``String || declName == ``ByteArray ||
+            declName == ``FloatArray || declName == ``Unit || declName == ``PUnit then
+      true
+    else if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName ||
+            Compiler.getKotlinClassSpec? env declName matches some _ then
+      true
+    else
+      match env.find? declName with
+      | some (.inductInfo _) => declName != ``Option
+      | _ => false
+  | .app .. =>
+    let fn := ty.getAppFn
+    let args := ty.getAppArgs
+    if fn.isConstOf ``Option then
+      false
+    else if fn.isConstOf ``Prod && args.size == 2 then
+      isNonNullableKotlinType env args[0]! && isNonNullableKotlinType env args[1]!
+    else if fn.isConstOf ``Array then
+      true
+    else if fn.isConstOf `jvmType && args.size == 1 then
+      match args[0]! with
+      | .lit (.strVal desc) =>
+        if desc.startsWith "kotlin:" then
+          let kt := (desc.drop 7).toString
+          !kt.endsWith "?" && kt != "Any?"
+        else false
+      | _ => false
+    else if let .const declName _ := fn then
+      if Compiler.isMutableKotlinClass env declName || Compiler.isKotlinInductive env declName ||
+         Compiler.getKotlinClassSpec? env declName matches some _ then
+        true
+      else
+        match env.find? declName with
+        | some (.inductInfo _) => declName != ``Option
+        | _ => false
+    else
+      false
+  | .forallE .. => true
+  | _ => false
+
+/-- The non-nullable Kotlin type string for `ty`, if known. -/
+public partial def kotlinTypeForNonNullable? (env : Environment) (ty : Expr) : CoreM (Option String) := do
+  match ty with
+  | .const declName _ =>
+    if declName == ``Bool || declName == ``Decidable then return some "Boolean"
+    if declName == ``UInt8 then return some "UByte"
+    if declName == ``UInt16 then return some "UShort"
+    if declName == ``UInt32 then return some "UInt"
+    if declName == ``UInt64 then return some "ULong"
+    if declName == ``USize || declName == ``ISize || declName == ``Int32 then return some "Int"
+    if declName == ``Int8 then return some "Byte"
+    if declName == ``Int16 then return some "Short"
+    if declName == ``Int64 then return some "Long"
+    if declName == ``Float then return some "Double"
+    if declName == ``Float32 then return some "Float"
+    if declName == ``Nat || declName == ``Int then return some "java.math.BigInteger"
+    if declName == ``String then return some "String"
+    if declName == ``ByteArray then return some "ByteArray"
+    if declName == ``FloatArray then return some "DoubleArray"
+    if declName == ``Unit || declName == ``PUnit then return some "Unit"
+    if let some spec := Compiler.getKotlinClassSpec? env declName then return some spec.baseClassName
+    if let some desc := getExternNameFor env `kotlin declName then
+      if desc.startsWith "kotlin:" then return some (desc.drop 7).toString
+    let impTy ← nameToImpureType declName
+    match impTy with
+    | ImpureType.uint8 => return some "UByte"
+    | ImpureType.uint16 => return some "UShort"
+    | ImpureType.uint32 => return some "UInt"
+    | ImpureType.bool => return some "Boolean"
+    | .app (.const `jvmType _) (.lit (.strVal desc)) =>
+      if desc.startsWith "kotlin:" && !desc.endsWith "?" && desc != "kotlin:Any?" then
+        return some (desc.drop 7).toString
+      return none
+    | _ => return none
+  | .app .. =>
+    let fn := ty.getAppFn
+    let args := ty.getAppArgs
+    if fn.isConstOf ``Prod && args.size == 2 then
+      let t0? ← kotlinTypeForNonNullable? env args[0]!
+      let t1? ← kotlinTypeForNonNullable? env args[1]!
+      match t0?, t1? with
+      | some t0, some t1 => return some s!"Pair<{t0}, {t1}>"
+      | _, _ => return none
+    if fn.isConstOf ``Array && args.size == 1 then
+      return some (kotlinArrayType args[0]!)
+    if fn.isConstOf `jvmType && args.size == 1 then
+      match args[0]! with
+      | .lit (.strVal desc) =>
+        if desc.startsWith "kotlin:" && !desc.endsWith "?" && desc != "kotlin:Any?" then
+          return some (desc.drop 7).toString
+        return none
+      | _ => return none
+    if let .const declName _ := fn then
+      if let some spec := Compiler.getKotlinClassSpec? env declName then
+        return some spec.baseClassName
+    return none
+  | _ => return none
+
 public partial def toImpureType (type : Expr) : CoreM Expr := do
   match type with
   | .const name _ => visitApp name #[]
@@ -202,6 +315,11 @@ public partial def toImpureType (type : Expr) : CoreM Expr := do
   | _ => unreachable!
 where
   visitApp (declName : Name) (args : Array Lean.Expr) : CoreM Expr := do
+    if declName == ``Option && args.size == 1 && compiler.kotlin.nullableOption.get (← getOptions) then
+      let env ← getEnv
+      if isNonNullableKotlinType env args[0]! then
+        if let some kt ← kotlinTypeForNonNullable? env args[0]! then
+          return ImpureType.jvmType s!"kotlin:{kt}?"
     if declName == ``Array && args.size == 1 && compiler.kotlin.typedArrays.get (← getOptions) then
       return ImpureType.jvmType s!"kotlin:{kotlinArrayType args[0]!}"
     if declName == ``ByteArray && compiler.kotlin.typedArrays.get (← getOptions) then

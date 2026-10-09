@@ -174,7 +174,11 @@ partial def lowerLet (decl : LetDecl .pure) (k : Code .pure) : ToImpureM (Code .
             | some .erased => loop (i + 1)
             | none => k.toImpure
           loop 0
-        let declType := if (getJvmTypeDesc? type).isSome then type else ctorInfo.type
+        let impureDeclType ← toImpureType decl.type
+        let declType :=
+          if (getJvmTypeDesc? type).isSome then type
+          else if (getJvmTypeDesc? impureDeclType).isSome then impureDeclType
+          else ctorInfo.type
         let decl := ⟨decl.fvarId, decl.binderName, declType, .ctor ctorInfo objArgs⟩
         modifyLCtx fun lctx => lctx.addLetDecl decl
         return .let decl (← lowerNonObjectFields)
@@ -288,7 +292,12 @@ partial def Alt.toImpure (discr : FVarId) (alt : Alt .pure) : ToImpureM (Alt .im
             addSubst param.fvarId .erased
             loop (i + 1)
           | _ =>
-            let decl := ⟨param.fvarId, param.binderName, type, result⟩
+            let impureParamType ← toImpureType param.type
+            let effType :=
+              if (getJvmTypeDesc? type).isSome then type
+              else if (getJvmTypeDesc? impureParamType).isSome then impureParamType
+              else type
+            let decl := ⟨param.fvarId, param.binderName, effType, result⟩
             modifyLCtx fun lctx => lctx.addLetDecl decl
             return .let decl (← loop (i + 1))
         | none, none => k.toImpure

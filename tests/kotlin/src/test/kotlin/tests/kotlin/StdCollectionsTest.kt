@@ -13,9 +13,9 @@ class StdCollectionsTest {
     @Test
     fun testTreeMap() {
         val res = f_testTreeMap("beta", "alpha", "gamma", 10.toBigInteger(), 20.toBigInteger(), 30.toBigInteger())
-        val p1 = optBigInt(res.first)
+        val p1 = res.first
         val p2 = res.second
-        val g2 = optBigInt(p2.first)
+        val g2 = p2.first
         val sz = p2.second
         assertEquals(10.toBigInteger(), p1)
         assertEquals(null, g2)
@@ -33,8 +33,8 @@ class StdCollectionsTest {
     @Test
     fun testHashMap() {
         val res = f_testHashMap("beta", "alpha", "gamma", 10.toBigInteger(), 20.toBigInteger(), 30.toBigInteger())
-        assertEquals(10.toBigInteger(), optBigInt(res.first))
-        assertEquals(null, optBigInt(res.second.first))
+        assertEquals(10.toBigInteger(), res.first)
+        assertEquals(null, res.second.first)
         assertEquals(2.toBigInteger(), res.second.second)
     }
 
@@ -42,8 +42,8 @@ class StdCollectionsTest {
     fun testHashMapExpand() {
         val res = f_testHashMapExpand(32.toBigInteger())
         assertEquals(32.toBigInteger(), res.first)
-        assertEquals(0.toBigInteger(), optBigInt(res.second.first))
-        assertEquals(310.toBigInteger(), optBigInt(res.second.second))
+        assertEquals(0.toBigInteger(), res.second.first)
+        assertEquals(310.toBigInteger(), res.second.second)
     }
 
     @Test

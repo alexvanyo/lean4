@@ -187,13 +187,15 @@
     when (((r_156_1 as Array<*>)[0] as Int))     {
         0 ->         {
             val a_157_6 = (r_156_1 as Array<*>)[1]
-            val v_x_163_2 = f_IO_withStderr___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__4___redArg___lam__0(v_x_154_4, v_x_155_5, arrayOf<Any?>(1, a_157_6), null)
+            val reuseFailAlloc_172_7 = arrayOf<Any?>(1, a_157_6)
+            val v_x_163_2 = f_IO_withStderr___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__4___redArg___lam__0(v_x_154_4, v_x_155_5, reuseFailAlloc_172_7, null)
             return arrayOf<Any?>(0, a_157_6)
         }
         1 ->         {
-            val a_174_7 = (r_156_1 as Array<*>)[1]
-            val v_x_176_3 = f_IO_withStderr___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__4___redArg___lam__0(v_x_154_4, v_x_155_5, arrayOf<Any?>(0), null)
-            return arrayOf<Any?>(1, a_174_7)
+            val a_174_8 = (r_156_1 as Array<*>)[1]
+            val v_x_175_9 = arrayOf<Any?>(0)
+            val v_x_176_3 = f_IO_withStderr___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__4___redArg___lam__0(v_x_154_4, v_x_155_5, v_x_175_9, null)
+            return arrayOf<Any?>(1, a_174_8)
         }
         else ->         { error("unreachable") }
     }
@@ -227,13 +229,15 @@
     when (((r_215_1 as Array<*>)[0] as Int))     {
         0 ->         {
             val a_216_6 = (r_215_1 as Array<*>)[1]
-            val v_x_222_2 = f_IO_withStdin___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__3___redArg___lam__0(v_x_213_4, v_x_214_5, arrayOf<Any?>(1, a_216_6), null)
+            val reuseFailAlloc_231_7 = arrayOf<Any?>(1, a_216_6)
+            val v_x_222_2 = f_IO_withStdin___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__3___redArg___lam__0(v_x_213_4, v_x_214_5, reuseFailAlloc_231_7, null)
             return arrayOf<Any?>(0, a_216_6)
         }
         1 ->         {
-            val a_233_7 = (r_215_1 as Array<*>)[1]
-            val v_x_235_3 = f_IO_withStdin___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__3___redArg___lam__0(v_x_213_4, v_x_214_5, arrayOf<Any?>(0), null)
-            return arrayOf<Any?>(1, a_233_7)
+            val a_233_8 = (r_215_1 as Array<*>)[1]
+            val v_x_234_9 = arrayOf<Any?>(0)
+            val v_x_235_3 = f_IO_withStdin___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__3___redArg___lam__0(v_x_213_4, v_x_214_5, v_x_234_9, null)
+            return arrayOf<Any?>(1, a_233_8)
         }
         else ->         { error("unreachable") }
     }
@@ -259,13 +263,15 @@
     when (((r_264_1 as Array<*>)[0] as Int))     {
         0 ->         {
             val a_265_6 = (r_264_1 as Array<*>)[1]
-            val v_x_271_2 = f_IO_withStdout___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__2___redArg___lam__0(v_x_262_4, v_x_263_5, arrayOf<Any?>(1, a_265_6), null)
+            val reuseFailAlloc_280_7 = arrayOf<Any?>(1, a_265_6)
+            val v_x_271_2 = f_IO_withStdout___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__2___redArg___lam__0(v_x_262_4, v_x_263_5, reuseFailAlloc_280_7, null)
             return arrayOf<Any?>(0, a_265_6)
         }
         1 ->         {
-            val a_282_7 = (r_264_1 as Array<*>)[1]
-            val v_x_284_3 = f_IO_withStdout___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__2___redArg___lam__0(v_x_262_4, v_x_263_5, arrayOf<Any?>(0), null)
-            return arrayOf<Any?>(1, a_282_7)
+            val a_282_8 = (r_264_1 as Array<*>)[1]
+            val v_x_283_9 = arrayOf<Any?>(0)
+            val v_x_284_3 = f_IO_withStdout___at___00IO_FS_withIsolatedStreams___at___00testIOPrintCaptured_spec__2_spec__2___redArg___lam__0(v_x_262_4, v_x_263_5, v_x_283_9, null)
+            return arrayOf<Any?>(1, a_282_8)
         }
         else ->         { error("unreachable") }
     }
@@ -425,17 +431,13 @@ private fun f_IO_Error_toString(p_0: Any?): String {
     val details_405_9: Any?
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
-            val filename_408_2 = (p_0 as Array<*>)[1]
-            when (((filename_408_2 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val v_x_411_10 = "already exists"
-                    return f_IO_Error_otherErrorToString(v_x_411_10, ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                1 ->                 {
-                    val v_x_417_11 = "already exists"
-                    return f_IO_Error_fopenErrorToString(v_x_417_11, ((filename_408_2 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                else ->                 { error("unreachable") }
+            val filename_408_2 = (if (((p_0 as Array<*>)[1]) is Array<*>) (if ((((p_0 as Array<*>)[1]) as Array<*>)[0] as Int == 1) (((p_0 as Array<*>)[1]) as Array<*>)[1] as String else null) else (((p_0 as Array<*>)[1]) as String?))
+            if (filename_408_2 == null)             {
+                val v_x_411_10 = "already exists"
+                return f_IO_Error_otherErrorToString(v_x_411_10, ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
+            } else             {
+                val v_x_417_11 = "already exists"
+                return f_IO_Error_fopenErrorToString(v_x_417_11, (filename_408_2 as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
             }
         }
         1 ->         {
@@ -446,113 +448,93 @@ private fun f_IO_Error_toString(p_0: Any?): String {
         }
         2 ->         {
             val v_x_424_14 = "resource busy"
-            return f_IO_Error_otherErrorToString(v_x_424_14, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_424_14, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         3 ->         {
             val v_x_429_15 = "resource vanished"
-            return f_IO_Error_otherErrorToString(v_x_429_15, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_429_15, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         4 ->         {
             val v_x_434_16 = "unsupported operation"
-            return f_IO_Error_otherErrorToString(v_x_434_16, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_434_16, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         5 ->         {
             val v_x_438_17 = "hardware fault"
-            return f_IO_Error_otherErrorToString(v_x_438_17, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(0))
+            return f_IO_Error_otherErrorToString(v_x_438_17, ((p_0 as Array<*>)[2] as UInt), null)
         }
         6 ->         {
             val v_x_442_18 = "directory not empty"
-            return f_IO_Error_otherErrorToString(v_x_442_18, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(0))
+            return f_IO_Error_otherErrorToString(v_x_442_18, ((p_0 as Array<*>)[2] as UInt), null)
         }
         7 ->         {
             val v_x_447_19 = "illegal operation"
-            return f_IO_Error_otherErrorToString(v_x_447_19, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_447_19, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         8 ->         {
             val v_x_452_20 = "protocol error"
-            return f_IO_Error_otherErrorToString(v_x_452_20, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_452_20, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         9 ->         {
             val v_x_457_21 = "time expired"
-            return f_IO_Error_otherErrorToString(v_x_457_21, ((p_0 as Array<*>)[2] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[1]))
+            return f_IO_Error_otherErrorToString(v_x_457_21, ((p_0 as Array<*>)[2] as UInt), ((p_0 as Array<*>)[1] as String?))
         }
         10 ->         {
             val v_x_463_22 = "interrupted system call"
-            return f_IO_Error_fopenErrorToString(v_x_463_22, ((p_0 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
+            return f_IO_Error_fopenErrorToString(v_x_463_22, ((p_0 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
         }
         11 ->         {
             val v_x_468_23 = "no such file or directory"
-            return f_IO_Error_fopenErrorToString(v_x_468_23, ((p_0 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(0))
+            return f_IO_Error_fopenErrorToString(v_x_468_23, ((p_0 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), null)
         }
         12 ->         {
-            val filename_471_3 = (p_0 as Array<*>)[1]
-            when (((filename_471_3 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val v_x_474_24 = "invalid argument"
-                    return f_IO_Error_otherErrorToString(v_x_474_24, ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                1 ->                 {
-                    val v_x_480_25 = "invalid argument"
-                    return f_IO_Error_fopenErrorToString(v_x_480_25, ((filename_471_3 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                else ->                 { error("unreachable") }
+            val filename_471_3 = ((p_0 as Array<*>)[1] as String?)
+            if (filename_471_3 == null)             {
+                val v_x_474_24 = "invalid argument"
+                return f_IO_Error_otherErrorToString(v_x_474_24, ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
+            } else             {
+                val v_x_480_25 = "invalid argument"
+                return f_IO_Error_fopenErrorToString(v_x_480_25, (filename_471_3 as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
             }
         }
         13 ->         {
-            val filename_483_4 = (p_0 as Array<*>)[1]
-            when (((filename_483_4 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val osCode_484_26 = ((p_0 as Array<*>)[3] as UInt)
-                    val details_485_27 = (p_0 as Array<*>)[2]
-                    code_404_8 = osCode_484_26
-                    details_405_9 = details_485_27
-                }
-                1 ->                 {
-                    return f_IO_Error_fopenErrorToString(((p_0 as Array<*>)[2] as String), ((filename_483_4 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(0))
-                }
-                else ->                 { error("unreachable") }
+            val filename_483_4 = ((p_0 as Array<*>)[1] as String?)
+            if (filename_483_4 == null)             {
+                val osCode_484_26 = ((p_0 as Array<*>)[3] as UInt)
+                val details_485_27 = (p_0 as Array<*>)[2]
+                code_404_8 = osCode_484_26
+                details_405_9 = details_485_27
+            } else             {
+                return f_IO_Error_fopenErrorToString(((p_0 as Array<*>)[2] as String), (filename_483_4 as String), ((p_0 as Array<*>)[3] as UInt), null)
             }
         }
         14 ->         {
-            val filename_491_5 = (p_0 as Array<*>)[1]
-            when (((filename_491_5 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val v_x_494_28 = "resource exhausted"
-                    return f_IO_Error_otherErrorToString(v_x_494_28, ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                1 ->                 {
-                    val v_x_500_29 = "resource exhausted"
-                    return f_IO_Error_fopenErrorToString(v_x_500_29, ((filename_491_5 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                else ->                 { error("unreachable") }
+            val filename_491_5 = ((p_0 as Array<*>)[1] as String?)
+            if (filename_491_5 == null)             {
+                val v_x_494_28 = "resource exhausted"
+                return f_IO_Error_otherErrorToString(v_x_494_28, ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
+            } else             {
+                val v_x_500_29 = "resource exhausted"
+                return f_IO_Error_fopenErrorToString(v_x_500_29, (filename_491_5 as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
             }
         }
         15 ->         {
-            val filename_503_6 = (p_0 as Array<*>)[1]
-            when (((filename_503_6 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val v_x_506_30 = "inappropriate type"
-                    return f_IO_Error_otherErrorToString(v_x_506_30, ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                1 ->                 {
-                    val v_x_512_31 = "inappropriate type"
-                    return f_IO_Error_fopenErrorToString(v_x_512_31, ((filename_503_6 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                else ->                 { error("unreachable") }
+            val filename_503_6 = ((p_0 as Array<*>)[1] as String?)
+            if (filename_503_6 == null)             {
+                val v_x_506_30 = "inappropriate type"
+                return f_IO_Error_otherErrorToString(v_x_506_30, ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
+            } else             {
+                val v_x_512_31 = "inappropriate type"
+                return f_IO_Error_fopenErrorToString(v_x_512_31, (filename_503_6 as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
             }
         }
         16 ->         {
-            val filename_515_7 = (p_0 as Array<*>)[1]
-            when (((filename_515_7 as Array<*>)[0] as Int))             {
-                0 ->                 {
-                    val v_x_518_32 = "no such thing"
-                    return f_IO_Error_otherErrorToString(v_x_518_32, ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                1 ->                 {
-                    val v_x_524_33 = "no such thing"
-                    return f_IO_Error_fopenErrorToString(v_x_524_33, ((filename_515_7 as Array<*>)[1] as String), ((p_0 as Array<*>)[3] as UInt), arrayOf<Any?>(1, (p_0 as Array<*>)[2]))
-                }
-                else ->                 { error("unreachable") }
+            val filename_515_7 = ((p_0 as Array<*>)[1] as String?)
+            if (filename_515_7 == null)             {
+                val v_x_518_32 = "no such thing"
+                return f_IO_Error_otherErrorToString(v_x_518_32, ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
+            } else             {
+                val v_x_524_33 = "no such thing"
+                return f_IO_Error_fopenErrorToString(v_x_524_33, (filename_515_7 as String), ((p_0 as Array<*>)[3] as UInt), ((p_0 as Array<*>)[2] as String?))
             }
         }
         17 ->         {
@@ -563,28 +545,23 @@ private fun f_IO_Error_toString(p_0: Any?): String {
         }
         else ->         { error("unreachable") }
     }
-    return f_IO_Error_otherErrorToString((details_405_9 as String), code_404_8, arrayOf<Any?>(0))
+    return f_IO_Error_otherErrorToString((details_405_9 as String), code_404_8, null)
 }
 
-private fun f_IO_Error_fopenErrorToString(gist: String, fn: String, code: UInt, p_3: Any?): String {
-    when (((p_3 as Array<*>)[0] as Int))     {
-        0 ->         {
-            val v_x_533_2 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
-            val v_x_534_3 = " (error code: "
-            val v_x_539_4 = ")\n  file: "
-            return ((((v_x_533_2 + v_x_534_3) + ((code).toInt()).toString()) + v_x_539_4) + fn)
-        }
-        1 ->         {
-            val val_542_5 = (p_3 as Array<*>)[1]
-            val v_x_543_6 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
-            val v_x_544_7 = " (error code: "
-            val v_x_549_8 = ", "
-            val v_x_550_9 = (((v_x_543_6 + v_x_544_7) + ((code).toInt()).toString()) + v_x_549_8)
-            val v_x_551_10 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((val_542_5 as String))
-            val v_x_553_11 = ")\n  file: "
-            return (((v_x_550_9 + v_x_551_10) + v_x_553_11) + fn)
-        }
-        else ->         { error("unreachable") }
+private fun f_IO_Error_fopenErrorToString(gist: String, fn: String, code: UInt, p_3: String?): String {
+    if (p_3 == null)     {
+        val v_x_533_2 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
+        val v_x_534_3 = " (error code: "
+        val v_x_539_4 = ")\n  file: "
+        return ((((v_x_533_2 + v_x_534_3) + ((code).toInt()).toString()) + v_x_539_4) + fn)
+    } else     {
+        val v_x_543_5 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
+        val v_x_544_6 = " (error code: "
+        val v_x_549_7 = ", "
+        val v_x_550_8 = (((v_x_543_5 + v_x_544_6) + ((code).toInt()).toString()) + v_x_549_7)
+        val v_x_551_9 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((p_3 as String))
+        val v_x_553_10 = ")\n  file: "
+        return (((v_x_550_8 + v_x_551_9) + v_x_553_10) + fn)
     }
 }
 
@@ -604,25 +581,20 @@ private fun f___private_Init_System_IOError_0__IO_Error_downCaseFirst(s: String)
     }
 }
 
-private fun f_IO_Error_otherErrorToString(gist: String, code: UInt, p_2: Any?): String {
-    when (((p_2 as Array<*>)[0] as Int))     {
-        0 ->         {
-            val v_x_572_2 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
-            val v_x_573_3 = " (error code: "
-            val v_x_578_4 = ")"
-            return (((v_x_572_2 + v_x_573_3) + ((code).toInt()).toString()) + v_x_578_4)
-        }
-        1 ->         {
-            val val_580_5 = (p_2 as Array<*>)[1]
-            val v_x_581_6 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
-            val v_x_582_7 = " (error code: "
-            val v_x_587_8 = ", "
-            val v_x_588_9 = (((v_x_581_6 + v_x_582_7) + ((code).toInt()).toString()) + v_x_587_8)
-            val v_x_589_10 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((val_580_5 as String))
-            val v_x_591_11 = ")"
-            return ((v_x_588_9 + v_x_589_10) + v_x_591_11)
-        }
-        else ->         { error("unreachable") }
+private fun f_IO_Error_otherErrorToString(gist: String, code: UInt, p_2: String?): String {
+    if (p_2 == null)     {
+        val v_x_572_2 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
+        val v_x_573_3 = " (error code: "
+        val v_x_578_4 = ")"
+        return (((v_x_572_2 + v_x_573_3) + ((code).toInt()).toString()) + v_x_578_4)
+    } else     {
+        val v_x_581_5 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst(gist)
+        val v_x_582_6 = " (error code: "
+        val v_x_587_7 = ", "
+        val v_x_588_8 = (((v_x_581_5 + v_x_582_6) + ((code).toInt()).toString()) + v_x_587_7)
+        val v_x_589_9 = f___private_Init_System_IOError_0__IO_Error_downCaseFirst((p_2 as String))
+        val v_x_591_10 = ")"
+        return ((v_x_588_8 + v_x_589_9) + v_x_591_10)
     }
 }
 
@@ -658,45 +630,40 @@ private fun f_IO_FS_Stream_ofBuffer___lam__3(r: Any?, p_1: Any?): Any? {
     val pos_613_4 = (v_x_611_2 as Array<*>)[2]
     val v_y_615_5: Any?
     val v_x_625_1 = f_ByteArray_findIdx_x3f_loop___at___00IO_FS_Stream_ofBuffer_spec__0((data_612_3 as ByteArray), (pos_613_4 as java.math.BigInteger))
-    when (((v_x_625_1 as Array<*>)[0] as Int))     {
-        0 ->         {
-            val v_x_626_6 = java.math.BigInteger.valueOf(((data_612_3 as ByteArray)).size.toLong())
-            v_y_615_5 = v_x_626_6
-        }
-        1 ->         {
-            val val_627_7 = (v_x_625_1 as Array<*>)[1]
-            if (!((((data_612_3 as ByteArray))[((val_627_7 as java.math.BigInteger)).toInt()]).toUByte() == (0u).toUByte()))             {
-                val v_x_632_8 = ((val_627_7 as java.math.BigInteger).add(java.math.BigInteger.ONE))
-                v_y_615_5 = v_x_632_8
-            } else             {
-                v_y_615_5 = val_627_7
-            }
-        }
-        else ->         { error("unreachable") }
-    }
-    val v_x_616_9 = (run { val bs = (data_612_3 as ByteArray); val start = (((pos_613_4 as java.math.BigInteger)).toInt()).coerceIn(0, bs.size); val stop = (((v_y_615_5 as java.math.BigInteger)).toInt()).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
-    (r as Array<Any?>)[0] = arrayOf<Any?>(0, data_612_3, v_y_615_5)
-    if (!(try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(v_x_616_9)); true } catch (_: Throwable) { false }))     {
-        val v_x_620_10 = "invalid UTF-8"
-        return arrayOf<Any?>(1, arrayOf<Any?>(18, v_x_620_10))
+    if (v_x_625_1 == null)     {
+        val v_x_626_6 = java.math.BigInteger.valueOf(((data_612_3 as ByteArray)).size.toLong())
+        v_y_615_5 = v_x_626_6
     } else     {
-        return arrayOf<Any?>(0, (v_x_616_9).decodeToString())
+        if (!((((data_612_3 as ByteArray))[((v_x_625_1 as java.math.BigInteger)).toInt()]).toUByte() == (0u).toUByte()))         {
+            val v_x_632_7 = ((v_x_625_1 as java.math.BigInteger).add(java.math.BigInteger.ONE))
+            v_y_615_5 = v_x_632_7
+        } else         {
+            v_y_615_5 = v_x_625_1
+        }
+    }
+    val v_x_616_8 = (run { val bs = (data_612_3 as ByteArray); val start = (((pos_613_4 as java.math.BigInteger)).toInt()).coerceIn(0, bs.size); val stop = (((v_y_615_5 as java.math.BigInteger)).toInt()).coerceIn(start, bs.size); bs.copyOfRange(start, stop) })
+    (r as Array<Any?>)[0] = arrayOf<Any?>(0, data_612_3, v_y_615_5)
+    if (!(try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(v_x_616_8)); true } catch (_: Throwable) { false }))     {
+        val v_x_620_9 = "invalid UTF-8"
+        return arrayOf<Any?>(1, arrayOf<Any?>(18, v_x_620_9))
+    } else     {
+        return arrayOf<Any?>(0, (v_x_616_8).decodeToString())
     }
 }
 
-private tailrec fun f_ByteArray_findIdx_x3f_loop___at___00IO_FS_Stream_ofBuffer_spec__0(a: ByteArray, i: java.math.BigInteger): Any? {
+private tailrec fun f_ByteArray_findIdx_x3f_loop___at___00IO_FS_Stream_ofBuffer_spec__0(a: ByteArray, i: java.math.BigInteger): java.math.BigInteger? {
     if (!(i < java.math.BigInteger.valueOf((a).size.toLong())))     {
-        return arrayOf<Any?>(0)
+        return null
     } else     {
         val v_x_638_1 = ((a)[(i).toInt()]).toUByte()
         if (!(v_x_638_1 == (0u).toUByte()))         {
             if (!(v_x_638_1 == (10u).toUByte()))             {
                 return f_ByteArray_findIdx_x3f_loop___at___00IO_FS_Stream_ofBuffer_spec__0(a, (i.add(java.math.BigInteger.ONE)))
             } else             {
-                return arrayOf<Any?>(1, i)
+                return i
             }
         } else         {
-            return arrayOf<Any?>(1, i)
+            return i
         }
     }
 }
