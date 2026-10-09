@@ -39,6 +39,32 @@ def optionMapInc (o : Option UInt32) : Option UInt32 :=
 def testOption (x : UInt32) : UInt32 :=
   optionGetD (optionMapInc (.some x)) 0 + optionGetD (optionMapInc .none) 10
 
+def optionSomeFirst (o : Option UInt32) : UInt32 :=
+  match o with
+  | .some x => x * 2
+  | .none => 0
+
+def optionString (o : Option String) : String :=
+  match o with
+  | .none => "none"
+  | .some s => s
+
+def optionNat (o : Option Nat) : Nat :=
+  match o with
+  | .none => 0
+  | .some n => n + 10
+
+def nestedOption (o : Option (Option UInt32)) : UInt32 :=
+  match o with
+  | .none => 0
+  | .some .none => 1
+  | .some (.some x) => x + 2
+
+def genericOption {α : Type} (o : Option α) (d : α) : α :=
+  match o with
+  | .none => d
+  | .some x => x
+
 def sumList (xs : List UInt32) : UInt32 :=
   match xs with
   | [] => 0

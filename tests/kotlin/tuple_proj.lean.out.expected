@@ -27,7 +27,7 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_sumPair___boxed(p: Any?): Any? {
-    val res_28_1 = f_sumPair((p as Pair<UInt, UInt>))
+    val res_28_1 = f_sumPair((run { val _p = p as Pair<*, *>; Pair((_p.first as UInt), (_p.second as UInt)) }))
     return res_28_1
 }
 
@@ -71,6 +71,6 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_readNestedPair___boxed(p: Any?): Any? {
-    return f_readNestedPair((p as Pair<UInt, Pair<Int, String>>))
+    return f_readNestedPair((run { val _p = p as Pair<*, *>; Pair((_p.first as UInt), (run { val _p = (_p.second) as Pair<*, *>; Pair((_p.first as Int), (_p.second as String)) })) }))
 }
 

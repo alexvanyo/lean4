@@ -1,5 +1,6 @@
 package tests.kotlin
 
+import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -21,10 +22,23 @@ class InductivesTest {
     @Test
     fun testOption() {
         assertEquals(52u, f_testOption(41u))
-        val noneVal = f_optionMapInc(arrayOf<Any?>(0))
-        assertEquals(99u, f_optionGetD(noneVal, 99u))
-        val someVal = f_optionMapInc(arrayOf<Any?>(1, 10u))
-        assertEquals(11u, f_optionGetD(someVal, 99u))
+        assertEquals(null, f_optionMapInc(null))
+        assertEquals(99u, f_optionGetD(null, 99u))
+        assertEquals(11u, f_optionMapInc(10u))
+        assertEquals(10u, f_optionGetD(10u, 99u))
+        assertEquals(0u, f_optionSomeFirst(null))
+        assertEquals(20u, f_optionSomeFirst(10u))
+        assertEquals("none", f_optionString(null))
+        assertEquals("hello", f_optionString("hello"))
+        assertEquals(0.toBigInteger(), f_optionNat(null))
+        assertEquals(15.toBigInteger(), f_optionNat(5.toBigInteger()))
+        // Nested option retains ADT Array<Any?> for outer option, inner is UInt?
+        assertEquals(0u, f_nestedOption(arrayOf<Any?>(0)))
+        assertEquals(1u, f_nestedOption(arrayOf<Any?>(1, null)))
+        assertEquals(12u, f_nestedOption(arrayOf<Any?>(1, 10u)))
+        // Generic option retains ADT Array<Any?>
+        assertEquals(99u, f_genericOption(arrayOf<Any?>(0), 99u))
+        assertEquals(42u, f_genericOption(arrayOf<Any?>(1, 42u), 99u))
     }
 
     @Test
@@ -78,7 +92,7 @@ class InductivesTest {
 
     @Test
     fun testStdOptionOps() {
-        assertEquals(24u, f_stdOptionMapGetD(arrayOf<Any?>(1, 12u), 99u))
-        assertEquals(99u, f_stdOptionMapGetD(arrayOf<Any?>(0), 99u))
+        assertEquals(24u, f_stdOptionMapGetD(12u, 99u))
+        assertEquals(99u, f_stdOptionMapGetD(null, 99u))
     }
 }

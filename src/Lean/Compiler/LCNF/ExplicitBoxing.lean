@@ -328,7 +328,10 @@ where
         return currentType
     | .lit (.str ..) =>
       return object
-    | .ctor i _ => return i.type
+    | .ctor i _ =>
+      if (getJvmTypeDesc? currentType).isSome && !i.type.isScalar then
+        return currentType
+      return i.type
     | .fvar .. | .lit .. | .sproj .. | .oproj .. | .reset .. | .reuse .. =>
       return currentType
     | .box .. | .unbox .. | .isShared .. => unreachable!
