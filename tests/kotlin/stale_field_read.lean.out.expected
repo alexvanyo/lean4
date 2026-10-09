@@ -1,0 +1,20 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+class StaleCounter(var count: Int) {
+public fun bump(): Unit {
+    val count_2_1 = count
+    count = (count_2_1 + 1)
+    return
+}
+
+public fun testRead(): Int {
+    val count_13_1 = count
+    bump()
+    val count_15_2 = count
+    return (count_13_1 + count_15_2)
+}
+
+
+}
+

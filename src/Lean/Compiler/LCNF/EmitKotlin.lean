@@ -130,6 +130,8 @@ structure Context where
   extDeclNames : Std.HashSet Name := {}
   /-- Variable types from the mono phase, by variable binder name. -/
   monoVarTypes : Std.HashMap String Expr := {}
+  /-- Array sets that fell back to defensive copying (see `Ownership.analyze`). -/
+  nonExclusiveArraySets : Std.HashSet FVarId := {}
 
 structure State where
   buf : String := ""
@@ -3259,7 +3261,8 @@ partial def collectAliases (params : Array (Param .impure)) (code : Code .impure
             addAlias x rootSrcs[0]!
       | .fap fn args =>
         if fn == arrOp "set!" || fn == arrOp "setIfInBounds" || fn == arrOp "uset" then
-          if let some (.fvar y) := (args[1]? : Option (Arg .impure)) then addAlias x (← root y)
+          unless (← read).nonExclusiveArraySets.contains x do
+            if let some (.fvar y) := (args[1]? : Option (Arg .impure)) then addAlias x (← root y)
         else if fn == arrOp "propagateMark" || fn == `Array.propagateMark._redArg then
           if let some (.fvar y) := args.back? then addAlias x (← root y)
         else if let some ai := Ownership.inplaceArg? (← getEnv) fn args then
@@ -4450,34 +4453,46 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             | some e => castIfNeeded vStr e
             | none => pure vStr
         let aStr ← castIfNeeded (← toKotlinArg a) arrTy
-        if checkBounds then
-          emitLn s!"if ({idx} >= 0 && {idx} < {aStr}.size) {aStr}[{idx}] = {vStr}"
+        if (← read).nonExclusiveArraySets.contains x then
+          let n ← getVarName x
+          recordVarType n arrTy
+          if checkBounds then
+            emitLn s!"val {n} = if ({idx} >= 0 && {idx} < {aStr}.size) {aStr}.copyOf().also \{ it[{idx}] = {vStr} } else {aStr}"
+          else
+            emitLn s!"val {n} = {aStr}.copyOf().also \{ it[{idx}] = {vStr} }"
         else
-          emitLn s!"{aStr}[{idx}] = {vStr}"
-        setParamVarName x aStr
+          if checkBounds then
+            emitLn s!"if ({idx} >= 0 && {idx} < {aStr}.size) {aStr}[{idx}] = {vStr}"
+          else
+            emitLn s!"{aStr}[{idx}] = {vStr}"
+          setParamVarName x aStr
       else if let some (a, iStr, jStr, checkBounds) ← arraySwap? fn args then
         let arrTy ← arrayType a
         let aStr ← castIfNeeded (← toKotlinArg a) arrTy
-        let count := (← get).nameCounter + 1
-        modify fun st => { st with nameCounter := count }
-        let tmpName := s!"tmp_{count}"
-        if checkBounds then
-          emitLn s!"if ({iStr} >= 0 && {iStr} < {aStr}.size && {jStr} >= 0 && {jStr} < {aStr}.size) \{ val {tmpName} = {aStr}[{iStr}]; {aStr}[{iStr}] = {aStr}[{jStr}]; {aStr}[{jStr}] = {tmpName} }"
+        if (← read).nonExclusiveArraySets.contains x then
+          let n ← getVarName x
+          recordVarType n arrTy
+          if checkBounds then
+            emitLn s!"val {n} = if ({iStr} >= 0 && {iStr} < {aStr}.size && {jStr} >= 0 && {jStr} < {aStr}.size) {aStr}.copyOf().also \{ val tmp = it[{iStr}]; it[{iStr}] = it[{jStr}]; it[{jStr}] = tmp } else {aStr}"
+          else
+            emitLn s!"val {n} = {aStr}.copyOf().also \{ val tmp = it[{iStr}]; it[{iStr}] = it[{jStr}]; it[{jStr}] = tmp }"
         else
-          emitLn s!"val {tmpName} = {aStr}[{iStr}]"
-          emitLn s!"{aStr}[{iStr}] = {aStr}[{jStr}]"
-          emitLn s!"{aStr}[{jStr}] = {tmpName}"
-        setParamVarName x aStr
+          let count := (← get).nameCounter + 1
+          modify fun st => { st with nameCounter := count }
+          let tmpName := s!"tmp_{count}"
+          if checkBounds then
+            emitLn s!"if ({iStr} >= 0 && {iStr} < {aStr}.size && {jStr} >= 0 && {jStr} < {aStr}.size) \{ val {tmpName} = {aStr}[{iStr}]; {aStr}[{iStr}] = {aStr}[{jStr}]; {aStr}[{jStr}] = {tmpName} }"
+          else
+            emitLn s!"val {tmpName} = {aStr}[{iStr}]"
+            emitLn s!"{aStr}[{iStr}] = {aStr}[{jStr}]"
+            emitLn s!"{aStr}[{jStr}] = {tmpName}"
+          setParamVarName x aStr
       else if let some ai := Ownership.inplaceArg? (← getEnv) fn args then
         -- `kotlin_inplace:` extern: a statement updating argument `ai`, which is the result.
         emitLn (← emitLetValue decl)
         setParamVarName x (← toKotlinArg args[ai]!)
       else
-        -- A callee that updates values in place or invokes a callback may write fields.
-        if let some s := (← read).summaries[fn]? then
-          if s.exclusive.any id then forgetFieldVals
-        if getExternNameFor (← getEnv) `kotlin fn == some "kotlin_op:invoke" then
-          forgetFieldVals
+        if !(← isPureLet decl) then forgetFieldVals
         if let some shape ← dropShape? fn then
           let call ← emitLetValue decl
           if isUnitShape shape then
@@ -5705,7 +5720,8 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     throwError (MessageData.joinSep ownership.errors.toList "\n")
   let extDeclNames := extDecls.foldl (init := ({} : Std.HashSet Name)) fun s d => s.insert d.name
   let ctx : Context := { modName, localDecls := allDecls, otherModuleDecls, declMap,
-                         summaries := ownership.summaries, classStructs, extDeclNames }
+                         summaries := ownership.summaries, classStructs, extDeclNames,
+                         nonExclusiveArraySets := ownership.nonExclusiveArraySets }
   let ((), st) ← ((do
     let mut topBuf := ""
     let mut memberBufs : Std.HashMap String String := {}

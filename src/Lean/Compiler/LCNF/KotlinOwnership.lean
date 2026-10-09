@@ -37,6 +37,11 @@ public section
 
 namespace Lean.Compiler.LCNF.Kotlin.Ownership
 
+public register_builtin_option compiler.kotlin.strictInplace : Bool := {
+  defValue := true
+  descr := "require static verification of exclusive ownership for all in-place updates (Kotlin backend)"
+}
+
 /-- Reference count of an abstract object: exact, or unknown. -/
 inductive RC where
   | exact (n : Nat)
@@ -137,6 +142,7 @@ structure Ctx where
   localParams : Std.HashMap Name (Array (Param .impure))
   mutableClasses : Std.HashSet String := {}
   jps : Std.HashMap FVarId (FunDecl .impure) := {}
+  activeJps : Std.HashSet FVarId := {}
   /-- Object ids of the parameters at entry. -/
   paramObjs : Array Nat := #[]
 
@@ -149,6 +155,7 @@ structure Out where
   requireExclusive : Std.HashSet Nat := {}
   errors : Array MessageData := #[]
   ret : RetShape := .none
+  nonExclusiveArraySets : Std.HashSet FVarId := {}
 
 abbrev M := ReaderT Ctx (StateRefT Out CompilerM)
 
@@ -215,9 +222,18 @@ partial def decObj (st : PathState) (i : Nat) : PathState :=
     if k == 0 then o.children.foldl (fun st (_, c) => decObj st c) st else st
   | _ => st
 
-/-- Makes the count of object `i` unknown (a reference escaped to code we do not track). -/
-def escape (st : PathState) (i : Nat) : PathState :=
-  modifyObj st i fun o => { o with rc := .top, pristine? := none }
+/-- Makes the count of object `i` and its reachable children unknown (escaped). -/
+partial def escape (st : PathState) (i : Nat) : PathState :=
+  let o := st.objs[i]!
+  if o.rc == .top && o.pristine?.isNone && !o.deep then st
+  else
+    let st := modifyObj st i fun o => { o with rc := .top, pristine? := none, deep := false }
+    o.children.foldl (fun st (_, c) => escape st c) st
+
+def isTaskOp (fn : Name) : Bool :=
+  let fn := match fn with | .str p "_boxed" => p | _ => fn
+  fn.getPrefix == `Task || fn.getPrefix == `IO.asTask || fn == `BaseIO.asTask ||
+    fn == `Task.spawn || fn == `Task.map || fn == `Task.bind
 
 def isArraySet (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
@@ -408,6 +424,7 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
   | .jp decl k =>
     withReader (fun ctx => { ctx with jps := ctx.jps.insert decl.fvarId decl }) (visitCode st k)
   | .jmp j args =>
+    if (← read).activeJps.contains j then return
     let some decl := (← read).jps[j]? | return
     let mut st := st
     for p in decl.params, a in args do
@@ -418,7 +435,8 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
         if st.knownFalse.contains a then st := { st with knownFalse := st.knownFalse.insert p.fvarId }
         if st.knownTrue.contains a then st := { st with knownTrue := st.knownTrue.insert p.fvarId }
       | .erased => pure ()
-    visitCode st decl.value
+    withReader (fun ctx => { ctx with activeJps := ctx.activeJps.insert j }) do
+      visitCode st decl.value
   | .cases cs =>
     if st.knownFalse.contains cs.discr then
       let has0 := cs.alts.any fun | .ctorAlt info _ => info.cidx == 0 | .default _ => false
@@ -497,9 +515,24 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       if let some (.fvar a) := args.back? then
         let (st, i) := objOf st a
         return bind st x i
+    if isTaskOp fn then
+      let mut curSt := st
+      for a in args do
+        if let .fvar a := a then
+          let (st', i) := objOf curSt a
+          curSt := escape st' i
+      let (finalSt, i) := newObj curSt { rc := .top, isMutableClass := isMut }
+      return bind finalSt x i
     if let some ai := inplaceArg? (← getEnv) fn args then
       if let some (Arg.fvar a) := args[ai]? then
         let (st, i) := objOf st a
+        let o := st.objs[i]!
+        let canFallback := (isArraySet fn || isScalarArraySet fn) && !compiler.kotlin.strictInplace.get (← getOptions)
+        if canFallback && (o.rc != .exact 1 || o.pristine?.isSome) then
+          modify fun out => { out with nonExclusiveArraySets := out.nonExclusiveArraySets.insert x }
+          let st ← consumeArgs st none ((args.extract 0 ai) ++ (args.extract (ai + 1) args.size))
+          let (st, resObj) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
+          return bind st x resObj
         discard <| claim st i false m!"`{fn}`"
         let st ← consumeArgs st none ((args.extract 0 ai) ++ (args.extract (ai + 1) args.size))
         return bind st x i
@@ -547,6 +580,13 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
       if summary.exclusive[k]?.getD false then
         discard <| claim st i true m!"argument {k + 1} of `{fn}`"
     | .erased => argObjs := argObjs.push none
+  -- Verify that no exclusive argument aliases another argument at this call site.
+  for h : k in [:args.size] do
+    if summary.exclusive[k]?.getD false then
+      if let some (some i) := argObjs[k]? then
+        for h2 : j in [:args.size] do
+          if j != k && argObjs[j]? == some (some i) then
+            error m!"argument {k + 1} of `{fn}` requires exclusive ownership, but the value is passed multiple times at this call site"
   -- Arguments that come back as part of the result keep their count if the callee requires them
   -- exclusive (it returns them exclusive); all other owned arguments escape.
   let ids := summary.ret.identities
@@ -647,6 +687,7 @@ def analyzeDecl (decl : Decl .impure) (summaries : Std.HashMap Name Summary)
 structure Result where
   summaries : Std.HashMap Name Summary
   errors : Array MessageData
+  nonExclusiveArraySets : Std.HashSet FVarId := {}
 
 /--
 Computes ownership summaries for `decls` and checks all in-place updates. `external` returns
@@ -664,12 +705,14 @@ def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExterna
   let mut summaries : Std.HashMap Name Summary := decls.foldl (init := {}) fun m d =>
     m.insert d.name { exclusive := d.params.map fun _ => false }
   let mut iter := 0
+  let mut allNonExclusiveArraySets := ({} : Std.HashSet FVarId)
   repeat
     iter := iter + 1
     let mut changed := false
     let mut errors := #[]
     for d in decls do
       let out ← analyzeDecl d summaries localParams mutableClasses
+      allNonExclusiveArraySets := allNonExclusiveArraySets.union out.nonExclusiveArraySets
       let old := summaries[d.name]!
       let mut exclusive := old.exclusive
       for j in out.requireExclusive do
@@ -699,7 +742,7 @@ def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExterna
             else if isExternal d.name then
               errors := errors.push m!"Kotlin backend: `{d.name}` is called from Kotlin, but \
                 parameter {j + 1} would need to be exclusively owned"
-      return { summaries, errors }
-  return { summaries, errors := #[] }
+      return { summaries, errors, nonExclusiveArraySets := allNonExclusiveArraySets }
+  return { summaries, errors := #[], nonExclusiveArraySets := allNonExclusiveArraySets }
 
 end Lean.Compiler.LCNF.Kotlin.Ownership
