@@ -1752,7 +1752,16 @@ partial def formatGenericKotlinType (env : Environment) (typeParams : Std.HashMa
     if declName == ``FloatArray then return "DoubleArray"
     if let some spec := Compiler.getKotlinClassSpec? env declName then
       if (← hasTrivialImpureStructure? declName).isSome then return "Any?"
-      return spec.baseClassName
+      let base := spec.baseClassName
+      if !spec.className.contains '<' then
+        match isInductiveCore? env declName with
+        | some iv =>
+          if iv.numParams > 0 then
+            let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+            return s!"{base}<{stars}>"
+          else return base
+        | none => return base
+      else return spec.className
     if let some desc := getExternNameFor env `kotlin declName then
       if desc.startsWith "kotlin:" then return (desc.drop 7).toString
     return "Any?"
@@ -1779,7 +1788,16 @@ partial def formatGenericKotlinType (env : Environment) (typeParams : Std.HashMa
         let base := spec.baseClassName
         let argTys ← args.mapM (formatGenericKotlinType env typeParams)
         let relevantArgs := argTys.filter (!·.isEmpty)
-        if relevantArgs.isEmpty then return base
+        if relevantArgs.isEmpty then
+          if !spec.className.contains '<' then
+            match isInductiveCore? env declName with
+            | some iv =>
+              if iv.numParams > 0 then
+                let stars := String.intercalate ", " (List.replicate iv.numParams "*")
+                return s!"{base}<{stars}>"
+              else return base
+            | none => return base
+          else return spec.className
         else return s!"{base}<{String.intercalate ", " relevantArgs.toList}>"
     return "Any?"
   | .forallE .. =>
@@ -1943,26 +1961,28 @@ def classStructOf? (x : FVarId) : EmitM (Option Name) := do
   if let some s := (← get).nameStructs[n]? then
     return some s
   if let some t ← kotlinTypeOf? (.fvar x) then
-    let base := String.ofList (t.toList.takeWhile (· != '<') |>.filter (· != ' '))
-    if let some s := (← read).classStructs[base]? <|> (← read).classStructs[t]? then
-      let env ← getEnv
-      if isStructure env s then
-        modify fun st => { st with nameStructs := st.nameStructs.insert n s }
-        return some s
+    if !t.endsWith "?" then
+      let base := String.ofList (t.toList.takeWhile (· != '<') |>.filter (· != ' '))
+      if let some s := (← read).classStructs[base]? <|> (← read).classStructs[t]? then
+        let env ← getEnv
+        if isStructure env s then
+          modify fun st => { st with nameStructs := st.nameStructs.insert n s }
+          return some s
   let monoTypes := (← read).monoVarTypes
   let baseName := String.ofList (n.toList.takeWhile (· != '_'))
   let monoTy? := monoTypes[n]?.orElse fun _ => monoTypes[baseName]?
   if let some monoTy := monoTy? then
-    let env ← getEnv
-    if let some s := monoTy.getAppFn.constName? then
-      if (Compiler.getKotlinClassSpec? env s).isSome && isStructure env s then
-        modify fun st => { st with nameStructs := st.nameStructs.insert n s }
-        return some s
-      let sBase := s.getString!
-      if let some s' := (← read).classStructs[sBase]? then
-        if isStructure env s' then
-          modify fun st => { st with nameStructs := st.nameStructs.insert n s' }
-          return some s'
+    if !monoTy.isAppOfArity ``Option 1 then
+      let env ← getEnv
+      if let some s := monoTy.getAppFn.constName? then
+        if (Compiler.getKotlinClassSpec? env s).isSome && isStructure env s then
+          modify fun st => { st with nameStructs := st.nameStructs.insert n s }
+          return some s
+        let sBase := s.getString!
+        if let some s' := (← read).classStructs[sBase]? then
+          if isStructure env s' then
+            modify fun st => { st with nameStructs := st.nameStructs.insert n s' }
+            return some s'
   return (← get).nameStructs[n]?
 
 def mutableClassStructOf? (x : FVarId) : EmitM (Option Name) := do
@@ -3596,12 +3616,20 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
       if let some c := comps[i]? then
         setParamVarName x c
         return true
-    if i == 0 && compiler.kotlin.nullableOption.get (← getOptions) then
+    if i == 0 && compiler.kotlin.nullableOption.get (← getOptions) && (← classStructOf? var).isNone then
       let varTy := (← get).varTypes[n]?.getD "Any?"
-      if varTy.endsWith "?" && varTy != "Any?" then
+      let lcnfTy := toKotlinType (← getType var)
+      if (varTy.endsWith "?" && varTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
         let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == n && v
         if !isVar then
           setParamVarName x n
+          let classStructs := (← read).classStructs
+          let elemStruct? := (← get).optionElemStructs[n]?.orElse fun _ =>
+            let targetTy := toKotlinType decl.type
+            let base := String.ofList (targetTy.toList.takeWhile (· != '<') |>.filter (· != ' '))
+            classStructs[base]?
+          if let some elemStruct := elemStruct? then
+            modify fun st => { st with nameStructs := st.nameStructs.insert n elemStruct }
           return true
     return false
   | .sproj _ _ var =>
@@ -3738,12 +3766,22 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     recordVarType n ty
     if decl.value matches .oproj 0 _ && compiler.kotlin.nullableOption.get (← getOptions) then
       let yTy := (← get).varTypes[yName]?.getD "Any?"
-      if yTy.endsWith "?" && yTy != "Any?" then
+      let lcnfTy := toKotlinType (← getType y)
+      if (yTy.endsWith "?" && yTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
         let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == yName && v
+        let classStructs := (← read).classStructs
+        let elemStruct? := (← get).optionElemStructs[yName]?.orElse fun _ =>
+          let targetTy := toKotlinType decl.type
+          let base := String.ofList (targetTy.toList.takeWhile (· != '<') |>.filter (· != ' '))
+          classStructs[base]?
         if isVar then
           emitLn s!"val {n} = {yName}!!"
+          if let some elemStruct := elemStruct? then
+            modify fun st => { st with nameStructs := st.nameStructs.insert n elemStruct }
         else
           setParamVarName x yName
+          if let some elemStruct := elemStruct? then
+            modify fun st => { st with nameStructs := st.nameStructs.insert yName elemStruct }
         return
     emitLn s!"val {n} = {← emitLetValue decl}"
 
@@ -4311,8 +4349,8 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
               | .object i _ =>
                 let mut vStr := objs[i]?.getD "null"
                 if let some fTy := ctorLayout.objTypes[i]? then
-                  if !ctorLayout.typeParams.any (fTy.contains ·) then
-                    vStr ← castIfNeeded vStr fTy
+                  let instantiatedFTy := ctorLayout.typeParams.foldl (init := fTy) fun s tp => s.replace tp "Any?"
+                  vStr ← castIfNeeded vStr instantiatedFTy
                 ctorArgs := ctorArgs.push vStr
               | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
               | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
@@ -4341,8 +4379,8 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             | .object i _ =>
               let mut vStr := objs[i]?.getD "null"
               if let some fTy := clsLayout.objTypes[i]? then
-                if !clsLayout.typeParams.any (fTy.contains ·) then
-                  vStr ← castIfNeeded vStr fTy
+                let instantiatedFTy := clsLayout.typeParams.foldl (init := fTy) fun s tp => s.replace tp "Any?"
+                vStr ← castIfNeeded vStr instantiatedFTy
               ctorArgs := ctorArgs.push vStr
             | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
             | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")

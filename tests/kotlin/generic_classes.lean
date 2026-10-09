@@ -142,3 +142,30 @@ def makeTreeSetWith (x : String) : Std.TreeSet String :=
 
 def treeSetContains (s : Std.TreeSet String) (x : String) : Bool :=
   s.contains x
+
+-- 10. Generic structure inside Option and field access on unwrapped value
+@[kotlin_class "data class PairItem"]
+structure PairItem (α : Type) where
+  id : String
+  val : α
+deriving Inhabited
+
+@[kotlin_class "data class Container"]
+structure Container (α : Type) where
+  optItem : Option (PairItem α)
+
+def checkItem (c : Container α) (expectedId : String) : Bool :=
+  match c.optItem with
+  | none => false
+  | some item => expectedId == item.id
+
+-- Multi-branch join point with generic Option parameter
+def stepContainer (c : Container α) (fallback : Option (PairItem α)) (cond1 cond2 : Bool) : Container α :=
+  let nextOpt : Option (PairItem α) :=
+    if cond1 then
+      c.optItem
+    else if cond2 then
+      fallback
+    else
+      none
+  { optItem := nextOpt }
