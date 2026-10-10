@@ -1,0 +1,3 @@
+Kotlin backend: in `_private.array_set_self_aliasing.0.testInplaceOverlap`: `inplaceOp` requires exclusive ownership, but the value may be shared
+Kotlin backend: in `_private.array_set_self_aliasing.0.testInplaceOverlap`: `inplaceOp` updates its argument in place, but the value is passed multiple times at this call site
+Kotlin backend: in `_private.array_set_self_aliasing.0.testInplaceOverlap`: returning parameter 1 requires exclusive ownership, but the value may be shared

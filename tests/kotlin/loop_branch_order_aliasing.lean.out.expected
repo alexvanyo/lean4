@@ -1,0 +1,4 @@
+Kotlin backend: in `_private.loop_branch_order_aliasing.0.loopBranch`: argument 3 of `_private.loop_branch_order_aliasing.0.loopBranch` requires exclusive ownership, but the value may be shared
+Kotlin backend: in `_private.loop_branch_order_aliasing.0.loopBranch`: argument 4 of `_private.loop_branch_order_aliasing.0.loopBranch` requires exclusive ownership, but the value may be shared
+Kotlin backend: in `_private.loop_branch_order_aliasing.0.loopBranch`: argument 3 of `_private.loop_branch_order_aliasing.0.loopBranch` requires exclusive ownership, but the value is passed multiple times at this call site
+Kotlin backend: in `_private.loop_branch_order_aliasing.0.loopBranch`: argument 4 of `_private.loop_branch_order_aliasing.0.loopBranch` requires exclusive ownership, but the value is passed multiple times at this call site

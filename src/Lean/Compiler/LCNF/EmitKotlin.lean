@@ -5409,6 +5409,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       let m := if isExt then "private" else compiler.kotlin.topLevelModifiers.get opts
       let m := if m.isEmpty then "" else m ++ " "
       (m, toKotlinFnName decl.name)
+
   let explicitInline := (identTokens mods).contains "inline"
   let auto :=
     if isTailRec then "tailrec "
@@ -5702,12 +5703,13 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     match d.value with
     | .code c => collectPaps c acc
     | _ => acc
+  let extDeclNames := extDecls.foldl (init := ({} : Std.HashSet Name)) fun s d => s.insert d.name
   let isMember (n : Name) := (Compiler.getKotlinMemberInfo? env n).isSome
-  let ownership ← (Ownership.analyze allDecls isMember
-    (fun n => isMember n || isExport env n || papTargets.contains n)).run (phase := .impure)
+  let isExternal (n : Name) : Bool :=
+    isMember n || isExport env n || papTargets.contains n
+  let ownership ← (Ownership.analyze allDecls isMember isExternal).run (phase := .impure)
   unless ownership.errors.isEmpty do
     throwError (MessageData.joinSep ownership.errors.toList "\n")
-  let extDeclNames := extDecls.foldl (init := ({} : Std.HashSet Name)) fun s d => s.insert d.name
   let ctx : Context := { modName, localDecls := allDecls, otherModuleDecls, declMap,
                          summaries := ownership.summaries, classStructs, extDeclNames,
                          nonExclusiveArraySets := ownership.nonExclusiveArraySets }
