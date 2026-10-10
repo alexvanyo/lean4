@@ -3248,11 +3248,7 @@ partial def collectAliases (params : Array (Param .impure)) (code : Code .impure
             ++ Ownership.ctorScalars x k
           let roots ← vs.mapM root
           let projs := (← get).projs
-          let mut srcs := roots.filterMap fun v => projs[v]?.map (·.2.2)
-          if srcs.isEmpty then
-            for (_, _, y) in projs.values do
-              if (← mutableClassStructOf? y) == some info.name.getPrefix then
-                srcs := srcs.push y
+          let srcs := roots.filterMap fun v => projs[v]?.map (·.2.2)
           let mut rootSrcs : Array FVarId := #[]
           for y in srcs do
             let ry ← root y
@@ -4291,13 +4287,6 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
         for a in args ++ (Ownership.ctorScalars x k).map .fvar do
           if let .fvar a := a then
             if let some y := (← get).projSrc[← getVarName a]? then
-              if let some prev := src? then
-                if (← getVarName prev) != (← getVarName y) then
-                  throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
-              src? := some y
-        if src?.isNone then
-          for y in (← get).projSrc.values do
-            if (← mutableClassStructOf? y) == some s then
               if let some prev := src? then
                 if (← getVarName prev) != (← getVarName y) then
                   throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
