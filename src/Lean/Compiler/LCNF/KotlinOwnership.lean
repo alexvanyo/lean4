@@ -142,6 +142,7 @@ structure Ctx where
   localParams : Std.HashMap Name (Array (Param .impure))
   mutableClasses : Std.HashSet String := {}
   jps : Std.HashMap FVarId (FunDecl .impure) := {}
+  jpClaimed : Std.HashMap FVarId (Std.HashSet Nat) := {}
   activeJps : Std.HashSet FVarId := {}
   /-- Object ids of the parameters at entry. -/
   paramObjs : Array Nat := #[]
@@ -156,7 +157,6 @@ structure Out where
   errors : Array MessageData := #[]
   ret : RetShape := .none
   nonExclusiveArraySets : Std.HashSet FVarId := {}
-  claimedObjs : Std.HashSet Nat := {}
 
 abbrev M := ReaderT Ctx (StateRefT Out CompilerM)
 
@@ -193,20 +193,11 @@ partial def isDeeplyImmutableMonoType (t : Expr) : Bool :=
     isDeeplyImmutableMonoType a && isDeeplyImmutableMonoType b
   | _ => false
 
-partial def recordClaimed (st : PathState) (i : Nat) : M Unit := do
-  let rec go (curr : Nat) : M Unit := do
-    modify fun out => { out with claimedObjs := out.claimedObjs.insert curr }
-    if curr < st.objs.size then
-      if let some p := st.objs[curr]!.parent? then
-        go p
-  go i
-
 /--
 Checks that object `i` is exclusively owned (and, if `deep`, everything reachable through its
 fields). Returns `false` after reporting an error or requesting a parameter to be exclusive.
 -/
 partial def claim (st : PathState) (i : Nat) (deep : Bool) (what : MessageData) : M Bool := do
-  recordClaimed st i
   let o := st.objs[i]!
   if o.immutable && (deep || o.rc == .exact 1) then return true
   if let some j := o.pristine? then
@@ -267,15 +258,28 @@ def objectsOverlap (st : PathState) (i1 i2 : Nat) : Bool :=
       reach1.contains i2 || reach2.contains i1 || reach1.any (reach2.contains ·)
 
 def isConcurrentOp (fn : Name) : Bool :=
-  let fn := match fn with | .str p "_boxed" => p | _ => fn
-  let fn := match fn with | .str p "_redArg" => p | _ => fn
-  let p := fn.getPrefix
-  p == `Task || p == `IO.asTask || p == `BaseIO.asTask ||
-    p == `IO.Promise || p == `Std.Channel || p == `Std.Sync.Channel ||
-    p == `Std.Broadcast || p == `Std.Sync.Broadcast ||
-    fn == `Task.spawn || fn == `Task.map || fn == `Task.bind ||
-    fn == `IO.asTask || fn == `BaseIO.asTask ||
-    (p.isStr && (p.getString! == "Promise" || p.getString! == "Channel" || p.getString! == "Broadcast"))
+  let rec baseName (n : Name) : Name :=
+    match n with
+    | .str p s =>
+      if s.startsWith "_at_" || s.startsWith "spec_" || s == "_boxed" || s == "_redArg" then
+        baseName p
+      else
+        .str (baseName p) s
+    | .num p _ => baseName p
+    | .anonymous => .anonymous
+  let rec hasConcurrentMarker (n : Name) : Bool :=
+    match n with
+    | .str p s =>
+      s == "Sync" || s == "Channel" || s == "Broadcast" || s == "Mutex" || s == "Promise" || hasConcurrentMarker p
+    | .num p _ => hasConcurrentMarker p
+    | .anonymous => false
+  let base := baseName fn
+  let p := base.getPrefix
+  base == `Task.spawn || base == `Task.map || base == `Task.bind ||
+    base == `IO.asTask || base == `BaseIO.asTask ||
+    p == `Task || p == `IO.asTask || p == `BaseIO.asTask ||
+    p == `IO.Promise || p == `BaseIO.Promise ||
+    hasConcurrentMarker base
 
 def isArraySet (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
@@ -392,7 +396,12 @@ def classCtorSource? (st : PathState) (args : Array (Arg .impure)) : Option Nat 
           match src? with
           | none => src? := some p
           | some q => if q != p then return none
-  return src?
+  if let some p := src? then
+    if p < st.objs.size && st.objs[p]!.isMutableClass then
+      return src?
+    else
+      return none
+  return none
 
 /--
 A constructor application of a `@[mutable_kotlin_class]` structure updates the value it reads its other
@@ -408,6 +417,9 @@ def visitClassCtor? (st : PathState) (x : FVarId) (info : CtorInfo) (args : Arra
         `\{ s with f := v }` with some field of `s` unchanged)"
       return some st
   let o := st.objs[p]!
+  unless o.isMutableClass do
+    error m!"updating a `{structName}` in place, but the source value is not a mutable class"
+    return some st
   if let some j := o.pristine? then
     modify fun out => { out with requireExclusive := out.requireExclusive.insert j }
   else unless o.rc == .exact 0 do
@@ -424,6 +436,75 @@ partial def ctorScalars (x : FVarId) (k : Code .impure) : Array FVarId :=
     if y == x then #[v] ++ ctorScalars x k else ctorScalars x k
   | .inc (k := k) .. | .dec (k := k) .. => ctorScalars x k
   | _ => #[]
+
+/--
+Collects the indices of parameters of `decl` that are claimed (updated in place or passed to an
+exclusive parameter) anywhere in `decl.value`.
+-/
+partial def collectClaimedJpParams (env : Environment) (summaries : Std.HashMap Name Summary)
+    (jps : Std.HashMap FVarId (FunDecl .impure)) (decl : FunDecl .impure) : Std.HashSet Nat := Id.run do
+  let mut prov : Std.HashMap FVarId (Std.HashSet Nat) := {}
+  for h : k in [:decl.params.size] do
+    prov := prov.insert decl.params[k].fvarId (({} : Std.HashSet Nat).insert k)
+  let rec go (code : Code .impure) (prov : Std.HashMap FVarId (Std.HashSet Nat))
+      (claimed : Std.HashSet Nat) (visited : Std.HashSet FVarId) : Std.HashSet Nat := Id.run do
+    match code with
+    | .let d k =>
+      let mut claimed := claimed
+      let mut prov := prov
+      match d.value with
+      | .oproj _ y =>
+        if let some s := prov[y]? then
+          prov := prov.insert d.fvarId s
+      | .reset _ y =>
+        if let some s := prov[y]? then
+          claimed := claimed.union s
+          prov := prov.insert d.fvarId s
+      | .fap fn args =>
+        if let some ai := inplaceArg? env fn args then
+          if let some (.fvar a) := args[ai]? then
+            if let some s := prov[a]? then
+              claimed := claimed.union s
+              prov := prov.insert d.fvarId s
+        else if let some summary := summaries[fn]? then
+          for j in [:args.size] do
+            if summary.exclusive[j]?.getD false then
+              if let some (.fvar a) := args[j]? then
+                if let some s := prov[a]? then
+                  claimed := claimed.union s
+          match summary.ret with
+          | .param j =>
+            if let some (.fvar a) := args[j]? then
+              if let some s := prov[a]? then
+                prov := prov.insert d.fvarId s
+          | _ => pure ()
+      | _ => pure ()
+      go k prov claimed visited
+    | .cases cs =>
+      cs.alts.foldl (fun s alt => s.union (go alt.getCode prov claimed visited)) claimed
+    | .jp innerDecl k =>
+      let claimed := go innerDecl.value prov claimed visited
+      go k prov claimed visited
+    | .jmp j args =>
+      if j == decl.fvarId then
+        claimed
+      else if let some targetDecl := jps[j]? then
+        if visited.contains j then claimed
+        else
+          let targetClaimed := collectClaimedJpParams env summaries jps targetDecl
+          let mut claimed := claimed
+          for k in [:args.size] do
+            if targetClaimed.contains k then
+              if let some (.fvar a) := args[k]? then
+                if let some s := prov[a]? then
+                  claimed := claimed.union s
+          claimed
+      else claimed
+    | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. | .oset (k := k) ..
+    | .sset (k := k) .. | .uset (k := k) .. | .setTag (k := k) .. =>
+      go k prov claimed visited
+    | .return _ | .unreach _ => claimed
+  return go decl.value prov {} (({} : Std.HashSet FVarId).insert decl.fvarId)
 
 mutual
 
@@ -457,10 +538,19 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
   | .sset (k := k) .. | .uset (k := k) .. | .setTag (k := k) .. | .del (k := k) .. =>
     visitCode st k
   | .jp decl k =>
-    withReader (fun ctx => { ctx with jps := ctx.jps.insert decl.fvarId decl }) (visitCode st k)
+    let env ← getEnv
+    let summaries := (← read).summaries
+    let jps := (← read).jps.insert decl.fvarId decl
+    let claimed := collectClaimedJpParams env summaries jps decl
+    withReader (fun ctx => { ctx with
+      jps,
+      jpClaimed := ctx.jpClaimed.insert decl.fvarId claimed
+    }) (visitCode st k)
   | .jmp j args =>
     let some decl := (← read).jps[j]? | return
-    if (← read).activeJps.contains j then
+    let isLoop := (← read).activeJps.contains j
+    if isLoop then
+      let claimedParams := (← read).jpClaimed[j]?.getD {}
       let mut argObjs : Array (Option Nat) := #[]
       for a in args do
         match a with
@@ -468,20 +558,21 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
           let (_, i) := objOf st a
           argObjs := argObjs.push (some i)
         | .erased => argObjs := argObjs.push none
-      let claimed := (← get).claimedObjs
-      for k in [:args.size] do
-        if let some p := decl.params[k]? then
-          if let some paramObj := st.vars[p.fvarId]? then
-            if claimed.contains paramObj then
-              if let some (some i) := argObjs[k]? then
-                discard <| claim st i true m!"back-edge argument {k + 1} of loop `{decl.binderName}`"
-      for k in [:args.size] do
+      for k in claimedParams do
+        if let some (some i) := argObjs[k]? then
+          discard <| claim st i false m!"back-edge argument {k + 1} of loop `{decl.binderName}`"
+      for k in claimedParams do
         if let some (some i) := argObjs[k]? then
           for m in [:args.size] do
             if m != k then
               if let some (some mObj) := argObjs[m]? then
                 if objectsOverlap st i mObj then
-                  error m!"in recursive join-point loop `{decl.binderName}`: argument {k + 1} aliases argument {m + 1}"
+                  let err :=
+                    if i == mObj then
+                      m!"in recursive join-point loop `{decl.binderName}`: argument {k + 1} is passed multiple times at this jump site"
+                    else
+                      m!"in recursive join-point loop `{decl.binderName}`: argument {k + 1} aliases argument {m + 1}"
+                  error err
       return
     let mut st := st
     for p in decl.params, a in args do
@@ -584,13 +675,29 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       if let some (Arg.fvar a) := args[ai]? then
         let (st, i) := objOf st a
         let o := st.objs[i]!
+        let hasOverlap := Id.run do
+          for h : j in [:args.size] do
+            if j != ai then
+              if let .fvar otherA := args[j] then
+                if let some otherObj := st.vars[otherA]? then
+                  if objectsOverlap st i otherObj then return true
+          return false
         let canFallback := (isArraySet fn || isScalarArraySet fn) && !compiler.kotlin.strictInplace.get (← getOptions)
-        if canFallback && (o.rc != .exact 1 || o.pristine?.isSome) then
+        if canFallback && (o.rc != .exact 1 || o.pristine?.isSome || hasOverlap) then
           modify fun out => { out with nonExclusiveArraySets := out.nonExclusiveArraySets.insert x }
           let st ← consumeArgs st none ((args.extract 0 ai) ++ (args.extract (ai + 1) args.size))
           let (st, resObj) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
           return bind st x resObj
         discard <| claim st i false m!"`{fn}`"
+        for h : j in [:args.size] do
+          if j != ai then
+            if let .fvar otherA := args[j] then
+              let (st', otherObj) := objOf st otherA
+              if objectsOverlap st i otherObj then
+                if i == otherObj then
+                  error m!"`{fn}` updates its argument in place, but the value is passed multiple times at this call site"
+                else
+                  error m!"`{fn}` updates its argument in place, but it aliases argument {j + 1}"
         let st ← consumeArgs st none ((args.extract 0 ai) ++ (args.extract (ai + 1) args.size))
         return bind st x i
     if args.isEmpty && (getExternNameFor (← getEnv) `kotlin fn).any (·.startsWith "kotlin_expr:") then
@@ -692,6 +799,31 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
     let (st2, i) := newObj st { rc := .top, isMutableClass := isMut }
     return bind st2 x i
 
+partial def isDeepFresh (st : PathState) (paramObjs : Array Nat) (i : Nat) : Bool :=
+  if i >= st.objs.size then false
+  else
+    let o := st.objs[i]!
+    if o.immutable then true
+    else if o.rc != .exact 1 || o.pristine?.isSome then false
+    else if paramObjs.contains i then false
+    else if let some p := o.parent? then
+      if p < st.objs.size && st.objs[p]!.rc != .exact 0 then false
+      else checkChildren o
+    else checkChildren o
+where
+  checkChildren (o : Obj) : Bool :=
+    if !o.deep && o.ctor?.isNone then false
+    else
+      let childrenFresh := o.children.all (fun (_, c) => isDeepFresh st paramObjs c)
+      let childrenDisjoint := Id.run do
+        for a in [:o.children.size] do
+          let c1 := o.children[a]!.2
+          for b in [(a + 1):o.children.size] do
+            let c2 := o.children[b]!.2
+            if objectsOverlap st c1 c2 then return false
+        return true
+      childrenFresh && childrenDisjoint
+
 partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
   let (st, i) := objOf st x
   let o := st.objs[i]!
@@ -701,10 +833,12 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
   let shape : RetShape :=
     if let some j := paramOf? i then .param j
     else if o.ctor? == some ``Prod.mk then
-      .prod ((List.range 2).toArray.map fun c =>
-        (o.children.find? (·.1 == c)).bind fun (_, ci) => paramOf? ci)
-    else if o.rc == .exact 1 && (o.deep || o.ctor?.isSome) &&
-            o.children.all (fun (_, c) => st.objs[c]!.immutable || (st.objs[c]!.rc == .exact 1 && (st.objs[c]!.deep || st.objs[c]!.ctor?.isSome))) then
+      let comps := (List.range 2).toArray.map fun c =>
+        (o.children.find? (·.1 == c)).bind fun (_, ci) => paramOf? ci
+      if comps.any (·.isSome) then .prod comps
+      else if isDeepFresh st ctx.paramObjs i then .fresh
+      else .prod comps
+    else if isDeepFresh st ctx.paramObjs i then
       .fresh
     else .unknown
   -- Parameters returned as (part of) the result must come back exclusive if they came in exclusive.
@@ -792,18 +926,19 @@ def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExterna
       -- Parameters of declarations called from Kotlin cannot be required to be exclusive, except
       -- for the receiver of a member, which must then be returned so that callers observe the
       -- update.
-      for d in decls do
-        let s := summaries[d.name]!
-        for h : j in [:s.exclusive.size] do
-          if s.exclusive[j] then
-            let receiver := j == 0 && isMember d.name
-            if receiver then
-              unless s.ret.identities.any (·.2 == 0) do
-                errors := errors.push m!"Kotlin backend: `{d.name}` updates its receiver in \
-                  place, so it must return the receiver (e.g. as the last component of its result)"
-            else if isExternal d.name then
-              errors := errors.push m!"Kotlin backend: `{d.name}` is called from Kotlin, but \
-                parameter {j + 1} would need to be exclusively owned"
+      if errors.isEmpty then
+        for d in decls do
+          let s := summaries[d.name]!
+          for h : j in [:s.exclusive.size] do
+            if s.exclusive[j] then
+              let receiver := j == 0 && isMember d.name
+              if receiver then
+                unless s.ret.identities.any (·.2 == 0) do
+                  errors := errors.push m!"Kotlin backend: `{d.name}` updates its receiver in \
+                    place, so it must return the receiver (e.g. as the last component of its result)"
+              else if isExternal d.name then
+                errors := errors.push m!"Kotlin backend: `{d.name}` is called from Kotlin, but \
+                  parameter {j + 1} would need to be exclusively owned"
       return { summaries, errors, nonExclusiveArraySets := allNonExclusiveArraySets }
   return { summaries, errors := #[], nonExclusiveArraySets := allNonExclusiveArraySets }
 
