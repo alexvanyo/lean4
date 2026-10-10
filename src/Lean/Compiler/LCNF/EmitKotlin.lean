@@ -1118,7 +1118,10 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       else if let some d := extractNatLiteralDigits? a1 then
         if d.length <= 9 then pure d else pure s!"({a1}).toInt()"
       else if let some src := (← get).intSources[a1]? then
-        pure src
+        if (← get).varTypes[src]? == some "Int" then
+          pure src
+        else
+          pure s!"({src}).toInt()"
       else if let some intExpr := stripToLong? a1 then
         pure intExpr
       else if a1.endsWith "uL" && a1.length > 2 && (a1.take (a1.length - 2)).all Char.isDigit then
@@ -4071,10 +4074,13 @@ def recordIntSource (n : String) (rhs : String) (decl : LetDecl .impure) : EmitM
   if let some intExpr := stripToLong? rhs then
     modify fun st => { st with intSources := st.intSources.insert n intExpr }
   else if let .fap fn args := decl.value then
-    if args.size == 1 && (fn == ``Int32.toInt64 || fn == ``ISize.toInt64 || fn == ``UInt32.toUInt64 ||
-                          fn == ``Int64.ofInt || fn == ``UInt32.toNat || fn == ``Int32.toNatClampNeg || fn == ``USize.toNat) then
+    if args.size == 1 && (fn == ``Int32.toInt64 || fn == ``ISize.toInt64 ||
+                          fn == ``Int64.ofInt || fn == ``Int32.toNatClampNeg) then
       let a0 ← toKotlinArg args[0]!
       modify fun st => { st with intSources := st.intSources.insert n a0 }
+    else if args.size == 1 && (fn == ``UInt32.toUInt64 || fn == ``UInt32.toNat || fn == ``USize.toNat) then
+      let a0 ← toKotlinArg args[0]!
+      modify fun st => { st with intSources := st.intSources.insert n s!"({a0}).toInt()" }
 
 def tryInlineSingleUseLet? (decl : LetDecl .impure) (k : Code .impure) : EmitM Bool := do
   unless ← isInlineableLet decl do return false
