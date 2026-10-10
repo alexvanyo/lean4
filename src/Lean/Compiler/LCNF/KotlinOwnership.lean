@@ -156,6 +156,7 @@ structure Out where
   errors : Array MessageData := #[]
   ret : RetShape := .none
   nonExclusiveArraySets : Std.HashSet FVarId := {}
+  claimedObjs : Std.HashSet Nat := {}
 
 abbrev M := ReaderT Ctx (StateRefT Out CompilerM)
 
@@ -192,11 +193,20 @@ partial def isDeeplyImmutableMonoType (t : Expr) : Bool :=
     isDeeplyImmutableMonoType a && isDeeplyImmutableMonoType b
   | _ => false
 
+partial def recordClaimed (st : PathState) (i : Nat) : M Unit := do
+  let rec go (curr : Nat) : M Unit := do
+    modify fun out => { out with claimedObjs := out.claimedObjs.insert curr }
+    if curr < st.objs.size then
+      if let some p := st.objs[curr]!.parent? then
+        go p
+  go i
+
 /--
 Checks that object `i` is exclusively owned (and, if `deep`, everything reachable through its
 fields). Returns `false` after reporting an error or requesting a parameter to be exclusive.
 -/
 partial def claim (st : PathState) (i : Nat) (deep : Bool) (what : MessageData) : M Bool := do
+  recordClaimed st i
   let o := st.objs[i]!
   if o.immutable && (deep || o.rc == .exact 1) then return true
   if let some j := o.pristine? then
@@ -230,10 +240,42 @@ partial def escape (st : PathState) (i : Nat) : PathState :=
     let st := modifyObj st i fun o => { o with rc := .top, pristine? := none, deep := false }
     o.children.foldl (fun st (_, c) => escape st c) st
 
-def isTaskOp (fn : Name) : Bool :=
+/-- Collects all non-immutable object IDs reachable from `i` through field references. -/
+partial def reachableObjs (st : PathState) (i : Nat) : Std.HashSet Nat :=
+  let rec go (curr : Nat) (acc : Std.HashSet Nat) : Std.HashSet Nat :=
+    if acc.contains curr then acc
+    else if curr >= st.objs.size then acc
+    else
+      let o := st.objs[curr]!
+      if o.immutable then acc
+      else
+        let acc := acc.insert curr
+        o.children.foldl (fun s (_, c) => go c s) acc
+  go i {}
+
+/-- Checks if object `i1` and `i2` overlap (identity, containment, or shared mutable child). -/
+def objectsOverlap (st : PathState) (i1 i2 : Nat) : Bool :=
+  if i1 == i2 then true
+  else if i1 >= st.objs.size || i2 >= st.objs.size then false
+  else
+    let o1 := st.objs[i1]!
+    let o2 := st.objs[i2]!
+    if o1.immutable || o2.immutable then false
+    else
+      let reach1 := reachableObjs st i1
+      let reach2 := reachableObjs st i2
+      reach1.contains i2 || reach2.contains i1 || reach1.any (reach2.contains ·)
+
+def isConcurrentOp (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
-  fn.getPrefix == `Task || fn.getPrefix == `IO.asTask || fn == `BaseIO.asTask ||
-    fn == `Task.spawn || fn == `Task.map || fn == `Task.bind
+  let fn := match fn with | .str p "_redArg" => p | _ => fn
+  let p := fn.getPrefix
+  p == `Task || p == `IO.asTask || p == `BaseIO.asTask ||
+    p == `IO.Promise || p == `Std.Channel || p == `Std.Sync.Channel ||
+    p == `Std.Broadcast || p == `Std.Sync.Broadcast ||
+    fn == `Task.spawn || fn == `Task.map || fn == `Task.bind ||
+    fn == `IO.asTask || fn == `BaseIO.asTask ||
+    (p.isStr && (p.getString! == "Promise" || p.getString! == "Channel" || p.getString! == "Broadcast"))
 
 def isArraySet (fn : Name) : Bool :=
   let fn := match fn with | .str p "_boxed" => p | _ => fn
@@ -350,13 +392,6 @@ def classCtorSource? (st : PathState) (args : Array (Arg .impure)) : Option Nat 
           match src? with
           | none => src? := some p
           | some q => if q != p then return none
-  if src?.isNone then
-    for o in st.objs do
-      if let some p := o.parent? then
-        if st.objs[p]!.isMutableClass then
-          match src? with
-          | none => src? := some p
-          | some q => if q != p then return none
   return src?
 
 /--
@@ -424,8 +459,30 @@ partial def visitCode (st : PathState) (code : Code .impure) : M Unit := do
   | .jp decl k =>
     withReader (fun ctx => { ctx with jps := ctx.jps.insert decl.fvarId decl }) (visitCode st k)
   | .jmp j args =>
-    if (← read).activeJps.contains j then return
     let some decl := (← read).jps[j]? | return
+    if (← read).activeJps.contains j then
+      let mut argObjs : Array (Option Nat) := #[]
+      for a in args do
+        match a with
+        | .fvar a =>
+          let (_, i) := objOf st a
+          argObjs := argObjs.push (some i)
+        | .erased => argObjs := argObjs.push none
+      let claimed := (← get).claimedObjs
+      for k in [:args.size] do
+        if let some p := decl.params[k]? then
+          if let some paramObj := st.vars[p.fvarId]? then
+            if claimed.contains paramObj then
+              if let some (some i) := argObjs[k]? then
+                discard <| claim st i true m!"back-edge argument {k + 1} of loop `{decl.binderName}`"
+      for k in [:args.size] do
+        if let some (some i) := argObjs[k]? then
+          for m in [:args.size] do
+            if m != k then
+              if let some (some mObj) := argObjs[m]? then
+                if objectsOverlap st i mObj then
+                  error m!"in recursive join-point loop `{decl.binderName}`: argument {k + 1} aliases argument {m + 1}"
+      return
     let mut st := st
     for p in decl.params, a in args do
       match a with
@@ -515,7 +572,7 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       if let some (.fvar a) := args.back? then
         let (st, i) := objOf st a
         return bind st x i
-    if isTaskOp fn then
+    if isConcurrentOp fn then
       let mut curSt := st
       for a in args do
         if let .fvar a := a then
@@ -584,9 +641,14 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
   for h : k in [:args.size] do
     if summary.exclusive[k]?.getD false then
       if let some (some i) := argObjs[k]? then
-        for h2 : j in [:args.size] do
-          if j != k && argObjs[j]? == some (some i) then
-            error m!"argument {k + 1} of `{fn}` requires exclusive ownership, but the value is passed multiple times at this call site"
+        for j in [:args.size] do
+          if j != k then
+            if let some (some jObj) := argObjs[j]? then
+              if objectsOverlap st i jObj then
+                if i == jObj then
+                  error m!"argument {k + 1} of `{fn}` requires exclusive ownership, but the value is passed multiple times at this call site"
+                else
+                  error m!"argument {k + 1} of `{fn}` requires exclusive ownership, but it aliases argument {j + 1}"
   -- Arguments that come back as part of the result keep their count if the callee requires them
   -- exclusive (it returns them exclusive); all other owned arguments escape.
   let ids := summary.ret.identities

@@ -1,0 +1,3 @@
+Kotlin backend: in `loopArray`: argument 3 of `loopArray` requires exclusive ownership, but the value may be shared
+Kotlin backend: in `loopArray`: argument 3 of `loopArray` requires exclusive ownership, but it aliases argument 4
+Kotlin backend: in `loopArray`: returning parameter 3 requires exclusive ownership, but the value may be shared

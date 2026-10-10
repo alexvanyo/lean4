@@ -1,0 +1,2 @@
+Kotlin backend: in `testSubobjectAliasing`: argument 1 of `mutateFirst` requires exclusive ownership, but the value may be shared
+Kotlin backend: in `testSubobjectAliasing`: argument 1 of `mutateFirst` requires exclusive ownership, but it aliases argument 2
