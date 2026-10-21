@@ -92,7 +92,7 @@
     return (xs).foldRight(arrayOf<Any?>(0) as Any?) { elem, acc -> arrayOf<Any?>(1, elem, acc) }
 }
 
-@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal: java.math.BigInteger, p_1: Array<Any?>, i: Int, stop: Int, b: Array<Any?>): Array<Any?> {
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal: java.math.BigInteger, p_1: Array<Any?>, i: Int, stop: Int, b: Array<Any?>): Array<Any?> {
     val v_y_85_1: Array<Any?>
     if (!(i == stop))     {
         val v_x_90_2 = p_1[i]

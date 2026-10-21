@@ -67,7 +67,7 @@
     return f_testStringInterp((name as String), (n as java.math.BigInteger), i)
 }
 
-@PublishedApi internal fun f_List_mapTR_loop___at___00testStringChars_spec__0(p_0: Any?, p_1: Any?): Any? {
+@PublishedApi internal tailrec fun f_List_mapTR_loop___at___00testStringChars_spec__0(p_0: Any?, p_1: Any?): Any? {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
             return f_List_reverse___redArg(p_1)
