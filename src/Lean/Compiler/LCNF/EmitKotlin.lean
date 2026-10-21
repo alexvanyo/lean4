@@ -1833,6 +1833,28 @@ def getFnParamKotlinTypes (env : Environment) (fn : Name) : CoreM (Array String)
               return s!"{t0}?"
         return "Any?"
 
+def identTokens (s : String) : Std.HashSet String :=
+  let (set, cur) := s.foldl (init := (({} : Std.HashSet String), "")) fun (set, cur) c =>
+    if c.isAlphanum || c == '_' then (set, cur.push c)
+    else (if cur.isEmpty then set else set.insert cur, "")
+  if cur.isEmpty then set else set.insert cur
+
+/--
+Kotlin types derived from the Lean type of `fn` for its runtime parameters (with the type parameters
+of its declaration), which `emitFnDecl` declares unless they are `Any?`. Empty for compiler
+auxiliary declarations and declarations without a Lean type.
+-/
+def getFnDeclaredParamKotlinTypes (env : Environment) (fn : Name) : CoreM (Array String) := do
+  if isCompilerAuxDecl env fn then return #[]
+  let baseFn := match fn with | .str p "_redArg" => p | _ => fn
+  Meta.MetaM.run' do
+    let some info := (env.find? fn).orElse (fun _ => env.find? baseFn) | return #[]
+    let typeParams ← getDeclTypeParams env baseFn
+    let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
+    Meta.forallTelescopeReducing info.type fun xs _ => do
+      let runtimeXs ← xs.filterM fun x => do return !(← Meta.inferType x).isSort
+      runtimeXs.mapM fun x => do formatGenericKotlinType env typeParamMap (← Meta.inferType x)
+
 /-- Kotlin property names and types of a `@[kotlin_class]` structure by runtime position. -/
 structure ClassLayout where
   objs : Std.HashMap Nat String := {}
@@ -2327,6 +2349,11 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       | some d => pure (some d.params)
       | none => (·.map (·.params)) <$> getImpureSignature? fn
     let fnParamTys ← getFnParamKotlinTypes (← getEnv) fn
+    let declaredParamTys ← getFnDeclaredParamKotlinTypes (← getEnv) fn
+    let declaredTypeParams ← (Meta.MetaM.run' do
+      if isAux then return #[]
+      let baseFn := match fn with | .str p "_redArg" => p | _ => fn
+      return (← getDeclTypeParams (← getEnv) baseFn).map (·.2) : CoreM (Array String))
     let mut argStrs : Array String := #[]
     for i in [:runtimeArgs.size] do
       let fullIdx := numTypeParams + i
@@ -2342,6 +2369,12 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         | none => none
       let expectedTy? := expectedTy?.orElse fun _ =>
         fnParamTys[i]?.bind fun kt => if kt != "Any?" then some kt else none
+      -- The type the callee declares the parameter with, so that an `Any?` argument (such as a
+      -- parameter of a `_boxed` wrapper) is cast to it, unless it names a type parameter of the
+      -- callee, which is not in scope here.
+      let expectedTy? := expectedTy?.orElse fun _ =>
+        declaredParamTys[i]?.bind fun kt =>
+          if kt == "Any?" || declaredTypeParams.any (identTokens kt).contains then none else some kt
       let aStr ← match expectedTy? with
         | some expectedTy => castIfNeeded aStr expectedTy
         | none => pure aStr
@@ -3792,12 +3825,6 @@ def withKnown (name : String) (b : Bool) (act : EmitM Unit) : EmitM Unit := do
   modify fun st => { st with knownBools := st.knownBools.insert name b }
   act
   modify fun st => { st with knownBools := saved }
-
-def identTokens (s : String) : Std.HashSet String :=
-  let (set, cur) := s.foldl (init := (({} : Std.HashSet String), "")) fun (set, cur) c =>
-    if c.isAlphanum || c == '_' then (set, cur.push c)
-    else (if cur.isEmpty then set else set.insert cur, "")
-  if cur.isEmpty then set else set.insert cur
 
 /-- Self tail call inside a loop-expanded body: update the loop variables and `continue`. -/
 def emitLoopContinue (l : LoopCtx) (args : Array (Arg .impure)) : EmitM Unit := do
@@ -5376,16 +5403,15 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let monoDecl? ← match ← getMonoDecl? decl.name with
     | some md => pure (some md)
     | none => getMonoDecl? baseDeclName
+  let declaredParamTys ← getFnDeclaredParamKotlinTypes env decl.name
   let fnTypeInfo? ← (Meta.MetaM.run' do
     if isAux then return none
     let some info := (env.find? decl.name).orElse (fun _ => env.find? baseDeclName) | return none
     let typeParams ← getDeclTypeParams env baseDeclName
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
-    Meta.forallTelescopeReducing info.type fun xs retType => do
-      let runtimeXs ← xs.filterM fun x => do return !(← Meta.inferType x).isSort
-      let paramTys ← runtimeXs.mapM fun x => do formatGenericKotlinType env typeParamMap (← Meta.inferType x)
+    Meta.forallTelescopeReducing info.type fun _ retType => do
       let retTy ← formatGenericKotlinType env typeParamMap retType
-      return some (typeParams, paramTys, retTy) : CoreM (Option (Array (Name × String) × Array String × String)))
+      return some (typeParams, declaredParamTys, retTy) : CoreM (Option (Array (Name × String) × Array String × String)))
   let classTypeParams ← match member? with
     | some info =>
       match (← read).classStructs[info.className]? with
