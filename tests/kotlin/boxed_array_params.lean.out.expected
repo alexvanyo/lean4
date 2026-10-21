@@ -1,0 +1,146 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@PublishedApi internal fun f_sumFrom___boxed__const__1(): Any? {
+    return 0uL
+}
+
+@PublishedApi internal fun f_sumFrom___boxed__const__2(): Any? {
+    return 0u
+}
+
+@PublishedApi internal fun f_sumFrom(xs: Array<Any?>, ys: Array<Any?>, i: java.math.BigInteger, bias: UInt): ULong {
+    val v_x_11_1 = (xs[(i).toInt()] as UInt)
+    val v_x_16_2 = (ys[(i).toInt()] as ULong)
+    return (((v_x_11_1 + bias)).toULong() + v_x_16_2)
+}
+
+@PublishedApi internal fun f_sumFrom___boxed(xs: Any?, ys: Any?, i: Any?, bias: Any?): Any? {
+    val bias_boxed_22_1 = (bias as UInt)
+    val res_23_2 = f_sumFrom((xs as Array<Any?>), (ys as Array<Any?>), (i as java.math.BigInteger), bias_boxed_22_1)
+    return res_23_2
+}
+
+@PublishedApi internal tailrec fun f_List_filterTR_loop___at___00countAbove_spec__0(limit: UByte, p_1: Any?, p_2: Any?): Any? {
+    when (((p_1 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_2)
+        }
+        1 ->         {
+            val head_29_2 = (p_1 as Array<*>)[1]
+            val tail_30_3 = (p_1 as Array<*>)[2]
+            val v_x_34_4 = (head_29_2 as UByte)
+            if (!(limit < v_x_34_4))             {
+                return f_List_filterTR_loop___at___00countAbove_spec__0(limit, tail_30_3, p_2)
+            } else             {
+                return f_List_filterTR_loop___at___00countAbove_spec__0(limit, tail_30_3, arrayOf<Any?>(1, head_29_2, p_2))
+            }
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_filterTR_loop___at___00countAbove_spec__0___boxed(limit: Any?, p_1: Any?, p_2: Any?): Any? {
+    val limit_boxed_45_1 = (limit as UByte)
+    return f_List_filterTR_loop___at___00countAbove_spec__0(limit_boxed_45_1, p_1, p_2)
+}
+
+@PublishedApi internal tailrec fun f_List_filterTR_loop___at___00countAbove_spec__1(scale: Double, p_1: Any?, p_2: Any?): Any? {
+    when (((p_1 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_2)
+        }
+        1 ->         {
+            val head_51_2 = (p_1 as Array<*>)[1]
+            val tail_52_3 = (p_1 as Array<*>)[2]
+            val v_x_56_4 = (head_51_2 as Double)
+            if (!(scale < v_x_56_4))             {
+                return f_List_filterTR_loop___at___00countAbove_spec__1(scale, tail_52_3, p_2)
+            } else             {
+                return f_List_filterTR_loop___at___00countAbove_spec__1(scale, tail_52_3, arrayOf<Any?>(1, head_51_2, p_2))
+            }
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_List_filterTR_loop___at___00countAbove_spec__1___boxed(scale: Any?, p_1: Any?, p_2: Any?): Any? {
+    val scale_boxed_67_1 = (scale as Double)
+    return f_List_filterTR_loop___at___00countAbove_spec__1(scale_boxed_67_1, p_1, p_2)
+}
+
+@PublishedApi internal fun f_countAbove(bs: ByteArray, fs: DoubleArray, limit: UByte, scale: Double): UInt {
+    val v_x_73_1 = f_ByteArray_toList(bs)
+    val v_x_74_2 = arrayOf<Any?>(0)
+    val v_x_75_3 = f_List_filterTR_loop___at___00countAbove_spec__0(limit, v_x_73_1, v_x_74_2)
+    val v_x_76_4 = f_List_lengthTR___redArg(v_x_75_3)
+    val v_x_77_5 = (v_x_76_4).toInt().toUInt()
+    val v_x_78_6 = f_FloatArray_toList(fs)
+    val v_x_79_7 = f_List_filterTR_loop___at___00countAbove_spec__1(scale, v_x_78_6, v_x_74_2)
+    val v_x_80_8 = f_List_lengthTR___redArg(v_x_79_7)
+    return (v_x_77_5 + (v_x_80_8).toInt().toUInt())
+}
+
+@PublishedApi internal fun f_countAbove___boxed(bs: Any?, fs: Any?, limit: Any?, scale: Any?): Any? {
+    val limit_boxed_87_1 = (limit as UByte)
+    val scale_boxed_88_2 = (scale as Double)
+    val res_89_3 = f_countAbove((bs as ByteArray), (fs as DoubleArray), limit_boxed_87_1, scale_boxed_88_2)
+    return res_89_3
+}
+
+private fun f_List_lengthTR___redArg(p_0: Any?): java.math.BigInteger {
+    return f_List_lengthTRAux___redArg(p_0, java.math.BigInteger.ZERO)
+}
+
+private tailrec fun f_List_lengthTRAux___redArg(p_0: Any?, p_1: java.math.BigInteger): java.math.BigInteger {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_lengthTRAux___redArg((p_0 as Array<*>)[2], (p_1.add(java.math.BigInteger.ONE)))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+private fun f_FloatArray_toList(ds: DoubleArray): Any? {
+    return f___private_Init_Data_FloatArray_Basic_0__FloatArray_toList_loop(ds, java.math.BigInteger.ZERO, arrayOf<Any?>(0))
+}
+
+private tailrec fun f___private_Init_Data_FloatArray_Basic_0__FloatArray_toList_loop(ds: DoubleArray, i: java.math.BigInteger, r: Any?): Any? {
+    if (!(i < java.math.BigInteger.valueOf((ds).size.toLong())))     {
+        return f_List_reverse___redArg(r)
+    } else     {
+        return f___private_Init_Data_FloatArray_Basic_0__FloatArray_toList_loop(ds, (i.add(java.math.BigInteger.ONE)), arrayOf<Any?>(1, (ds)[(i).toInt()], r))
+    }
+}
+
+private fun f_List_reverse___redArg(p_0: Any?): Any? {
+    return f_List_reverseAux___redArg(p_0, arrayOf<Any?>(0))
+}
+
+private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_reverseAux___redArg((p_0 as Array<*>)[2], arrayOf<Any?>(1, (p_0 as Array<*>)[1], p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+private fun f_ByteArray_toList(bs: ByteArray): Any? {
+    return f_ByteArray_toList_loop(bs, java.math.BigInteger.ZERO, arrayOf<Any?>(0))
+}
+
+private tailrec fun f_ByteArray_toList_loop(bs: ByteArray, i: java.math.BigInteger, r: Any?): Any? {
+    if (!(i < java.math.BigInteger.valueOf((bs).size.toLong())))     {
+        return f_List_reverse___redArg(r)
+    } else     {
+        return f_ByteArray_toList_loop(bs, (i.add(java.math.BigInteger.ONE)), arrayOf<Any?>(1, ((bs)[(i).toInt()]).toUByte(), r))
+    }
+}
+
