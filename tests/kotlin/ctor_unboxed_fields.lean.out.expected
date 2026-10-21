@@ -1,0 +1,275 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+sealed class Frame {
+    class Node(val id: UInt, val x: Long, val fuel: UInt) : Frame()
+    class Leaf(val bits: ULong, val x: Long) : Frame()
+}
+
+@PublishedApi internal fun f_Frame_ctorIdx(x: Any?): java.math.BigInteger {
+    when (x)     {
+        is Frame.Node ->         {
+            return java.math.BigInteger.ZERO
+        }
+        is Frame.Leaf ->         {
+            return java.math.BigInteger.ONE
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Frame_ctorIdx___boxed(x: Any?): Any? {
+    return f_Frame_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_Frame_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (t)     {
+        is Frame.Node ->         {
+            val id_8_2 = t.id
+            val x_9_3 = t.x
+            val fuel_10_4 = t.fuel
+            return (k as (Any?, Any?, Any?) -> Any?)(id_8_2, x_9_3, fuel_10_4)
+        }
+        is Frame.Leaf ->         {
+            val bits_15_5 = t.bits
+            val x_16_6 = t.x
+            return (k as (Any?, Any?) -> Any?)(bits_15_5, x_16_6)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Frame_ctorElim___redArg___boxed(t: Any?, k: Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Frame_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Frame_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Frame_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
+}
+
+@PublishedApi internal fun f_Frame_node_elim___redArg(t: Any?, node: (UInt, Long, UInt) -> Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, node)
+}
+
+@PublishedApi internal fun f_Frame_node_elim___redArg___boxed(t: Any?, node: Any?): Any? {
+    return f_Frame_node_elim___redArg(t, (node as (UInt, Long, UInt) -> Any?))
+}
+
+@PublishedApi internal fun f_Frame_node_elim(motive: Any?, t: Any?, h: Any?, node: (UInt, Long, UInt) -> Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, node)
+}
+
+@PublishedApi internal fun f_Frame_node_elim___boxed(motive: Any?, t: Any?, h: Any?, node: Any?): Any? {
+    return f_Frame_node_elim(motive, t, h, (node as (UInt, Long, UInt) -> Any?))
+}
+
+@PublishedApi internal fun f_Frame_leaf_elim___redArg(t: Any?, leaf: (ULong, Long) -> Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, leaf)
+}
+
+@PublishedApi internal fun f_Frame_leaf_elim___redArg___boxed(t: Any?, leaf: Any?): Any? {
+    return f_Frame_leaf_elim___redArg(t, (leaf as (ULong, Long) -> Any?))
+}
+
+@PublishedApi internal fun f_Frame_leaf_elim(motive: Any?, t: Any?, h: Any?, leaf: (ULong, Long) -> Any?): Any? {
+    return f_Frame_ctorElim___redArg(t, leaf)
+}
+
+@PublishedApi internal fun f_Frame_leaf_elim___boxed(motive: Any?, t: Any?, h: Any?, leaf: Any?): Any? {
+    return f_Frame_leaf_elim(motive, t, h, (leaf as (ULong, Long) -> Any?))
+}
+
+@PublishedApi internal fun f_frameChildren___boxed__const__1(): Any? {
+    return 0uL
+}
+
+@PublishedApi internal fun f_frameChildren___boxed__const__2(): Any? {
+    return 0u
+}
+
+@PublishedApi internal fun f_frameChildren(ids: Any?, bits: Any?, x: Long, half: Long, fuel: UInt): Any? {
+    val v_x_78_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
+    val v_x_81_2 = (fuel - 1u)
+    val v_x_83_3 = (v_x_78_1 as UInt)
+    val v_x_82_4 = Frame.Node(v_x_83_3, x, v_x_81_2)
+    val v_x_85_5 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
+    val v_x_86_6 = (x + half)
+    val v_x_88_7 = (v_x_85_5 as UInt)
+    val v_x_87_8 = Frame.Node(v_x_88_7, v_x_86_6, v_x_81_2)
+    val v_x_90_9 = f_List_getD___redArg(bits, java.math.BigInteger.ZERO, 0uL)
+    val v_x_92_10 = (v_x_90_9 as ULong)
+    return arrayOf<Any?>(1, v_x_82_4, arrayOf<Any?>(1, v_x_87_8, arrayOf<Any?>(1, Frame.Leaf(v_x_92_10, v_x_86_6), arrayOf<Any?>(0))))
+}
+
+@PublishedApi internal fun f_frameChildren___boxed(ids: Any?, bits: Any?, x: Any?, half: Any?, fuel: Any?): Any? {
+    val x_boxed_102_1 = (x as Long)
+    val half_boxed_103_2 = (half as Long)
+    val fuel_boxed_104_3 = (fuel as UInt)
+    return f_frameChildren(ids, bits, x_boxed_102_1, half_boxed_103_2, fuel_boxed_104_3)
+}
+
+@PublishedApi internal fun f_Cell_ctorIdx(x: Any?): java.math.BigInteger {
+    when (((x as Array<*>)[0] as Int))     {
+        0 ->         {
+            return java.math.BigInteger.ZERO
+        }
+        1 ->         {
+            return java.math.BigInteger.ONE
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Cell_ctorIdx___boxed(x: Any?): Any? {
+    return f_Cell_ctorIdx(x)
+}
+
+@PublishedApi internal fun f_Cell_ctorElim___redArg(t: Any?, k: Any?): Any? {
+    when (((t as Array<*>)[0] as Int))     {
+        0 ->         {
+            val id_113_2 = ((t as Array<*>)[9] as UInt)
+            val x_114_3 = ((t as Array<*>)[1] as Long)
+            return (k as (Any?, Any?) -> Any?)(id_113_2, x_114_3)
+        }
+        1 ->         {
+            return k
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_Cell_ctorElim___redArg___boxed(t: Any?, k: Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Cell_ctorElim(motive: Any?, ctorIdx: java.math.BigInteger, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, k)
+}
+
+@PublishedApi internal fun f_Cell_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
+    return f_Cell_ctorElim(motive, (ctorIdx as java.math.BigInteger), t, h, k)
+}
+
+@PublishedApi internal fun f_Cell_live_elim___redArg(t: Any?, live: (UInt, Long) -> Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, live)
+}
+
+@PublishedApi internal fun f_Cell_live_elim___redArg___boxed(t: Any?, live: Any?): Any? {
+    return f_Cell_live_elim___redArg(t, (live as (UInt, Long) -> Any?))
+}
+
+@PublishedApi internal fun f_Cell_live_elim(motive: Any?, t: Any?, h: Any?, live: (UInt, Long) -> Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, live)
+}
+
+@PublishedApi internal fun f_Cell_live_elim___boxed(motive: Any?, t: Any?, h: Any?, live: Any?): Any? {
+    return f_Cell_live_elim(motive, t, h, (live as (UInt, Long) -> Any?))
+}
+
+@PublishedApi internal fun f_Cell_dead_elim___redArg(t: Any?, dead: Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, dead)
+}
+
+@PublishedApi internal fun f_Cell_dead_elim___redArg___boxed(t: Any?, dead: Any?): Any? {
+    return f_Cell_dead_elim___redArg(t, dead)
+}
+
+@PublishedApi internal fun f_Cell_dead_elim(motive: Any?, t: Any?, h: Any?, dead: Any?): Any? {
+    return f_Cell_ctorElim___redArg(t, dead)
+}
+
+@PublishedApi internal fun f_Cell_dead_elim___boxed(motive: Any?, t: Any?, h: Any?, dead: Any?): Any? {
+    return f_Cell_dead_elim(motive, t, h, dead)
+}
+
+@PublishedApi internal fun f_cellChildren___closed__0(): Any? {
+    return arrayOf<Any?>(1, arrayOf<Any?>(1), arrayOf<Any?>(0))
+}
+
+@PublishedApi internal fun f_cellChildren(ids: Any?, x: Long, half: Long): Any? {
+    val v_x_173_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
+    val v_x_175_2 = (v_x_173_1 as UInt)
+    val v_x_174_3 = arrayOf<Any?>(0, x, null, null, null, null, null, null, null, v_x_175_2)
+    val v_x_178_4 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
+    val v_x_181_5 = (v_x_178_4 as UInt)
+    val v_x_180_6 = arrayOf<Any?>(0, (x + half), null, null, null, null, null, null, null, v_x_181_5)
+    val v_x_182_7 = f_cellChildren___closed__0()
+    return arrayOf<Any?>(1, v_x_174_3, arrayOf<Any?>(1, v_x_180_6, v_x_182_7))
+}
+
+@PublishedApi internal fun f_cellChildren___boxed(ids: Any?, x: Any?, half: Any?): Any? {
+    val x_boxed_188_1 = (x as Long)
+    val half_boxed_189_2 = (half as Long)
+    return f_cellChildren(ids, x_boxed_188_1, half_boxed_189_2)
+}
+
+@PublishedApi internal fun f_cellId(p_0: Any?): UInt {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return ((p_0 as Array<*>)[9] as UInt)
+        }
+        1 ->         {
+            return 0u
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_cellId___boxed(p_0: Any?): Any? {
+    val res_195_1 = f_cellId(p_0)
+    return res_195_1
+}
+
+@PublishedApi internal fun f_cellX(p_0: Any?): Long {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return ((p_0 as Array<*>)[1] as Long)
+        }
+        1 ->         {
+            return (-1L)
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_cellX___boxed(p_0: Any?): Any? {
+    val res_201_1 = f_cellX(p_0)
+    return res_201_1
+}
+
+private fun f_List_getD___redArg(p_0: Any?, i: java.math.BigInteger, fallback: Any?): Any? {
+    val v_x_206_1 = f_List_get_x3fInternal___redArg(p_0, i)
+    when (((v_x_206_1 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return fallback
+        }
+        1 ->         {
+            return (v_x_206_1 as Array<*>)[1]
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+private tailrec fun f_List_get_x3fInternal___redArg(p_0: Any?, p_1: java.math.BigInteger): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        1 ->         {
+            val head_210_2 = (p_0 as Array<*>)[1]
+            val tail_211_3 = (p_0 as Array<*>)[2]
+            if ((p_1 == java.math.BigInteger.ZERO))             {
+                val v_x_214_4 = arrayOf<Any?>(1, head_210_2)
+                return v_x_214_4
+            } else             {
+                return f_List_get_x3fInternal___redArg(tail_211_3, (p_1.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO)))
+            }
+        }
+        else ->         {
+            val v_x_218_5 = arrayOf<Any?>(0)
+            return v_x_218_5
+        }
+    }
+}
+

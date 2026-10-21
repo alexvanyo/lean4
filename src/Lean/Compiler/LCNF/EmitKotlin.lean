@@ -5215,6 +5215,83 @@ partial def sinkMutableClassProjs (code : Code .impure) : EmitM (Code .impure) :
   | .setTag x cidx k u => return .setTag x cidx (← sinkMutableClassProjs k) u
   | .return .. | .unreach .. | .jmp .. => return code
 
+/--
+Whether the value of a `let` can move above a constructor allocation it does not use: it has no
+effect and reads no `@[mutable_kotlin_class]` value, whose fields in-place updates change.
+-/
+def isMovableAboveCtor (v : LetValue .impure) : EmitM Bool := do
+  match v with
+  | .lit .. | .erased | .box .. | .unbox .. => return true
+  | .oproj _ y | .sproj _ _ y | .uproj _ y => return !(← isMutableClassFVar y)
+  | _ => return false
+
+/--
+Splits `k`, the continuation of `let x := ctor ...`, into the movable `let`s that come before a
+field write to `x` (in order) and `k` without them. The flag tells whether `k` writes to `x`.
+-/
+partial def splitCtorInit (x : FVarId) (k : Code .impure) :
+    EmitM (List (LetDecl .impure) × Code .impure × Bool) := do
+  let usesX (v : LetValue .impure) : Bool :=
+    ((v.forFVarM (m := StateM Bool) (fun f => if f == x then set true else pure ())).run false).2
+  match k with
+  | .let d k' =>
+    if (← isMovableAboveCtor d.value) && !usesX d.value then
+      let (hs, rest, found) ← splitCtorInit x k'
+      if found then return (d :: hs, rest, true)
+    return ([], k, false)
+  | .sset y i off z ty k' u =>
+    if y != x then return ([], k, false)
+    let (hs, rest, _) ← splitCtorInit x k'
+    return (hs, .sset y i off z ty rest u, true)
+  | .uset y i z k' u =>
+    if y != x then return ([], k, false)
+    let (hs, rest, _) ← splitCtorInit x k'
+    return (hs, .uset y i z rest u, true)
+  | .oset y i a k' u =>
+    if y != x then return ([], k, false)
+    let (hs, rest, _) ← splitCtorInit x k'
+    return (hs, .oset y i a rest u, true)
+  | .inc y n c p k' u =>
+    let (hs, rest, found) ← splitCtorInit x k'
+    return (hs, .inc y n c p rest u, found)
+  | .dec y n c p o k' u =>
+    let (hs, rest, found) ← splitCtorInit x k'
+    return (hs, .dec y n c p o rest u, found)
+  | _ => return ([], k, false)
+
+/--
+Moves the `let`s that the IR places between a constructor allocation and the field writes that
+initialize it (such as the `unbox` of an array element stored in a scalar field) above the
+allocation, so that `collectCtorFieldSets` sees every write.
+-/
+partial def hoistCtorFieldInits (code : Code .impure) : EmitM (Code .impure) := do
+  match code with
+  | .let decl k =>
+    let k ← hoistCtorFieldInits k
+    match decl.value with
+    | .ctor .. =>
+      let (hs, rest, _) ← splitCtorInit decl.fvarId k
+      return hs.foldr (fun d c => .let d c) (.let decl rest)
+    | _ => return .let decl k
+  | .jp d k =>
+    let val' ← hoistCtorFieldInits d.value
+    return .jp (.mk d.fvarId d.binderName d.params d.type val') (← hoistCtorFieldInits k)
+  | .fun d k u =>
+    let val' ← hoistCtorFieldInits d.value
+    return .fun (.mk d.fvarId d.binderName d.params d.type val') (← hoistCtorFieldInits k) u
+  | .cases cs =>
+    let alts' ← cs.alts.mapM fun alt => do
+      return alt.updateCode (← hoistCtorFieldInits alt.getCode)
+    return .cases (cs.updateAlts alts')
+  | .inc x n c p k u => return .inc x n c p (← hoistCtorFieldInits k) u
+  | .dec x n c p o k u => return .dec x n c p o (← hoistCtorFieldInits k) u
+  | .del x k u => return .del x (← hoistCtorFieldInits k) u
+  | .oset x i y k u => return .oset x i y (← hoistCtorFieldInits k) u
+  | .sset x i off y ty k u => return .sset x i off y ty (← hoistCtorFieldInits k) u
+  | .uset x i y k u => return .uset x i y (← hoistCtorFieldInits k) u
+  | .setTag x cidx k u => return .setTag x cidx (← hoistCtorFieldInits k) u
+  | .return .. | .unreach .. | .jmp .. => return code
+
 partial def collectMonoVarTypes (code : Code .pure) (m : Std.HashMap String Expr := {}) : Std.HashMap String Expr :=
   match code with
   | .let decl k =>
@@ -5251,6 +5328,7 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let .code code := decl.value | return ()
   let code ← simplifyResetReuse code
   let code ← sinkMutableClassProjs code
+  let code ← hoistCtorFieldInits code
   markUsed code
   let fnAliases ← collectAliases decl.params code
   modify fun st => { st with aliases := fnAliases }
