@@ -1709,15 +1709,21 @@ def getDeclTypeParams (env : Environment) (declName : Name) : MetaM (Array (Name
         idx := idx + 1
     return typeParams
 
-def getDeclNumTypeParams (env : Environment) (declName : Name) : MetaM Nat := do
-  let some info := env.find? declName | return 0
-  Meta.forallTelescopeReducing info.type fun xs _ => do
-    let mut count := 0
-    for x in xs do
-      let type ← Meta.inferType x
-      if type.isSort then count := count + 1
-      else break
-    return count
+/--
+For each parameter of the Lean type of `declName`, whether it is a type parameter (its type is a sort), wherever it
+appears: leading, or after runtime parameters as in `def C.f (c : C) {β : Type} ...`. Kotlin passes no argument for
+a type parameter.
+-/
+def getDeclTypeParamMask (env : Environment) (declName : Name) : MetaM (Array Bool) := do
+  let some info := env.find? declName | return #[]
+  Meta.forallTelescopeReducing info.type fun xs _ => xs.mapM fun x => return (← Meta.inferType x).isSort
+
+/-- The positions below `n` that are not type parameters under `mask` (see `getDeclTypeParamMask`). -/
+def runtimeIndices (mask : Array Bool) (n : Nat) : Array Nat := Id.run do
+  let mut r := #[]
+  for i in [:n] do
+    unless mask[i]?.getD false do r := r.push i
+  return r
 
 def isCompilerAuxDecl (env : Environment) (n : Name) : Bool :=
   isAuxRecursor env n || isNoConfusion env n || isRecCore env n ||
@@ -2061,6 +2067,22 @@ def isUnitShape : Ownership.RetShape → Bool
   | s@(.prod _) => (keptComps s).isEmpty
   | _ => false
 
+/--
+Kotlin type of component `c` of the `Prod` result type of `declName`, naming the declaration's type parameters as
+`emitFnDecl` does (`B` for `β`), for components that mention them.
+-/
+def genericResultComponentKotlinType? (env : Environment) (declName : Name) (c : Nat) : CoreM (Option String) :=
+  let baseName := match declName with | .str p "_redArg" => p | _ => declName
+  Meta.MetaM.run' do
+    let some info := (env.find? declName).orElse (fun _ => env.find? baseName) | return none
+    let typeParams ← getDeclTypeParams env baseName
+    let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
+    Meta.forallTelescopeReducing info.type fun _ retType => do
+      let retType := (← Meta.whnf retType).consumeMData
+      unless retType.isAppOfArity ``Prod 2 do return none
+      let t ← formatGenericKotlinType env typeParamMap retType.getAppArgs[c]!
+      return if t == "Any?" then none else some t
+
 /-- Kotlin type of component `c` of a `Prod` type (without loose bound variables). -/
 def prodComponentKotlinType? (type : Expr) (c : Nat) : EmitM (Option String) := do
   let type := type.consumeMData
@@ -2224,8 +2246,8 @@ def memberKotlinName (declName : Name) (info : Compiler.KotlinMemberInfo) : Stri
 def emitMemberCall? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   let some info := Compiler.getKotlinMemberInfo? (← getEnv) fn | return none
   if args.isEmpty then return none
-  let numTypeParams ← (Meta.MetaM.run' (getDeclNumTypeParams (← getEnv) fn) : CoreM Nat)
-  let runtimeArgs := args.extract numTypeParams args.size
+  let typeParamMask ← (Meta.MetaM.run' (getDeclTypeParamMask (← getEnv) fn) : CoreM (Array Bool))
+  let runtimeArgs := (runtimeIndices typeParamMask args.size).map (args[·]!)
   if runtimeArgs.isEmpty then return none
   let recv ← toKotlinArg runtimeArgs[0]!
   let tyOverrides := (Compiler.getKotlinTypes? (← getEnv) fn).getD #[]
@@ -2341,10 +2363,11 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     let fnName := toKotlinFnName fn
     let monoDecl? ← getMonoDecl? fn
     let isAux := isCompilerAuxDecl (← getEnv) fn
-    let numTypeParams ← (Meta.MetaM.run' do
-      if isAux then return 0
-      getDeclNumTypeParams (← getEnv) fn : CoreM Nat)
-    let runtimeArgs := args.extract numTypeParams args.size
+    let typeParamMask ← (Meta.MetaM.run' do
+      if isAux then return #[]
+      getDeclTypeParamMask (← getEnv) fn : CoreM (Array Bool))
+    let runtimeIdxs := runtimeIndices typeParamMask args.size
+    let runtimeArgs := runtimeIdxs.map (args[·]!)
     let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[fn]? with
       | some d => pure (some d.params)
       | none => (·.map (·.params)) <$> getImpureSignature? fn
@@ -2356,7 +2379,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       return (← getDeclTypeParams (← getEnv) baseFn).map (·.2) : CoreM (Array String))
     let mut argStrs : Array String := #[]
     for i in [:runtimeArgs.size] do
-      let fullIdx := numTypeParams + i
+      let fullIdx := runtimeIdxs[i]!
       let aStr ← toKotlinArg runtimeArgs[i]!
       let expectedTy? := match impureParams?.bind (·[fullIdx]?) with
         | some p =>
@@ -2410,10 +2433,9 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
   | .pap fn args =>
     let targetFn ← unboxedPapFn fn
     let isAux := isCompilerAuxDecl (← getEnv) targetFn
-    let numTypeParams ← (Meta.MetaM.run' do
-      if isAux then return 0
-      getDeclNumTypeParams (← getEnv) targetFn : CoreM Nat)
-    let runtimeArgs := args.extract numTypeParams args.size
+    let typeParamMask ← (Meta.MetaM.run' do
+      if isAux then return #[]
+      getDeclTypeParamMask (← getEnv) targetFn : CoreM (Array Bool))
     let monoDecl? ← getMonoDecl? targetFn
     let impureParams? : Option (Array (Param .impure)) ← match (← read).declMap[targetFn]? with
       | some d => pure (some d.params)
@@ -2421,9 +2443,13 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     let numParams := match impureParams? with
       | some ps => ps.size
       | none => (monoDecl?.map (·.params.size)).getD args.size
-    let runtimeNumParams := numParams - numTypeParams
-    let paramTy (i : Nat) : String :=
-      let fullIdx := numTypeParams + i
+    -- Runtime parameters by position: those the partial application supplies, then those the lambda takes.
+    let mut suppliedIdxs : Array Nat := #[]
+    let mut missingIdxs : Array Nat := #[]
+    for i in runtimeIndices typeParamMask (max numParams args.size) do
+      if i < args.size then suppliedIdxs := suppliedIdxs.push i else missingIdxs := missingIdxs.push i
+    let runtimeArgs := suppliedIdxs.map (args[·]!)
+    let paramTy (fullIdx : Nat) : String :=
       let impTy := match impureParams?.bind (·[fullIdx]?) with
         | some p => toKotlinType p.type
         | none => "Any?"
@@ -2435,19 +2461,19 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     let mut fullArgs : Array (Arg .impure) := runtimeArgs
     for i in [:runtimeArgs.size] do
       let aStr ← toKotlinArg runtimeArgs[i]!
-      let aStr ← castIfNeeded aStr (paramTy i)
+      let aStr ← castIfNeeded aStr (paramTy suppliedIdxs[i]!)
       callArgs := callArgs.push aStr
     let inScope ← (← read).currParams.mapM fun p => getVarName p.fvarId
     let mut lambdaParams : Array String := #[]
-    for i in [runtimeArgs.size:runtimeNumParams] do
-      let idx := i - runtimeArgs.size
+    for idx in [:missingIdxs.size] do
+      let fullIdx := missingIdxs[idx]!
       let mut pName := s!"p_{idx}"
       if inScope.contains pName then
         pName := s!"arg_{idx}"
-      let pTy := paramTy i
+      let pTy := paramTy fullIdx
       lambdaParams := lambdaParams.push s!"{pName}: {pTy}"
       callArgs := callArgs.push pName
-      let dummyFv : FVarId := { name := .num `_pap_param i }
+      let dummyFv : FVarId := { name := .num `_pap_param fullIdx }
       setParamVarName dummyFv pName
       recordVarType pName pTy
       fullArgs := fullArgs.push (.fvar dummyFv)
@@ -2455,7 +2481,7 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       | some primExpr => pure primExpr
       | none =>
         let fnName :=
-          if numTypeParams > 0 then s!"{toKotlinFnName targetFn}___redArg"
+          if typeParamMask.any id then s!"{toKotlinFnName targetFn}___redArg"
           else toKotlinFnName targetFn
         pure s!"{fnName}({String.intercalate ", " callArgs.toList})"
     let paramStr := String.intercalate ", " lambdaParams.toList
@@ -5370,10 +5396,11 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | some t => if t == "_" then none else some t
     | none => none
   let isAux := isCompilerAuxDecl env decl.name
-  let numFnTypeParams ← (Meta.MetaM.run' do
-    if isAux then return 0
-    getDeclNumTypeParams env decl.name : CoreM Nat)
-  let runtimeParams := params.extract numFnTypeParams params.size
+  let typeParamMask ← (Meta.MetaM.run' do
+    if isAux then return #[]
+    getDeclTypeParamMask env decl.name : CoreM (Array Bool))
+  let runtimeIdxs := runtimeIndices typeParamMask params.size
+  let runtimeParams := runtimeIdxs.map (params[·]!)
   let numEmitted := if member?.isSome then runtimeParams.size - 1 else runtimeParams.size
   let retCast? := override? numEmitted
   -- A Lean result type of `Unit` becomes a Kotlin `Unit` return type.
@@ -5395,6 +5422,14 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
           let t? ← match env.find? decl.name with
             | some ci => prodComponentKotlinType? (resultType ci.type) c
             | none => pure none
+          -- A component that mentions a type parameter has loose bound variables after `resultType`: name the
+          -- type parameter if this declaration declares it, and otherwise (compiler auxiliary declarations such as
+          -- `_redArg`, which declare none) return `Any?`. The tuple type of the full result would be wrong.
+          let t? ← match t? with
+            | some t => pure (some t)
+            | none =>
+              if isAux then pure (some "Any?")
+              else pure ((← genericResultComponentKotlinType? env decl.name c).getD "Any?")
           pure (false, t?)
     | none => pure (retUnit, retCast?)
   let baseDeclName := match decl.name with
@@ -5444,11 +5479,12 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
   let mut seenParamNames : Std.HashSet String := {}
-  for i in [:numFnTypeParams] do
-    setParamVarName params[i]!.fvarId ""
+  for i in [:params.size] do
+    if typeParamMask[i]?.getD false then
+      setParamVarName params[i]!.fvarId ""
   for i in [:runtimeParams.size] do
     let p := runtimeParams[i]!
-    let fullIdx := numFnTypeParams + i
+    let fullIdx := runtimeIdxs[i]!
     if i == 0 && member?.isSome then
       setParamVarName p.fvarId "this"
       if let some info := member? then
@@ -5817,7 +5853,14 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
   let isMember (n : Name) := (Compiler.getKotlinMemberInfo? env n).isSome
   let isExternal (n : Name) : Bool :=
     isMember n || isExport env n || papTargets.contains n
-  let ownership ← (Ownership.analyze allDecls isMember isExternal).run (phase := .impure)
+  -- The receiver of a member is its first runtime parameter, after any type parameters.
+  let memberReceivers ← allDecls.foldlM (init := ({} : Std.HashMap Name Nat)) fun m d => do
+    if !isMember d.name then return m
+    let mask ← (Meta.MetaM.run' (getDeclTypeParamMask env d.name) : CoreM (Array Bool))
+    match (runtimeIndices mask d.params.size)[0]? with
+    | some j => return m.insert d.name j
+    | none => return m
+  let ownership ← (Ownership.analyze allDecls (memberReceivers[·]?) isExternal).run (phase := .impure)
   unless ownership.errors.isEmpty do
     throwError (MessageData.joinSep ownership.errors.toList "\n")
   let ctx : Context := { modName, localDecls := allDecls, otherModuleDecls, declMap,
