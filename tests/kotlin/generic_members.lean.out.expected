@@ -1,0 +1,158 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+class GenericCounter(var count: UInt, var total: ULong) {
+    /**
+     * The type parameter before the receiver.
+     */
+    @OptIn(kotlin.contracts.ExperimentalContracts::class)
+    public inline fun <B> bumpBefore(n: UInt, k: (UInt, UInt) -> B): B {
+            kotlin.contracts.contract {
+                    callsInPlace(k, kotlin.contracts.InvocationKind.EXACTLY_ONCE)
+            }
+        val count_42_1 = count
+        val v_x_47_2 = (count_42_1 + n)
+        val total_43_3 = total
+        count = v_x_47_2
+        total = (total_43_3 + (n).toULong())
+        val v_x_54_4 = k(count_42_1, v_x_47_2)
+        return v_x_54_4
+    }
+
+    /**
+     * The type parameter after the receiver.
+     */
+    @OptIn(kotlin.contracts.ExperimentalContracts::class)
+    public inline fun <B> bumpAfter(n: UInt, k: (UInt, UInt) -> B): B {
+            kotlin.contracts.contract {
+                    callsInPlace(k, kotlin.contracts.InvocationKind.EXACTLY_ONCE)
+            }
+        val count_81_1 = count
+        val v_x_86_2 = (count_81_1 + n)
+        val total_82_3 = total
+        count = v_x_86_2
+        total = (total_82_3 + (n).toULong())
+        val v_x_93_4 = k(count_81_1, v_x_86_2)
+        return v_x_93_4
+    }
+}
+
+@PublishedApi internal inline fun f_GenericCounter_bump(c: GenericCounter, n: UInt): Pair<UInt, UInt> {
+    val count_3_1 = c.count
+    val v_x_8_2 = (count_3_1 + n)
+    val total_4_3 = c.total
+    c.count = v_x_8_2
+    c.total = (total_4_3 + (n).toULong())
+    return Pair(count_3_1, v_x_8_2)
+}
+
+@PublishedApi internal fun f_GenericCounter_bumpBefore___redArg(c: GenericCounter, n: UInt, k: (UInt, UInt) -> Any?): Any? {
+    val count_22_1 = c.count
+    val v_x_27_2 = (count_22_1 + n)
+    val total_23_3 = c.total
+    c.count = v_x_27_2
+    c.total = (total_23_3 + (n).toULong())
+    val v_x_34_4 = k(count_22_1, v_x_27_2)
+    return v_x_34_4
+}
+
+@PublishedApi internal fun f_GenericCounter_bumpAfter___redArg(c: GenericCounter, n: UInt, k: (UInt, UInt) -> Any?): Any? {
+    val count_61_1 = c.count
+    val v_x_66_2 = (count_61_1 + n)
+    val total_62_3 = c.total
+    c.count = v_x_66_2
+    c.total = (total_62_3 + (n).toULong())
+    val v_x_73_4 = k(count_61_1, v_x_66_2)
+    return v_x_73_4
+}
+
+@PublishedApi internal fun f_applyAfter___redArg(n: UInt, f: (UInt) -> Any?): Any? {
+    val v_x_100_1 = (n + 1u)
+    return f(v_x_100_1)
+}
+
+@PublishedApi internal fun f_applyAfter___redArg___boxed(n: Any?, f: Any?): Any? {
+    val n_boxed_105_1 = (n as UInt)
+    return f_applyAfter___redArg(n_boxed_105_1, (f as (UInt) -> Any?))
+}
+
+/**
+ * A type parameter after a runtime parameter of a top-level function.
+ */
+@PublishedApi internal fun <T> f_applyAfter(n: UInt, f: (UInt) -> T): T {
+    return (f_applyAfter___redArg(n, (f as (UInt) -> Any?)) as T)
+}
+
+@PublishedApi internal fun f_applyAfter___boxed(n: Any?, p_1: Any?, f: Any?): Any? {
+    val n_boxed_114_1 = (n as UInt)
+    return f_applyAfter(n_boxed_114_1, (f as (UInt) -> Any?))
+}
+
+@PublishedApi internal fun f_applyAfterTwice___lam__0(x: UInt): ULong {
+    return ((x).toULong() * 10uL)
+}
+
+@PublishedApi internal fun f_applyAfterTwice___lam__0___boxed(x: Any?): Any? {
+    val x_boxed_121_1 = (x as UInt)
+    val res_122_2 = f_applyAfterTwice___lam__0(x_boxed_121_1)
+    return res_122_2
+}
+
+@PublishedApi internal fun f_applyAfterTwice___closed__0(): (UInt) -> ULong {
+    return ({ p_0: UInt -> (p_0).toULong() } as (UInt) -> ULong)
+}
+
+@PublishedApi internal fun f_applyAfterTwice___closed__1(): (UInt) -> ULong {
+    return { p_0: UInt -> f_applyAfterTwice___lam__0(p_0) }
+}
+
+@PublishedApi internal fun f_applyAfterTwice(n: UInt): ULong {
+    val v_f_127_1 = f_applyAfterTwice___closed__0()
+    val v_f_128_2 = f_applyAfterTwice___closed__1()
+    val v_x_129_3 = f_applyAfter___redArg(n, (v_f_127_1 as (UInt) -> Any?))
+    val v_x_132_4 = f_applyAfter___redArg((n + 1u), (v_f_128_2 as (UInt) -> Any?))
+    val v_x_133_5 = (v_x_129_3 as ULong)
+    val v_x_134_6 = (v_x_132_4 as ULong)
+    return (v_x_133_5 + v_x_134_6)
+}
+
+@PublishedApi internal fun f_applyAfterTwice___boxed(n: Any?): Any? {
+    val n_boxed_137_1 = (n as UInt)
+    val res_138_2 = f_applyAfterTwice(n_boxed_137_1)
+    return res_138_2
+}
+
+@PublishedApi internal tailrec fun f_List_mapTR_loop___at___00applyAfterEach_spec__0(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return f_List_reverse___redArg(p_1)
+        }
+        1 ->         {
+            val tail_144_2 = (p_0 as Array<*>)[2]
+            val v_x_149_3 = f_applyAfter___redArg(3u, ((p_0 as Array<*>)[1] as (UInt) -> Any?))
+            return f_List_mapTR_loop___at___00applyAfterEach_spec__0(tail_144_2, arrayOf<Any?>(1, v_x_149_3, p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_applyAfterEach(fs: Any?): Any? {
+    return f_List_mapTR_loop___at___00applyAfterEach_spec__0(fs, arrayOf<Any?>(0))
+}
+
+private fun f_List_reverse___redArg(p_0: Any?): Any? {
+    return f_List_reverseAux___redArg(p_0, arrayOf<Any?>(0))
+}
+
+private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
+    when (((p_0 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return p_1
+        }
+        1 ->         {
+            return f_List_reverseAux___redArg((p_0 as Array<*>)[2], arrayOf<Any?>(1, (p_0 as Array<*>)[1], p_1))
+        }
+        else ->         { error("unreachable") }
+    }
+}
+

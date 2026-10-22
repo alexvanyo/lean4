@@ -888,9 +888,11 @@ structure Result where
 /--
 Computes ownership summaries for `decls` and checks all in-place updates. `external` returns
 `true` for declarations called from outside the analyzed code (Kotlin members, exports, closures),
-whose parameters cannot be required to be exclusive except for a Kotlin member receiver.
+whose parameters cannot be required to be exclusive except for a Kotlin member receiver. `memberReceiver` gives the
+index of the receiver among the parameters of a Kotlin member: its first runtime parameter, which follows any type
+parameters.
 -/
-def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExternal : Name → Bool) :
+def analyze (decls : Array (Decl .impure)) (memberReceiver : Name → Option Nat) (isExternal : Name → Bool) :
     CompilerM Result := do
   let env ← getEnv
   let mutableClasses := env.constants.fold (init := ({} : Std.HashSet String)) fun s n _ =>
@@ -931,9 +933,9 @@ def analyze (decls : Array (Decl .impure)) (isMember : Name → Bool) (isExterna
           let s := summaries[d.name]!
           for h : j in [:s.exclusive.size] do
             if s.exclusive[j] then
-              let receiver := j == 0 && isMember d.name
+              let receiver := memberReceiver d.name == some j
               if receiver then
-                unless s.ret.identities.any (·.2 == 0) do
+                unless s.ret.identities.any (·.2 == j) do
                   errors := errors.push m!"Kotlin backend: `{d.name}` updates its receiver in \
                     place, so it must return the receiver (e.g. as the last component of its result)"
               else if isExternal d.name then
