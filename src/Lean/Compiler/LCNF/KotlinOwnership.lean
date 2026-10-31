@@ -37,7 +37,7 @@ public section
 
 namespace Lean.Compiler.LCNF.Kotlin.Ownership
 
-public register_builtin_option compiler.kotlin.strictInplace : Bool := {
+register_builtin_option compiler.kotlin.strictInplace : Bool := {
   defValue := true
   descr := "require static verification of exclusive ownership for all in-place updates (Kotlin backend)"
 }

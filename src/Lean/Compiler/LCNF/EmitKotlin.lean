@@ -6,6 +6,7 @@ Authors: Lean FRO, LLC
 module
 
 prelude
+import Init.Data.String.Csimp
 public import Lean.Compiler.LCNF.CompilerM
 import Lean.Compiler.LCNF.EmitUtil
 import Lean.Compiler.NameMangling

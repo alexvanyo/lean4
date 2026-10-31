@@ -6,6 +6,7 @@ Authors: Lean FRO, LLC
 module
 
 prelude
+import Init.Data.String.Csimp
 public import Lean.Attributes
 public import Lean.Parser.Attr
 public import Lean.MonadEnv
