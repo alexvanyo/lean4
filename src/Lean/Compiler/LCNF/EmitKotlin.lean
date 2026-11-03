@@ -490,6 +490,9 @@ def resolveKnownBool (s : String) : EmitM String := do
   | some false => return "false"
   | none => return s
 
+def toKotlinFnName (n : Name) : String :=
+  n.mangle (pre := "f_")
+
 @[noinline] partial def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := none) : EmitM String := do
   if targetTy == "Any?" || targetTy == "_" || s == "null" then
     return s
@@ -498,6 +501,11 @@ def resolveKnownBool (s : String) : EmitM String := do
     | some t => if t == "Any?" then vt[s]? else some t
     | none => vt[s]?
   let sTrimAll := stripOuterParens s
+  let currFnName := toKotlinFnName (← read).currFn
+  if sTrimAll.startsWith s!"{currFnName}(" then
+    if let some retT := (← read).retCast? then
+      if retT == targetTy then
+        return s
   let isUncheckedArrayProj := sTrimAll.contains "as Array<*>)[" && sTrimAll.endsWith "]" && !sTrimAll.contains s!" as {targetTy}"
   if !isUncheckedArrayProj && (actualTy? == some targetTy || actualTy? == some "Nothing" || (actualTy?.map (s!"{·}?") == some targetTy)) then
     return s
@@ -622,9 +630,6 @@ def getVarName (fvarId : FVarId) : EmitM String := do
 
 def setParamVarName (fvarId : FVarId) (name : String) : EmitM Unit := do
   modify fun st => { st with varNames := st.varNames.insert fvarId name }
-
-def toKotlinFnName (n : Name) : String :=
-  n.mangle (pre := "f_")
 
 def toKotlinArg (arg : Arg .impure) : EmitM String := do
   match arg with
@@ -2122,6 +2127,10 @@ def unboxedPapFn (fn : Name) : EmitM Name := do
 
 /-- The Kotlin return type of declaration `fn`. -/
 def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
+  let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+  if baseFn == (← read).currFn || fn == (← read).currFn then
+    if let some t := (← read).retCast? then return t
+    if (← read).retUnit then return "Unit"
   let env ← getEnv
   let rec resultType : Expr → Expr
     | .forallE _ _ b _ => resultType b
@@ -3415,6 +3424,9 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
     return (← get).varTypes[← getVarName fvarId]?.getD baseTy
   | .fap fn args =>
     let baseFn := match fn with | .str p "_boxed" => p | _ => fn
+    if baseFn == (← read).currFn || fn == (← read).currFn then
+      if let some t := (← read).retCast? then return t
+      else if (← read).retUnit then return "Unit"
     let fnStr := baseFn.toString
     if baseFn == `panic || baseFn == `panic._redArg || baseFn == `panicCore || baseFn == `panicCore._redArg ||
        baseFn == `panicWithPos || baseFn == `panicWithPos._redArg ||
