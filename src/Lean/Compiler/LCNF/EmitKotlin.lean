@@ -279,6 +279,7 @@ def isAdtMonoType (e : Expr) : Bool :=
 
 /-- Parse `Pair<A, B>` into `(A, B)`. -/
 partial def parseKotlinPairType? (s : String) : Option (String × String) :=
+  let s := if s.endsWith "?" then (s.take (s.length - 1)).toString else s
   if !s.startsWith "Pair<" || !s.endsWith ">" then none
   else
     let inner := ((s.drop 5).take (s.length - 6)).toString
@@ -2504,15 +2505,16 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     else
       let xName ← getVarName x
       let xTy := (← get).varTypes[xName]?.getD "Any?"
-      if i == 0 && xTy.endsWith "?" && xTy != "Any?" && compiler.kotlin.nullableOption.get (← getOptions) then
+      let baseXTy := if xTy.endsWith "?" && xTy != "Any?" then (xTy.take (xTy.length - 1)).toString else xTy
+      let targetTy := toKotlinType decl.type
+      if (parseKotlinPairType? baseXTy).isSome then
+        let prop := if i == 0 then "first" else "second"
+        let recv := if xName.all (fun c => c.isAlphanum || c == '_') then xName else s!"({xName} as Pair<*, *>)"
+        let expr := if xTy.endsWith "?" then s!"{recv}!!.{prop}" else s!"{recv}.{prop}"
+        castIfNeeded expr targetTy
+      else if i == 0 && xTy.endsWith "?" && xTy != "Any?" && compiler.kotlin.nullableOption.get (← getOptions) then
         let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == xName && v
         if isVar then return s!"{xName}!!" else return xName
-      let targetTy := toKotlinType decl.type
-      if (parseKotlinPairType? xTy).isSome then
-        match i with
-        | 0 => return s!"{xName}.first"
-        | 1 => return s!"{xName}.second"
-        | _ => unsupportedProj x
       else if xTy == "Array<Any?>" then
         castIfNeeded s!"{xName}[{1 + i}]" targetTy
       else if (← get).adtVars.contains xName || i >= 2 then
@@ -5897,7 +5899,7 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       topBuf.contains "UByteArray" || topBuf.contains "UShortArray" || topBuf.contains "UIntArray" || topBuf.contains "ULongArray" ||
       memberBufs.values.any (fun s => s.contains "UByteArray" || s.contains "UShortArray" || s.contains "UIntArray" || s.contains "ULongArray")
     let optInUnsigned := if hasUnsignedArrays then "\n@file:OptIn(ExperimentalUnsignedTypes::class)" else ""
-    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\", \"NO_TAIL_CALLS_FOUND\", \"NON_TAIL_RECURSIVE_CALL\")" ++ optInUnsigned
+    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\", \"NO_TAIL_CALLS_FOUND\", \"NON_TAIL_RECURSIVE_CALL\", \"USELESS_IS_CHECK\", \"CAST_NEVER_SUCCEEDS\")" ++ optInUnsigned
     let localClassStructs :=
       (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
       (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
