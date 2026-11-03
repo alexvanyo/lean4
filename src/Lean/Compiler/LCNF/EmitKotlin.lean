@@ -950,8 +950,10 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `Nat.reprFast | `Nat.repr | ``USize.repr | `Int.repr =>
       return some s!"({a0}).toString()"
     -- Unary negation
-    | ``Int32.neg | ``Int64.neg | ``ISize.neg =>
-      return some s!"(-{a0})"
+    | ``Int32.neg | ``ISize.neg =>
+      return some s!"(-{← castIfNeeded a0 "Int"})"
+    | ``Int64.neg =>
+      return some s!"(-{← castIfNeeded a0 "Long"})"
     | `Int.neg =>
       return some s!"(-{← castIfNeeded a0 "Int"})"
     | `Int.negOfNat =>
@@ -2147,7 +2149,7 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
       let t := toKotlinType ret
       if t != "Any?" then return t
   if let some d := (← read).declMap[fn]? then
-    let t := toKotlinType d.type
+    let t := toKotlinType (resultType d.type)
     if t != "Any?" then return t
   if let some md ← getMonoDecl? fn then
     if let some r := monoResultType? md then
@@ -3594,7 +3596,10 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       | some d => d.type
       | none => decl.type
     let retTy ← fnRetKotlinType targetFn defRetTy
-    return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
+    if remParams.isEmpty then
+      return retTy
+    else
+      return s!"({String.intercalate ", " remParams.toList}) -> {retTy}"
   | .oproj i x =>
     if let some s ← classStructOf? x then
       let layout ← classLayout s
@@ -3624,7 +3629,7 @@ def inferLetKotlinType (decl : LetDecl .impure) : EmitM String := do
       if info.name == ``Option.some && args.size == 1 then
         let aName ← toKotlinArg args[0]!
         if let some aTy := (← get).varTypes[aName]? then
-          if aTy != "Any?" && !aTy.endsWith "?" then
+          if aTy != "Any?" && aTy != "Array<Any?>" && !aTy.endsWith "?" then
             return s!"{aTy}?"
     return baseTy
   | _ => return baseTy
@@ -5892,7 +5897,7 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       topBuf.contains "UByteArray" || topBuf.contains "UShortArray" || topBuf.contains "UIntArray" || topBuf.contains "ULongArray" ||
       memberBufs.values.any (fun s => s.contains "UByteArray" || s.contains "UShortArray" || s.contains "UIntArray" || s.contains "ULongArray")
     let optInUnsigned := if hasUnsignedArrays then "\n@file:OptIn(ExperimentalUnsignedTypes::class)" else ""
-    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\")" ++ optInUnsigned
+    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\", \"NO_TAIL_CALLS_FOUND\", \"NON_TAIL_RECURSIVE_CALL\")" ++ optInUnsigned
     let localClassStructs :=
       (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
       (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
