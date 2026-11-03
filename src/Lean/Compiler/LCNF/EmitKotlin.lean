@@ -1076,7 +1076,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().contentHashCode().toULong()"
     | `String.Slice.hash =>
       return some s!"(run \{ val sl = {a0} as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() })"
-    | `String.singleton => return some s!"Character.toString(({← castIfNeeded a0 "UInt"}).toInt())"
+    | `String.singleton =>
+      return some s!"(run \{ val cp = ({← castIfNeeded a0 "UInt"}).toInt(); if (cp < 0x10000) Char(cp).toString() else charArrayOf(Char(0xD800 or ((cp - 0x10000) ushr 10)), Char(0xDC00 or ((cp - 0x10000) and 0x3FF))).concatToString() })"
     | `String.ofList | `String.mk | `List.asString =>
       return some s!"buildString \{ var cur: Any? = {a0}; while (((cur as Array<*>)[0] as Int) == 1) \{ appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }"
     | `String.toList | `String.data =>
@@ -1327,7 +1328,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
 
     -- Binary String
     | `String.append | `String.Internal.append => return some s!"({← castIfNeeded a0 "String"} + {← castIfNeeded a1 "String"})"
-    | `String.push => return some s!"({← castIfNeeded a0 "String"} + Character.toString(({a1}).toInt()))"
+    | `String.push =>
+      return some s!"(run \{ val cp = ({a1}).toInt(); if (cp < 0x10000) ({← castIfNeeded a0 "String"} + Char(cp)) else ({← castIfNeeded a0 "String"} + charArrayOf(Char(0xD800 or ((cp - 0x10000) ushr 10)), Char(0xDC00 or ((cp - 0x10000) and 0x3FF))).concatToString()) })"
     | `String.decEq => return some s!"({← castIfNeeded a0 "String"} == {← castIfNeeded a1 "String"})"
     | `String.decLt | `String.decidableLT | `String.lt => return some s!"({← castIfNeeded a0 "String"} < {← castIfNeeded a1 "String"})"
     | `String.compare =>
@@ -1445,7 +1447,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `String.extract | `String.Pos.extract | `String.Pos.Raw.extract | `String.Internal.extract =>
       return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val start = ({← fromNatTo a1 "Int"}).coerceIn(0, bs.size); val stop = ({← fromNatTo a2 "Int"}).coerceIn(start, bs.size); bs.decodeToString(start, stop) })"
     | `String.Pos.set | `String.Pos.Raw.set | `String.set =>
-      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) {← castIfNeeded a0 "String"} else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) {← castIfNeeded a0 "String"} else bs.decodeToString(0, idx) + Character.toString(({← castIfNeeded a2 "UInt"}).toInt()) + bs.decodeToString(idx + len, bs.size) } })"
+      return some s!"(run \{ val bs = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val idx = {← fromNatTo a1 "Int"}; if (idx < 0 || idx >= bs.size) {← castIfNeeded a0 "String"} else \{ val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) {← castIfNeeded a0 "String"} else \{ val cp = ({← castIfNeeded a2 "UInt"}).toInt(); val chStr = if (cp < 0x10000) Char(cp).toString() else charArrayOf(Char(0xD800 or ((cp - 0x10000) ushr 10)), Char(0xDC00 or ((cp - 0x10000) and 0x3FF))).concatToString(); bs.decodeToString(0, idx) + chStr + bs.decodeToString(idx + len, bs.size) } } })"
     | _ => return none
   if args.size == 4 then
     let a0 ← toKotlinArg args[0]!
