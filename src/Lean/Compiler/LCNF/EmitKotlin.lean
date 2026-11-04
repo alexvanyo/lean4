@@ -3849,23 +3849,25 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     recordVarType n ty
     if decl.value matches .oproj 0 _ && compiler.kotlin.nullableOption.get (← getOptions) then
       let yTy := (← get).varTypes[yName]?.getD "Any?"
-      let lcnfTy := toKotlinType (← getType y)
-      if (yTy.endsWith "?" && yTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
-        let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == yName && v
-        let classStructs := (← read).classStructs
-        let elemStruct? := (← get).optionElemStructs[yName]?.orElse fun _ =>
-          let targetTy := toKotlinType decl.type
-          let base := String.ofList (targetTy.toList.takeWhile (· != '<') |>.filter (· != ' '))
-          classStructs[base]?
-        if isVar then
-          emitLn s!"val {n} = {yName}!!"
-          if let some elemStruct := elemStruct? then
-            modify fun st => { st with nameStructs := st.nameStructs.insert n elemStruct }
-        else
-          setParamVarName x yName
-          if let some elemStruct := elemStruct? then
-            modify fun st => { st with nameStructs := st.nameStructs.insert yName elemStruct }
-        return
+      let baseXTy := if yTy.endsWith "?" && yTy != "Any?" then (yTy.take (yTy.length - 1)).toString else yTy
+      if (parseKotlinPairType? baseXTy).isNone then
+        let lcnfTy := toKotlinType (← getType y)
+        if (yTy.endsWith "?" && yTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
+          let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == yName && v
+          let classStructs := (← read).classStructs
+          let elemStruct? := (← get).optionElemStructs[yName]?.orElse fun _ =>
+            let targetTy := toKotlinType decl.type
+            let base := String.ofList (targetTy.toList.takeWhile (· != '<') |>.filter (· != ' '))
+            classStructs[base]?
+          if isVar then
+            emitLn s!"val {n} = {yName}!!"
+            if let some elemStruct := elemStruct? then
+              modify fun st => { st with nameStructs := st.nameStructs.insert n elemStruct }
+          else
+            setParamVarName x yName
+            if let some elemStruct := elemStruct? then
+              modify fun st => { st with nameStructs := st.nameStructs.insert yName elemStruct }
+          return
     emitLn s!"val {n} = {← emitLetValue decl}"
 
 def withKnown (name : String) (b : Bool) (act : EmitM Unit) : EmitM Unit := do
