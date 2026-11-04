@@ -5913,7 +5913,7 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
       topBuf.contains "UByteArray" || topBuf.contains "UShortArray" || topBuf.contains "UIntArray" || topBuf.contains "ULongArray" ||
       memberBufs.values.any (fun s => s.contains "UByteArray" || s.contains "UShortArray" || s.contains "UIntArray" || s.contains "ULongArray")
     let optInUnsigned := if hasUnsignedArrays then "\n@file:OptIn(ExperimentalUnsignedTypes::class)" else ""
-    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\", \"NO_TAIL_CALLS_FOUND\", \"NON_TAIL_RECURSIVE_CALL\", \"USELESS_IS_CHECK\", \"CAST_NEVER_SUCCEEDS\")" ++ optInUnsigned
+    let suppress := "@file:Suppress(\"UNCHECKED_CAST\", \"UNUSED_VARIABLE\", \"NAME_SHADOWING\", \"RemoveRedundantBackticks\", \"ConstantConditionIf\", \"RedundantExplicitType\", \"RedundantCallOfConversionMethod\", \"USELESS_CAST\", \"NOTHING_TO_INLINE\", \"UNREACHABLE_CODE\", \"UNUSED_PARAMETER\", \"UNUSED_EXPRESSION\", \"SENSELESS_COMPARISON\", \"NO_TAIL_CALLS_FOUND\", \"NON_TAIL_RECURSIVE_CALL\", \"USELESS_IS_CHECK\", \"CAST_NEVER_SUCCEEDS\", \"UNNECESSARY_NOT_NULL_ASSERTION\")" ++ optInUnsigned
     let localClassStructs :=
       (Compiler.kotlinClassAttr.ext.getState env).1.reverse ++
       (Compiler.mutableKotlinClassAttr.ext.getState env).1.reverse
