@@ -1,7 +1,7 @@
 set_option trace.Compiler.explicitRc true in
 /--
 trace: [Compiler.explicitRc] size: 3
-    def test._redArg @&xs i : UInt8 :=
+    def test._redArg @&xs i : Bool :=
       let _x.1 := 5;
       let _x.2 := Array.ugetBorrowed ◾ xs i ◾;
       let _x.3 := Nat.decLt _x.1 _x.2;
@@ -15,7 +15,7 @@ trace: [Compiler.explicitRc] size: 3
       let r := box res;
       return r
 [Compiler.explicitRc] size: 1
-    def test @&xs i h : UInt8 :=
+    def test @&xs i h : Bool :=
       let _x.1 := test._redArg xs i;
       return _x.1
 [Compiler.explicitRc] size: 5

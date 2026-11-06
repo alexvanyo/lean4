@@ -15,8 +15,8 @@ trace: [Compiler.saveMono] size: 5
         let _x.3 := false;
         return _x.3
 [Compiler.pushProj] size: 6
-    def isNone x : UInt8 :=
-      cases x : UInt8
+    def isNone x : Bool :=
+      cases x : Bool
       | Option.none =>
         let _x.1 := 1;
         return _x.1
@@ -25,8 +25,8 @@ trace: [Compiler.saveMono] size: 5
         let _x.3 := 0;
         return _x.3
 [Compiler.elimDeadVars] size: 5
-    def isNone x : UInt8 :=
-      cases x : UInt8
+    def isNone x : Bool :=
+      cases x : Bool
       | Option.none =>
         let _x.1 := 1;
         return _x.1
@@ -34,8 +34,8 @@ trace: [Compiler.saveMono] size: 5
         let _x.2 := 0;
         return _x.2
 [Compiler.pushProj] size: 5
-    def isNone @&x : UInt8 :=
-      cases x : UInt8
+    def isNone @&x : Bool :=
+      cases x : Bool
       | Option.none =>
         let _x.1 := 1;
         return _x.1

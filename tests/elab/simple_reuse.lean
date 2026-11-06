@@ -4,8 +4,8 @@
 
 /--
 trace: [Compiler.inferBorrow] size: 5
-    def isNone._redArg @&x : UInt8 :=
-      cases x : UInt8
+    def isNone._redArg @&x : Bool :=
+      cases x : Bool
       | Option.none =>
         let _x.1 := 1;
         return _x.1
@@ -14,7 +14,7 @@ trace: [Compiler.inferBorrow] size: 5
         return _x.2
 [Compiler.inferBorrow] own _x.23: result of function call _x.23
 [Compiler.inferBorrow] size: 1
-    def isNone α @&x : UInt8 :=
+    def isNone α @&x : Bool :=
       let _x.1 := isNone._redArg x;
       return _x.1
 -/

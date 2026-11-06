@@ -63,7 +63,7 @@ def test2 [Inhabited α] (xs : Array α) (f : α → α → α) := f xs[0]! xs[1
 
 /--
 trace: [Compiler.explicitRc] size: 4
-    def test3._lam_0 @&xs i : UInt8 :=
+    def test3._lam_0 @&xs i : Bool :=
       let _x.1 := USize.toNat i;
       let _x.2 := Array.size ◾ xs;
       let _x.3 := Nat.decLt _x.1 _x.2;
@@ -116,7 +116,7 @@ def test3 (xs : Array String) := xs[(0 : USize)]! ++ xs[(1 : USize)]!
 
 /--
 trace: [Compiler.explicitRc] size: 4
-    def test4._redArg._lam_0 @&xs i : UInt8 :=
+    def test4._redArg._lam_0 @&xs i : Bool :=
       let _x.1 := USize.toNat i;
       let _x.2 := Array.size ◾ xs;
       let _x.3 := Nat.decLt _x.1 _x.2;

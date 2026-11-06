@@ -7,10 +7,10 @@ set_option trace.Compiler.explicitRc true
 
 /--
 trace: [Compiler.explicitRc] size: 27
-    def f x y : UInt8 :=
-      jp _jp.1 x : UInt8 :=
+    def f x y : Bool :=
+      jp _jp.1 x : Bool :=
         let _x.2 := p x;
-        cases _x.2 : UInt8
+        cases _x.2 : Bool
         | Bool.false =>
           let _x.3 := 1;
           let _x.4 := Nat.add x _x.3;
@@ -23,7 +23,7 @@ trace: [Compiler.explicitRc] size: 27
           return _x.2;
       let _x.6 := 0;
       let _x.7 := Nat.decEq x _x.6;
-      cases _x.7 : UInt8
+      cases _x.7 : Bool
       | Bool.false =>
         dec y;
         let z := g x;
@@ -54,7 +54,7 @@ match x with
 
 /--
 trace: [Compiler.explicitRc] size: 2
-    def h @&x : UInt8 :=
+    def h @&x : Bool :=
       let _x.1 := 5;
       let _x.2 := Nat.decLt _x.1 x;
       return _x.2
