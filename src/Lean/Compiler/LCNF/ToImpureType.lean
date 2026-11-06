@@ -22,8 +22,9 @@ public register_builtin_option compiler.kotlin.typedArrays : Bool := {
 }
 
 public register_builtin_option compiler.kotlin.nullableOption : Bool := {
-  defValue := true
-  descr := "(Kotlin backend) represent `Option α` as Kotlin nullable `α?` when `α` is not nullable"
+  defValue := false
+  descr := "(Kotlin backend) represent `Option α` as Kotlin nullable `α?` when `α` is not nullable; \
+    enabled by default by `lean -K`"
 }
 
 /-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/

@@ -463,6 +463,12 @@ where
 @[export lean_shell_main]
 def shellMain (args : List String) (opts : ShellOptions) : IO UInt32 := do
   let opts := { opts with leanOpts := opts.leanOpts.mergeBy (fun _ _ v => v) (Internal.getOptionOverrides ()) }
+  -- The Kotlin representation of `Option` changes the compiled code, so it is only the default when
+  -- generating Kotlin.
+  let opts :=
+    if opts.kotlinFileName?.isSome && !opts.leanOpts.contains `compiler.kotlin.nullableOption then
+      { opts with leanOpts := Compiler.LCNF.compiler.kotlin.nullableOption.set opts.leanOpts true }
+    else opts
   if opts.printPrefix then
     IO.println (← getBuildDir)
     return 0
