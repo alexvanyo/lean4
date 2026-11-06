@@ -1,0 +1,36 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+class StepState(val x: Int, val y: Int, val gens: java.math.BigInteger)
+
+@PublishedApi internal tailrec fun f_KotlinTypesCalls_stepN(step: UInt, st: Any?, f: (Any?) -> Any?): StepState {
+    if (!(step == 0u))     {
+        val v_x_7_1 = (step - 1u)
+        val v_x_8_2 = f(st)
+        return f_KotlinTypesCalls_stepN(v_x_7_1, v_x_8_2, f)
+    } else     {
+        return (st as StepState)
+    }
+}
+
+@PublishedApi internal fun f_KotlinTypesCalls_stepWith(step: UInt, st: StepState, f: (StepState) -> StepState): StepState {
+    return f_KotlinTypesCalls_stepN(step, st, (f as (Any?) -> Any?))
+}
+
+@PublishedApi internal fun f_KotlinTypesCalls_advance___lam__0(s: StepState): StepState {
+    val x_15_1 = s.x
+    val y_16_2 = s.y
+    val gens_17_3 = s.gens
+    val v_x_24_4 = (gens_17_3.add(java.math.BigInteger.ONE))
+    return StepState((x_15_1 + 1), y_16_2, v_x_24_4)
+}
+
+@PublishedApi internal fun f_KotlinTypesCalls_advance___closed__0(): (Any?) -> Any? {
+    return ({ p_0: StepState -> f_KotlinTypesCalls_advance___lam__0(p_0) } as (Any?) -> Any?)
+}
+
+@PublishedApi internal fun f_KotlinTypesCalls_advance(step: UInt, st: StepState): StepState {
+    val v_f_32_1 = f_KotlinTypesCalls_advance___closed__0()
+    return f_KotlinTypesCalls_stepN(step, st, v_f_32_1)
+}
+

@@ -2378,6 +2378,20 @@ def emitExternCall? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Em
 def memberKotlinName (declName : Name) (info : Compiler.KotlinMemberInfo) : String :=
   info.name?.getD (match declName with | .str _ s => s | _ => toKotlinFnName declName)
 
+/--
+Splits a `@[kotlin_types]` parameter type such as `"@Foo(1) Int"` into its annotations (with a
+trailing space, or empty) and the type.
+-/
+def splitKotlinParamAnnotations (t : String) : String × String :=
+  if t.startsWith "@" then
+    let chars := t.toList
+    match chars.reverse.findIdx? (· == ')') with
+    | some revIdx =>
+      let idx := chars.length - 1 - revIdx
+      (String.ofList (chars.take (idx + 1)) ++ " ", (String.ofList (chars.drop (idx + 1))).trimAscii.toString)
+    | none => ("", t)
+  else ("", t)
+
 /-- Calls to `@[kotlin_member]` declarations: `recv.name(rest)`, or `name(rest)` on `this`. -/
 def emitMemberCall? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   let some info := Compiler.getKotlinMemberInfo? (← getEnv) fn | return none
@@ -2390,7 +2404,9 @@ def emitMemberCall? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option Str
   let rest ← (runtimeArgs.extract 1 runtimeArgs.size).mapIdxM fun i a => do
     let s ← toKotlinArg a
     match tyOverrides[i]? with
-    | some t => if t == "_" then pure s else castIfNeeded s t
+    | some t =>
+      let t := (splitKotlinParamAnnotations t).2
+      if t == "_" || t == "Any?" then pure s else castIfNeeded s t
     | none => pure s
   let call := s!"{memberKotlinName fn info}({String.intercalate ", " rest.toList})"
   if recv == "this" then
@@ -2518,10 +2534,17 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
     -- Kotlin cannot infer a type parameter that no parameter type mentions: pass `Any?` explicitly.
     let explicitTypeArgs := !isMember && !declaredTypeParams.isEmpty &&
       !declaredTypeParams.all fun tp => declaredParamTys.any fun kt => (identTokens kt).contains tp
+    let tyOverrides := (Compiler.getKotlinTypes? (← getEnv) fn).getD #[]
     let mut argStrs : Array String := #[]
     for i in [:runtimeArgs.size] do
       let fullIdx := runtimeIdxs[i]!
       let aStr ← toKotlinArg runtimeArgs[i]!
+      -- A `@[kotlin_types]` parameter type is exactly the emitted one (see `emitFnDecl`).
+      if let some t := tyOverrides[if isMember then i - 1 else i]? then
+        if t != "_" && !(isMember && i == 0) then
+          let t := (splitKotlinParamAnnotations t).2
+          argStrs := argStrs.push (← if t == "Any?" then pure aStr else castIfNeeded aStr t)
+          continue
       -- The declaration's own parameter type (see `emitFnDecl`), with the callee's type parameters
       -- instantiated to `Any?` or captured by a star projection.
       let declaredTy? := declaredParamTys[i]?.bind fun kt =>
@@ -5706,17 +5729,7 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
           | some mp => if isRichMonoType mp.type then toKotlinType mp.type else toKotlinType p.type
           | none => toKotlinType p.type
       let rawPType := (override? emittedIdx).getD defaultParamTy
-      let (paramAnno, pType) :=
-        if rawPType.startsWith "@" then
-          let chars := rawPType.toList
-          match chars.reverse.findIdx? (· == ')') with
-          | some revIdx =>
-            let idx := chars.length - 1 - revIdx
-            let annos := String.ofList (chars.take (idx + 1))
-            let ty := (String.ofList (chars.drop (idx + 1))).trimAscii.toString
-            (annos ++ " ", ty)
-          | none => ("", rawPType)
-        else ("", rawPType)
+      let (paramAnno, pType) := splitKotlinParamAnnotations rawPType
       recordVarType pName pType
       if pType == "Any?" then
         if let some mp := monoDecl?.bind (·.params[fullIdx]?) then

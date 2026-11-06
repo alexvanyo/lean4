@@ -112,7 +112,7 @@
 
 @PublishedApi internal fun f_applyErased___boxed(f: Any?, x: Any?): Any? {
     val x_boxed_99_1 = leanUnboxUInt(x)
-    val res_100_2 = f_applyErased((f as (UInt) -> UInt), x_boxed_99_1)
+    val res_100_2 = f_applyErased(f, x_boxed_99_1)
     return res_100_2
 }
 
