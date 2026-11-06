@@ -6090,7 +6090,16 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
   let emittedExt := extDecls.filter fun d =>
     visited.contains d.name && !isLoopExpandable env d && (isInlinedConstDecl? d).isNone &&
       applied.contains d.name
-  let toEmit := emittedLocal ++ emittedExt
+  -- `_boxed` wrappers exist for the C calling convention; partial applications in Kotlin use the
+  -- unboxed declaration (see `unboxedPapFn`). Those of declarations with Kotlin types are not
+  -- expressible in Kotlin (e.g. a generic class parameter received as `Any?`).
+  let hasKotlinTypes (d : Decl .impure) : Bool :=
+    (getJvmTypeDesc? d.type).isSome || d.params.any fun p => (getJvmTypeDesc? p.type).isSome
+  let isKotlinTypedBoxed (d : Decl .impure) : Bool :=
+    match d.name with
+    | .str base "_boxed" => (declMap[base]?.map hasKotlinTypes).getD false
+    | _ => false
+  let toEmit := (emittedLocal ++ emittedExt).filter (!isKotlinTypedBoxed ·)
   let classStructs := env.constants.fold (init := ({} : Std.HashMap String Name)) fun m n _ =>
     match Compiler.getKotlinClassSpec? env n with
     | some spec =>

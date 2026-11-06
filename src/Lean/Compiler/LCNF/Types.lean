@@ -527,7 +527,8 @@ Whether the type is a pointer for sure.
 -/
 def Lean.Expr.isDefiniteRef : Expr → Bool
   | ImpureType.object => true
-  | .app (.const `jvmType _) _ => true
+  -- Not `jvmType`: in the C backend, e.g. an `Option` with a nullable Kotlin type is `none` as a boxed
+  -- scalar, and so is a nullary constructor of a `@[kotlin_class]` inductive.
   | _ => false
 
 /--
