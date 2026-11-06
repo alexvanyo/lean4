@@ -1,0 +1,160 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+class SignedWarn(val tag: UInt, val charVal: UInt, val offsetX: Int, val offsetY: Int)
+
+@PublishedApi internal fun f_BoxedSignedness_fmt___closed__0(): String {
+    return " "
+}
+
+@PublishedApi internal fun f_BoxedSignedness_fmt(x: Int, y: Int): String {
+    val v_x_5_1 = (x).toString()
+    val v_x_6_2 = " "
+    return ((v_x_5_1 + v_x_6_2) + (y).toString())
+}
+
+@PublishedApi internal fun f_BoxedSignedness_fmt___boxed(x: Any?, y: Any?): Any? {
+    val x_boxed_13_1 = leanUnboxInt(x)
+    val y_boxed_14_2 = leanUnboxInt(y)
+    return f_BoxedSignedness_fmt(x_boxed_13_1, y_boxed_14_2)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_formatAt___closed__0___boxed__const__1(): Any? {
+    return 0
+}
+
+@PublishedApi internal fun f_BoxedSignedness_formatAt___closed__0(): Pair<Any?, Any?> {
+    return Pair(0, 0)
+}
+
+/**
+ * Elements of an `Array (Int32 × Int32)`, read before an `Int32` parameter.
+ */
+@PublishedApi internal fun f_BoxedSignedness_formatAt(cells: Array<Any?>, i: UInt): String {
+    val v_x_23_2 = f_BoxedSignedness_formatAt___closed__0()
+    val v_x_25_1 = cells[(i).toInt()]
+    val v_x_28_3 = leanUnboxInt((if (v_x_25_1 is Pair<*, *>) v_x_25_1.first else (v_x_25_1 as Array<*>)[1]))
+    val v_x_29_4 = leanUnboxInt((if (v_x_25_1 is Pair<*, *>) v_x_25_1.second else (v_x_25_1 as Array<*>)[2]))
+    return f_BoxedSignedness_fmt(v_x_28_3, v_x_29_4)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_formatAt___boxed(cells: Any?, i: Any?): Any? {
+    val i_boxed_33_1 = leanUnboxUInt(i)
+    return f_BoxedSignedness_formatAt((cells as Array<Any?>), i_boxed_33_1)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_firstMinusOne___redArg(cells: Any?, i: UInt): Int {
+    val v_x_37_2 = f_BoxedSignedness_formatAt___closed__0()
+    val c_39_1 = (cells as Array<Any?>)[(i).toInt()]
+    val v_x_42_3 = leanUnboxUInt((if (c_39_1 is Pair<*, *>) c_39_1.first else (c_39_1 as Array<*>)[1]))
+    return ((v_x_42_3).toInt() - 1)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_firstMinusOne___redArg___boxed(cells: Any?, i: Any?): Any? {
+    val i_boxed_46_1 = leanUnboxUInt(i)
+    val res_47_2 = f_BoxedSignedness_firstMinusOne___redArg(cells, i_boxed_46_1)
+    return res_47_2
+}
+
+/**
+ * The erased proof argument creates a `_redArg` copy that reads the element as `UInt32`.
+ */
+@PublishedApi internal fun f_BoxedSignedness_firstMinusOne(cells: Array<Any?>, _h: Any?, i: UInt): Int {
+    return f_BoxedSignedness_firstMinusOne___redArg(cells, i)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_firstMinusOne___boxed(cells: Any?, _h: Any?, i: Any?): Any? {
+    val i_boxed_56_1 = leanUnboxUInt(i)
+    val res_57_2 = f_BoxedSignedness_firstMinusOne((cells as Array<Any?>), _h, i_boxed_56_1)
+    return res_57_2
+}
+
+@PublishedApi internal fun f_BoxedSignedness_callFirstMinusOne(cells: Array<Any?>): Int {
+    return f_BoxedSignedness_firstMinusOne___redArg(cells, 0u)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_callFirstMinusOne___boxed(cells: Any?): Any? {
+    val res_63_1 = f_BoxedSignedness_callFirstMinusOne((cells as Array<Any?>))
+    return res_63_1
+}
+
+/**
+ * The `UInt32` is stored unconverted into the `Int32` field.
+ */
+@PublishedApi internal fun f_BoxedSignedness_mkParsed(v: UInt, e: UInt): Any? {
+    if (!(e == 0u))     {
+        val v_x_70_1 = arrayOf<Any?>(1, arrayOf<Any?>(0, v, null, null, null, e))
+        return v_x_70_1
+    } else     {
+        val v_x_71_2 = arrayOf<Any?>(0)
+        return v_x_71_2
+    }
+}
+
+@PublishedApi internal fun f_BoxedSignedness_mkParsed___boxed(v: Any?, e: Any?): Any? {
+    val v_boxed_74_1 = leanUnboxUInt(v)
+    val e_boxed_75_2 = leanUnboxUInt(e)
+    return f_BoxedSignedness_mkParsed(v_boxed_74_1, e_boxed_75_2)
+}
+
+@PublishedApi internal fun f_BoxedSignedness_parsedVal(v: UInt, e: UInt): Int {
+    val v_x_79_2 = f_BoxedSignedness_mkParsed(v, e)
+    when (((v_x_79_2 as Array<*>)[0] as Int))     {
+        0 ->         {
+            return 0
+        }
+        1 ->         {
+            val val_81_1 = (v_x_79_2 as Array<*>)[1]
+            return leanUnboxInt((val_81_1 as Array<*>)[1])
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
+@PublishedApi internal fun f_BoxedSignedness_parsedVal___boxed(v: Any?, e: Any?): Any? {
+    val v_boxed_85_1 = leanUnboxUInt(v)
+    val e_boxed_86_2 = leanUnboxUInt(e)
+    val res_87_3 = f_BoxedSignedness_parsedVal(v_boxed_85_1, e_boxed_86_2)
+    return res_87_3
+}
+
+@PublishedApi internal fun f_BoxedSignedness_parsePair(b: Boolean, x: Int, y: Int): Pair<Int, Int>? {
+    if (!b)     {
+        return null
+    } else     {
+        return Pair(x, y)
+    }
+}
+
+/**
+ * The first component of the `some` payload, not the payload itself.
+ */
+@PublishedApi internal fun f_BoxedSignedness_sumPair(b: Boolean, x: Int, y: Int): Int {
+    val v_x_100_2 = f_BoxedSignedness_parsePair(b, x, y)
+    if (v_x_100_2 == null)     {
+        return 0
+    } else     {
+        val v_x_105_3 = v_x_100_2!!.first
+        val v_x_106_4 = v_x_100_2!!.second
+        return (v_x_105_3 + v_x_106_4)
+    }
+}
+
+@PublishedApi internal fun f_BoxedSignedness_sumPair___boxed(b: Any?, x: Any?, y: Any?): Any? {
+    val b_boxed_111_1 = (b as Boolean)
+    val x_boxed_112_2 = leanUnboxInt(x)
+    val y_boxed_113_3 = leanUnboxInt(y)
+    val res_114_4 = f_BoxedSignedness_sumPair(b_boxed_111_1, x_boxed_112_2, y_boxed_113_3)
+    return res_114_4
+}
+
+/**
+ * The `0` literals are shared between the `UInt32` and `Int32` fields.
+ */
+@PublishedApi internal fun f_BoxedSignedness_mkSignedWarn(t: UInt): SignedWarn {
+    return SignedWarn(t, 0u, (0u).toInt(), (0u).toInt())
+}
+
+
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

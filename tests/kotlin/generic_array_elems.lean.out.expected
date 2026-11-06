@@ -1,0 +1,66 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+class ElemItem(val a: UInt, val b: String)
+
+/**
+ * `+` would be ambiguous between `plus(element)` and `plus(elements)` on `Array<Any?>`.
+ */
+@PublishedApi internal fun f_GenericArrayElems_appendArrays(a: Array<Any?>, b: Array<Any?>): Array<Any?> {
+    return (a).let { a -> (b).let { b -> a.copyOf(a.size + b.size).also { b.copyInto(it, a.size) } } }
+}
+
+@PublishedApi internal fun f_GenericArrayElems_appendArrays___boxed(a: Any?, b: Any?): Any? {
+    return f_GenericArrayElems_appendArrays((a as Array<Any?>), (b as Array<Any?>))
+}
+
+@PublishedApi internal fun f_GenericArrayElems_instInhabitedElemItem_default___closed__0(): String {
+    return ""
+}
+
+@PublishedApi internal fun f_GenericArrayElems_instInhabitedElemItem_default___closed__1(): ElemItem {
+    val v_x_8_1 = ""
+    return ElemItem(0u, v_x_8_1)
+}
+
+@PublishedApi internal fun f_GenericArrayElems_instInhabitedElemItem_default(): ElemItem {
+    return f_GenericArrayElems_instInhabitedElemItem_default___closed__1()
+}
+
+@PublishedApi internal fun f_GenericArrayElems_instInhabitedElemItem(): ElemItem {
+    return f_GenericArrayElems_instInhabitedElemItem_default()
+}
+
+@PublishedApi internal fun f_GenericArrayElems_itemA(i: ElemItem): UInt {
+    return i.a
+}
+
+@PublishedApi internal fun f_GenericArrayElems_firstA(b: Any?): UInt {
+    val data_16_2 = (b as Array<*>)[1]
+    val v_x_17_3 = f_GenericArrayElems_instInhabitedElemItem_default()
+    val v_x_19_4 = ((data_16_2 as Array<Any?>)[0] as ElemItem)
+    return v_x_19_4.a
+}
+
+@PublishedApi internal fun f_GenericArrayElems_firstA___boxed(b: Any?): Any? {
+    val res_22_1 = f_GenericArrayElems_firstA(b)
+    return res_22_1
+}
+
+@PublishedApi internal fun f_GenericArrayElems_itemAt(items: Array<Any?>, i: UInt): ElemItem {
+    val v_x_26_1 = f_GenericArrayElems_instInhabitedElemItem_default()
+    return (items[(i).toInt()] as ElemItem)
+}
+
+@PublishedApi internal fun f_GenericArrayElems_itemAtB(items: Array<Any?>, i: UInt): String {
+    val v_x_31_1 = f_GenericArrayElems_itemAt(items, i)
+    return v_x_31_1.b
+}
+
+@PublishedApi internal fun f_GenericArrayElems_itemAtB___boxed(items: Any?, i: Any?): Any? {
+    val i_boxed_35_1 = leanUnboxUInt(i)
+    return f_GenericArrayElems_itemAtB((items as Array<Any?>), i_boxed_35_1)
+}
+
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

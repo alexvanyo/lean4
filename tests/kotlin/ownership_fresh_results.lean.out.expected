@@ -1,0 +1,134 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+@PublishedApi internal fun f_OwnershipFresh_Buf_push___redArg(b: Any?, x: Any?): Any? {
+    val data_3_2 = (b as Array<*>)[1]
+    val size_4_3 = leanUnboxUInt((b as Array<*>)[2])
+    if (!(size_4_3 < ((data_3_2 as Array<Any?>).size).toUInt()))     {
+        val v_x_11_4 = ((data_3_2 as Array<Any?>).copyOf((data_3_2 as Array<Any?>).size + 1).also { it[(data_3_2 as Array<Any?>).size] = x })
+        return arrayOf<Any?>(0, v_x_11_4, (size_4_3 + 1u))
+    } else     {
+        (data_3_2 as Array<Any?>)[(size_4_3).toInt()] = x
+        return arrayOf<Any?>(0, data_3_2, (size_4_3 + 1u))
+    }
+}
+
+@PublishedApi internal fun <T> f_OwnershipFresh_Buf_push(b: Any?, x: T): Any? {
+    return f_OwnershipFresh_Buf_push___redArg(b, x)
+}
+
+@PublishedApi internal fun f_OwnershipFresh_Buf_toList(b: Any?): Any? {
+    val v_x_34_2 = ((b as Array<*>)[1] as Array<Any?>).copyOfRange((0).coerceIn(0, ((b as Array<*>)[1] as Array<Any?>).size), ((leanUnboxUInt((b as Array<*>)[2])).toInt()).coerceIn((0).coerceIn(0, ((b as Array<*>)[1] as Array<Any?>).size), ((b as Array<*>)[1] as Array<Any?>).size))
+    return (v_x_34_2).foldRight(arrayOf<Any?>(0) as Any?) { elem, acc -> arrayOf<Any?>(1, elem, acc) }
+}
+
+@PublishedApi internal fun f_OwnershipFresh_Buf_toList___boxed(b: Any?): Any? {
+    return f_OwnershipFresh_Buf_toList(b)
+}
+
+@PublishedApi internal tailrec fun f_OwnershipFresh_fill2(n: UInt, a: Any?, b: Any?): Pair<Any?, Any?> {
+    if (!(n == 0u))     {
+        val v_x_44_1 = (n - 1u)
+        val v_x_46_2 = f_OwnershipFresh_Buf_push___redArg(a, n)
+        val v_x_50_3 = f_OwnershipFresh_Buf_push___redArg(b, (n * 10u))
+        return f_OwnershipFresh_fill2(v_x_44_1, v_x_46_2, v_x_50_3)
+    } else     {
+        val v_x_52_4 = f_OwnershipFresh_Buf_toList(a)
+        val v_x_53_5 = f_OwnershipFresh_Buf_toList(b)
+        return Pair(v_x_52_4, v_x_53_5)
+    }
+}
+
+@PublishedApi internal fun f_OwnershipFresh_fill2___boxed(n: Any?, a: Any?, b: Any?): Any? {
+    val n_boxed_58_1 = leanUnboxUInt(n)
+    return f_OwnershipFresh_fill2(n_boxed_58_1, a, b)
+}
+
+@PublishedApi internal fun f_OwnershipFresh_twoEmpties___closed__0(): Any? {
+    return arrayOfNulls<Any?>(0)
+}
+
+@PublishedApi internal fun f_OwnershipFresh_twoEmpties___closed__1(): Any? {
+    return arrayOf<Any?>(0, f_OwnershipFresh_twoEmpties___closed__0(), 0u)
+}
+
+/**
+ * Both empty buffers are the same closed constant.
+ */
+@PublishedApi internal fun f_OwnershipFresh_twoEmpties(n: UInt): Pair<Any?, Any?> {
+    return f_OwnershipFresh_fill2(n, f_OwnershipFresh_twoEmpties___closed__1(), f_OwnershipFresh_twoEmpties___closed__1())
+}
+
+@PublishedApi internal fun f_OwnershipFresh_twoEmpties___boxed(n: Any?): Any? {
+    return f_OwnershipFresh_twoEmpties(leanUnboxUInt(n))
+}
+
+/**
+ * Returns its buffers, after pushing to them, in a tuple.
+ */
+@PublishedApi internal tailrec fun f_OwnershipFresh_lineHelper(k: UInt, b: Any?, w: Any?): Pair<Any?, Any?> {
+    if (!(k == 0u))     {
+        val v_x_77_1 = (k - 1u)
+        val v_x_79_2 = f_OwnershipFresh_Buf_push___redArg(b, k)
+        if (!((k % 2u) == 0u))         {
+            return f_OwnershipFresh_lineHelper(v_x_77_1, v_x_79_2, w)
+        } else         {
+            val v_x_85_3 = f_OwnershipFresh_Buf_push___redArg(w, k)
+            return f_OwnershipFresh_lineHelper(v_x_77_1, v_x_79_2, v_x_85_3)
+        }
+    } else     {
+        return Pair(b, w)
+    }
+}
+
+@PublishedApi internal fun f_OwnershipFresh_lineHelper___boxed(k: Any?, b: Any?, w: Any?): Any? {
+    val k_boxed_91_1 = leanUnboxUInt(k)
+    return f_OwnershipFresh_lineHelper(k_boxed_91_1, b, w)
+}
+
+/**
+ * Passes on the buffers returned by `lineHelper` to exclusive parameters.
+ */
+@PublishedApi internal tailrec fun f_OwnershipFresh_outer(n: UInt, b: Any?, w: Any?): Pair<Any?, Any?> {
+    if (!(n == 0u))     {
+        val v_x_99_1 = f_OwnershipFresh_lineHelper(3u, b, w)
+        return f_OwnershipFresh_outer((n - 1u), v_x_99_1.first, v_x_99_1.second)
+    } else     {
+        val v_x_105_2 = f_OwnershipFresh_Buf_toList(b)
+        val v_x_106_3 = f_OwnershipFresh_Buf_toList(w)
+        return Pair(v_x_105_2, v_x_106_3)
+    }
+}
+
+@PublishedApi internal fun f_OwnershipFresh_outer___boxed(n: Any?, b: Any?, w: Any?): Any? {
+    val n_boxed_111_1 = leanUnboxUInt(n)
+    return f_OwnershipFresh_outer(n_boxed_111_1, b, w)
+}
+
+@PublishedApi internal fun f___private_ownership__fresh__results_0__OwnershipFresh_outer_match__1_splitter___redArg(p_0: Pair<Any?, Any?>, h_1: (Any?, Any?) -> Any?): Any? {
+    val fst_115_2 = p_0.first
+    val snd_116_3 = p_0.second
+    return h_1(fst_115_2, snd_116_3)
+}
+
+@PublishedApi internal inline fun f___private_ownership__fresh__results_0__OwnershipFresh_outer_match__1_splitter(motive: (Pair<Any?, Any?>) -> Any?, p_1: Pair<Any?, Any?>, h_1: (Any?, Any?) -> Any?): Any? {
+    val fst_121_2 = p_1.first
+    val snd_122_3 = p_1.second
+    return h_1(fst_121_2, snd_122_3)
+}
+
+@PublishedApi internal fun f_OwnershipFresh_runOuter___closed__0(): Any? {
+    val v_x_126_1 = arrayOfNulls<Any?>(0)
+    return arrayOf<Any?>(0, v_x_126_1, 0u)
+}
+
+@PublishedApi internal fun f_OwnershipFresh_runOuter(n: UInt): Pair<Any?, Any?> {
+    return f_OwnershipFresh_outer(n, f_OwnershipFresh_runOuter___closed__0(), f_OwnershipFresh_runOuter___closed__0())
+}
+
+@PublishedApi internal fun f_OwnershipFresh_runOuter___boxed(n: Any?): Any? {
+    return f_OwnershipFresh_runOuter(leanUnboxUInt(n))
+}
+
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

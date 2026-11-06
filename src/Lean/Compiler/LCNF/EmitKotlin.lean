@@ -133,6 +133,8 @@ structure Context where
   monoVarTypes : Std.HashMap String Expr := {}
   /-- Array sets that fell back to defensive copying (see `Ownership.analyze`). -/
   nonExclusiveArraySets : Std.HashSet FVarId := {}
+  /-- Closed-constant variables that are recomputed at each use (see `Ownership.analyze`). -/
+  rematerialize : Std.HashSet FVarId := {}
 
 structure State where
   buf : String := ""
@@ -493,6 +495,28 @@ def resolveKnownBool (s : String) : EmitM String := do
 def toKotlinFnName (n : Name) : String :=
   n.mangle (pre := "f_")
 
+/--
+Fixed-width integers in `Any?` slots may be boxed with either signedness, because the IR does not
+distinguish e.g. `Int32` from `UInt32` consistently (`UInt32.toInt32` is erased). Reads go through
+these file-private helpers, which accept both.
+-/
+def unboxHelpers : Array (String × String × String) := #[
+  ("Byte", "UByte", "leanUnboxByte"), ("UByte", "Byte", "leanUnboxUByte"),
+  ("Short", "UShort", "leanUnboxShort"), ("UShort", "Short", "leanUnboxUShort"),
+  ("Int", "UInt", "leanUnboxInt"), ("UInt", "Int", "leanUnboxUInt"),
+  ("Long", "ULong", "leanUnboxLong"), ("ULong", "Long", "leanUnboxULong")]
+
+def unboxHelper? (targetTy : String) : Option String :=
+  unboxHelpers.findSome? fun (t, _, h) => if t == targetTy then some h else none
+
+/-- Definitions of the helpers of `unboxHelpers` used in `text`. -/
+def unboxHelperDefs (text : String) : String := Id.run do
+  let mut out := ""
+  for (t, other, h) in unboxHelpers do
+    if text.contains s!"{h}(" then
+      out := out ++ s!"private inline fun {h}(x: Any?): {t} = if (x is {other}) x.to{t}() else x as {t}\n"
+  return out
+
 @[noinline] partial def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := none) : EmitM String := do
   if targetTy == "Any?" || targetTy == "_" || s == "null" then
     return s
@@ -584,6 +608,8 @@ def toKotlinFnName (n : Name) : String :=
           return s
         let recv := if sTrim.all (fun c => c.isAlphanum || c == '_') then sTrim else s!"({sTrim})"
         return s!"(if ({recv} is Array<*>) (if (({recv} as Array<*>)[0] as Int == 1) ({recv} as Array<*>)[1] as {elemTy} else null) else ({recv} as {targetTy}))"
+  if let some h := unboxHelper? targetTy then
+    return s!"{h}({s})"
   return s!"({s} as {targetTy})"
 
 def isKotlinKeyword (s : String) : Bool :=
@@ -1095,7 +1121,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `ByteArray.hash => return some s!"({← castIfNeeded a0 "ByteArray"}).contentHashCode().toULong()"
     | `ByteArray.markLinear => return some s!"({← castIfNeeded a0 "ByteArray"}).copyOf()"
     | `ByteArray.validateUTF8 =>
-      return some s!"(try \{ java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap({← castIfNeeded a0 "ByteArray"})); true } catch (_: Throwable) \{ false })"
+      return some s!"(try \{ ({← castIfNeeded a0 "ByteArray"}).decodeToString(throwOnInvalidSequence = true); true } catch (_: CharacterCodingException) \{ false })"
     -- Unary FloatArray
     | `FloatArray.emptyWithCapacity => return some "DoubleArray(0)"
     | `FloatArray.size => return some s!"java.math.BigInteger.valueOf(({← castIfNeeded a0 "DoubleArray"}).size.toLong())"
@@ -1319,7 +1345,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `ByteArray.get! => return some s!"(({← castIfNeeded a0 "ByteArray"})[{← fromNatTo a1 "Int"}]).toUByte()"
     | `ByteArray.beq | `ByteArray.decEq => return some s!"({← castIfNeeded a0 "ByteArray"}).contentEquals({← castIfNeeded a1 "ByteArray"})"
     | `ByteSlice.beq =>
-      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val bx = x[1] as ByteArray; val sx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, bx.size); val lx = (x[3] as java.math.BigInteger).toInt().coerceIn(0, bx.size - sx); val by = y[1] as ByteArray; val sy = (y[2] as java.math.BigInteger).toInt().coerceIn(0, by.size); val ly = (y[3] as java.math.BigInteger).toInt().coerceIn(0, by.size - sy); java.util.Arrays.equals(bx, sx, sx + lx, by, sy, sy + ly) })"
+      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val bx = x[1] as ByteArray; val sx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, bx.size); val lx = (x[3] as java.math.BigInteger).toInt().coerceIn(0, bx.size - sx); val by = y[1] as ByteArray; val sy = (y[2] as java.math.BigInteger).toInt().coerceIn(0, by.size); val ly = (y[3] as java.math.BigInteger).toInt().coerceIn(0, by.size - sy); bx.copyOfRange(sx, sx + lx).contentEquals(by.copyOfRange(sy, sy + ly)) })"
     | `ByteArray.propagateMark => return some a1
     | `ByteArray.fastAppend | `ByteArray.append => return some s!"({← castIfNeeded a0 "ByteArray"} + {← castIfNeeded a1 "ByteArray"})"
     | `FloatArray.push => return some s!"({← castIfNeeded a0 "DoubleArray"} + {← castIfNeeded a1 "Double"})"
@@ -1335,7 +1361,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     | `String.compare =>
       return some s!"(run \{ val c = ({← castIfNeeded a0 "String"}).compareTo({← castIfNeeded a1 "String"}); if (c < 0) 0 else if (c == 0) 1 else 2 })"
     | `String.Slice.instDecidableLt =>
-      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val sx = (x[1] as String).encodeToByteArray(); val bx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, sx.size); val ex = (x[3] as java.math.BigInteger).toInt().coerceIn(bx, sx.size); val sy = (y[1] as String).encodeToByteArray(); val by = (y[2] as java.math.BigInteger).toInt().coerceIn(0, sy.size); val ey = (y[3] as java.math.BigInteger).toInt().coerceIn(by, sy.size); java.util.Arrays.compareUnsigned(sx, bx, ex, sy, by, ey) < 0 })"
+      return some s!"(run \{ val x = {a0} as Array<*>; val y = {a1} as Array<*>; val sx = (x[1] as String).encodeToByteArray(); val bx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, sx.size); val ex = (x[3] as java.math.BigInteger).toInt().coerceIn(bx, sx.size); val sy = (y[1] as String).encodeToByteArray(); val by = (y[2] as java.math.BigInteger).toInt().coerceIn(0, sy.size); val ey = (y[3] as java.math.BigInteger).toInt().coerceIn(by, sy.size); var i = 0; val n = minOf(ex - bx, ey - by); var r = 0; while (i < n && r == 0) \{ r = (sx[bx + i].toInt() and 0xFF) - (sy[by + i].toInt() and 0xFF); i++ }; (if (r != 0) r else (ex - bx) - (ey - by)) < 0 })"
     | `String.Internal.isPrefixOf => return some s!"({← castIfNeeded a1 "String"}).startsWith({← castIfNeeded a0 "String"})"
     | `String.propagateMark => return some a1
     | `String.ofByteArray | `String.fromUTF8 =>
@@ -1465,7 +1491,7 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
     if fn == `mkPanicMessageWithDecl then
       return some s!"(\"PANIC at \" + {← castIfNeeded a1 "String"} + \" \" + {← castIfNeeded a0 "String"} + \":\" + ({a2}).toString() + \":\" + ({a3}).toString() + \": \" + {← castIfNeeded a4 "String"})"
     if fn == `String.Slice.Pattern.Internal.memcmpStr then
-      return some s!"java.util.Arrays.equals(({← castIfNeeded a0 "String"}).encodeToByteArray(), {← fromNatTo a2 "Int"}, {← fromNatTo a2 "Int"} + {← fromNatTo a4 "Int"}, ({← castIfNeeded a1 "String"}).encodeToByteArray(), {← fromNatTo a3 "Int"}, {← fromNatTo a3 "Int"} + {← fromNatTo a4 "Int"})"
+      return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().copyOfRange({← fromNatTo a2 "Int"}, {← fromNatTo a2 "Int"} + {← fromNatTo a4 "Int"}).contentEquals(({← castIfNeeded a1 "String"}).encodeToByteArray().copyOfRange({← fromNatTo a3 "Int"}, {← fromNatTo a3 "Int"} + {← fromNatTo a4 "Int"}))"
   if args.size == 6 then
     if fn == `ByteArray.copySlice then
       let a0 ← toKotlinArg args[0]!
@@ -1552,15 +1578,21 @@ def arrOp (s : String) : Name := .str `Array s
 def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : EmitM (Option String) := do
   let fn := match fn with | .str p "_boxed" => p | _ => fn
   let arg (i : Nat) : EmitM String := toKotlinArg (args[i]?.getD .erased)
+  -- Elements of a generic array are `Any?`; cast them to the result's Kotlin type (e.g. a `@[kotlin_class]`).
+  let elemRead (arrIdx : Nat) : EmitM String := do
+    let arrTy ← arrayType (args[arrIdx]?.getD .erased)
+    let read := s!"{← castIfNeeded (← arg arrIdx) arrTy}[{← fromNatTo (← arg (arrIdx + 1)) "Int"}]"
+    let resKTy := toKotlinType resTy
+    if arrTy == "Array<Any?>" && resKTy != "Any?" then
+      castIfNeeded read resKTy (knownTy? := some "Any?")
+    else
+      return read
   if fn == arrOp "get!Internal" || fn == arrOp "get!InternalBorrowed" then
-    let arrTy ← arrayType (args[2]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 2) arrTy}[{← fromNatTo (← arg 3) "Int"}]"
+    return some (← elemRead 2)
   if fn == arrOp "getInternal" || fn == arrOp "getInternalBorrowed" then
-    let arrTy ← arrayType (args[1]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← fromNatTo (← arg 2) "Int"}]"
+    return some (← elemRead 1)
   if fn == arrOp "uget" || fn == arrOp "ugetBorrowed" then
-    let arrTy ← arrayType (args[1]?.getD .erased)
-    return some s!"{← castIfNeeded (← arg 1) arrTy}[{← fromNatTo (← arg 2) "Int"}]"
+    return some (← elemRead 1)
   if fn == arrOp "size" then
     let arrTy ← arrayType (args[1]?.getD .erased)
     return some s!"java.math.BigInteger.valueOf({← castIfNeeded (← arg 1) arrTy}.size.toLong())"
@@ -1646,7 +1678,13 @@ def emitArrayRead? (fn : Name) (args : Array (Arg .impure)) (resTy : Expr) : Emi
     let arrTy ← arrayType (args[aIdx]?.getD .erased)
     let aStr ← castIfNeeded (← arg aIdx) arrTy
     let bStr ← castIfNeeded (← arg bIdx) arrTy
-    return some s!"({aStr} + {bStr})"
+    if (kotlinArrayElem? arrTy).isSome then
+      return some s!"({aStr} + {bStr})"
+    -- `+` on `Array<Any?>` is ambiguous between `plus(element)` and `plus(elements)`.
+    if arrTy == "Array<Any?>" then
+      return some s!"({aStr}).let \{ a -> ({bStr}).let \{ b -> a.copyOf(a.size + b.size).also \{ b.copyInto(it, a.size) } } }"
+    let elemTy := ((arrTy.drop 6).dropEnd 1).toString
+    return some s!"arrayOf<{elemTy}>(*{aStr}, *{bStr})"
   if fn == arrOp "extract" || fn == `Array.extract._redArg then
     let aIdx := args.size - 3
     let startIdx := args.size - 2
@@ -1878,6 +1916,8 @@ structure ClassLayout where
   objTypes : Std.HashMap Nat String := {}
   /-- By byte offset. -/
   scalars : Std.HashMap Nat String := {}
+  /-- By byte offset. -/
+  scalarTypes : Std.HashMap Nat String := {}
   usizes : Std.HashMap Nat String := {}
   orderedFields : Array (String × String) := #[]
   typeParams : Array String := #[]
@@ -1926,6 +1966,7 @@ def ctorClassLayout (ctorName : Name) : EmitM ClassLayout := do
     | .scalar _ off _ =>
       r := { r with
         scalars := r.scalars.insert off name
+        scalarTypes := r.scalarTypes.insert off kotlinTy
         orderedFields := r.orderedFields.push (name, kotlinTy)
       }
     | .usize i =>
@@ -1987,6 +2028,7 @@ def classLayout (s : Name) : EmitM ClassLayout := do
     | .scalar _ off _ =>
       r := { r with
         scalars := r.scalars.insert off name
+        scalarTypes := r.scalarTypes.insert off kotlinTy
         orderedFields := r.orderedFields.push (name, kotlinTy)
       }
       relIdx := relIdx + 1
@@ -2042,10 +2084,18 @@ def isMutableClassFVar (x : FVarId) : EmitM Bool := do
 /-- Kotlin property of runtime field `pos` of `x`, which must be a `@[kotlin_class]` value. -/
 def classField (x : FVarId) (pos : ClassLayout → Option String) : EmitM String := do
   let some s ← classStructOf? x
-    | throwError "Kotlin backend: field access on a value that is not a `@[kotlin_class]` structure"
-  let some f := pos (← classLayout s)
-    | throwError "Kotlin backend: unknown field of `{s}`"
-  fieldRef (← getVarName x) f
+    | throwError "Kotlin backend: in `{(← read).currFn}`: field access on a value that is not a `@[kotlin_class]` structure"
+  let layout ← classLayout s
+  let some f := pos layout
+    | throwError "Kotlin backend: in `{(← read).currFn}`: unknown field of `{s}`"
+  let n ← getVarName x
+  -- e.g. an element read from a generic array
+  if (← get).varTypes[n]? == some "Any?" then
+    if let some spec := Compiler.getKotlinClassSpec? (← getEnv) s then
+      let cls := if layout.typeParams.isEmpty || spec.className.contains '<' then spec.className
+        else s!"{spec.className}<{String.intercalate ", " (layout.typeParams.map fun _ => "Any?").toList}>"
+      return s!"({n} as {cls}).{f}"
+  fieldRef n f
 
 /--
 The result shape of `fn` if results identical to parameters are dropped: the result itself is a
@@ -2059,14 +2109,14 @@ def dropShape? (fn : Name) : EmitM (Option Ownership.RetShape) := do
   let canDrop (j : Nat) : Bool := s.exclusive[j]?.getD false
   match s.ret with
   | .param j => return if canDrop j then some (.param j) else none
-  | .prod comps =>
+  | .prod comps fresh =>
     let comps' := comps.map fun c? => c?.filter canDrop
-    return if comps'.any (·.isSome) then some (.prod comps') else none
+    return if comps'.any (·.isSome) then some (.prod comps' fresh) else none
   | _ => return none
 
 /-- Indices of the components that are still returned under a drop shape. -/
 def keptComps : Ownership.RetShape → Array Nat
-  | .prod comps => Id.run do
+  | .prod comps _ => Id.run do
     let mut r := #[]
     for h : i in [:comps.size] do
       if comps[i].isNone then r := r.push i
@@ -2075,7 +2125,7 @@ def keptComps : Ownership.RetShape → Array Nat
 
 def isUnitShape : Ownership.RetShape → Bool
   | .param _ => true
-  | s@(.prod _) => (keptComps s).isEmpty
+  | s@(.prod ..) => (keptComps s).isEmpty
   | _ => false
 
 /--
@@ -2169,8 +2219,8 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
   return toKotlinType defaultTy
 
 /--
-Instantiates a `kotlin_expr:` template: `{i}` is replaced by the `i`-th argument; other characters,
-including other braces, are copied.
+Instantiates a `kotlin_expr:` template: `{i}` is replaced by the `i`-th argument counting from 0, and
+`#i` by the `i`-th argument counting from 1; other characters, including other braces, are copied.
 -/
 def instantiateKotlinTemplate (tmpl : String) (args : Array String) : String := Id.run do
   let cs := tmpl.toList.toArray
@@ -2178,6 +2228,17 @@ def instantiateKotlinTemplate (tmpl : String) (args : Array String) : String := 
   let mut i := 0
   while i < cs.size do
     let c := cs[i]!
+    -- `#i`: the `i`-th argument, counting from 1
+    if c == '#' then
+      let mut j := i + 1
+      let mut n := 0
+      while j < cs.size && cs[j]!.isDigit do
+        n := n * 10 + (cs[j]!.toNat - '0'.toNat)
+        j := j + 1
+      if j > i + 1 && n ≥ 1 && n ≤ args.size then
+        out := out ++ args[n - 1]!
+        i := j
+        continue
     if c == '{' then
       let mut j := i + 1
       let mut n := 0
@@ -2903,7 +2964,7 @@ def emitReturnVar (x : FVarId) : EmitM Unit := do
   let n ← resolveKnownBool rawName
   match (← read).retShape? with
   | some (.param _) => emitReturnUnit
-  | some shape@(.prod _) =>
+  | some shape@(.prod ..) =>
     if let some comps := (← get).tuples[n]? then
       match keptComps shape with
       | #[] => emitReturnUnit
@@ -2944,7 +3005,7 @@ def registerDropped (x : FVarId) (shape : Ownership.RetShape) (args : Array (Arg
   | .param j =>
     noteArg j
     setParamVarName x (← toKotlinArg (args[j]?.getD .erased))
-  | .prod comps =>
+  | .prod comps _ =>
     let mut strs := #[]
     for c in comps do
       match c with
@@ -3345,7 +3406,7 @@ partial def collectAliases (params : Array (Param .impure)) (code : Code .impure
           match ← dropShape? fn with
           | some (.param i) =>
             if let some (.fvar y) := args[i]? then addAlias x (← root y)
-          | some (.prod comps) =>
+          | some (.prod comps _) =>
             for h : c in [:comps.size] do
               if let some i := comps[c] then
                 if let some (.fvar y) := args[i]? then
@@ -3702,7 +3763,10 @@ def tryAliasLet? (decl : LetDecl .impure) : EmitM Bool := do
     if i == 0 && compiler.kotlin.nullableOption.get (← getOptions) && (← classStructOf? var).isNone then
       let varTy := (← get).varTypes[n]?.getD "Any?"
       let lcnfTy := toKotlinType (← getType var)
-      if (varTy.endsWith "?" && varTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
+      let lcnfOpt := lcnfTy.endsWith "?" && lcnfTy != "Any?"
+      let baseVarTy := if varTy.endsWith "?" then (varTy.take (varTy.length - 1)).toString else varTy
+      -- See `emitFieldRead`: a nullable `Pair` Kotlin type alone may be an unwrapped `some` payload.
+      if lcnfOpt || (varTy.endsWith "?" && varTy != "Any?" && (parseKotlinPairType? baseVarTy).isNone) then
         let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == n && v
         if !isVar then
           setParamVarName x n
@@ -3850,8 +3914,10 @@ def emitFieldRead (x y : FVarId) (pos : ClassLayout → Option String) (decl : L
     if decl.value matches .oproj 0 _ && compiler.kotlin.nullableOption.get (← getOptions) then
       let yTy := (← get).varTypes[yName]?.getD "Any?"
       let baseXTy := if yTy.endsWith "?" && yTy != "Any?" then (yTy.take (yTy.length - 1)).toString else yTy
-      if (parseKotlinPairType? baseXTy).isNone then
-        let lcnfTy := toKotlinType (← getType y)
+      let lcnfTy := toKotlinType (← getType y)
+      -- A nullable LCNF type is an `Option`. A variable that only has a nullable `Pair` Kotlin type may
+      -- be an already unwrapped `some` payload aliased to the `Option` variable.
+      if (lcnfTy.endsWith "?" && lcnfTy != "Any?") || (parseKotlinPairType? baseXTy).isNone then
         if (yTy.endsWith "?" && yTy != "Any?") || (lcnfTy.endsWith "?" && lcnfTy != "Any?") then
           let isVar := (← read).loop?.any fun l => (l.varNames.zip l.variant).any fun (name, v) => name == yName && v
           let classStructs := (← read).classStructs
@@ -4239,6 +4305,12 @@ partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure)
 mutual
 
 partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : EmitM Unit := do
+  if (← read).rematerialize.contains decl.fvarId then
+    let rhs ← emitLetValue decl
+    recordVarType rhs (← inferLetKotlinType decl)
+    setParamVarName decl.fvarId rhs
+    emitCode k
+    return
   if let some (callee, args) ← loopExpandable? decl.value then
     let curExit ← currentExit
     if let .return r := skipRC k then
@@ -4372,7 +4444,7 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
             if let some y := (← get).projSrc[← getVarName a]? then
               if let some prev := src? then
                 if (← getVarName prev) != (← getVarName y) then
-                  throwError "Kotlin backend: ambiguous in-place update of a `{s}`"
+                  throwError "Kotlin backend: in `{(← read).currFn}`: ambiguous in-place update of a `{s}`"
               src? := some y
         let some y := src?
           | throwError "Kotlin backend: in `{(← read).currFn}`: cannot allocate a new `{s}` (`@[mutable_kotlin_class]` values are only updated in place)"
@@ -4428,7 +4500,11 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
                   vStr ← castIfNeeded vStr instantiatedFTy
                 ctorArgs := ctorArgs.push vStr
               | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
-              | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
+              | .scalar _ off _ =>
+                let v := scalars[off]?.getD "0"
+                ctorArgs := ctorArgs.push (← match ctorLayout.scalarTypes[off]? with
+                  | some t => castIfNeeded v t
+                  | none => pure v)
               | _ => pure ()
             let typeArgs :=
               if !ctorLayout.typeParams.isEmpty then
@@ -4458,7 +4534,11 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
                 vStr ← castIfNeeded vStr instantiatedFTy
               ctorArgs := ctorArgs.push vStr
             | .usize i => ctorArgs := ctorArgs.push (usizes[i]?.getD "0")
-            | .scalar _ off _ => ctorArgs := ctorArgs.push (scalars[off]?.getD "0")
+            | .scalar _ off _ =>
+              let v := scalars[off]?.getD "0"
+              ctorArgs := ctorArgs.push (← match clsLayout.scalarTypes[off]? with
+                | some t => castIfNeeded v t
+                | none => pure v)
             | _ => pure ()
           let typeArgs :=
             if !clsLayout.typeParams.isEmpty && !clsName.contains '<' then
@@ -4849,7 +4929,12 @@ partial def emitCode (code : Code .impure) : EmitM Unit := do
     emitFieldWrite x (·.objs[i]?) (← toKotlinArg y)
     emitCode k
   | .sset x _ off y _ k =>
-    unless ← isWriteBack x y do emitFieldWrite x (·.scalars[off]?) (← getVarName y)
+    unless ← isWriteBack x y do
+      let mut v ← getVarName y
+      if let some s ← classStructOf? x then
+        if let some t := (← classLayout s).scalarTypes[off]? then
+          v ← castIfNeeded v t
+      emitFieldWrite x (·.scalars[off]?) v
     emitCode k
   | .uset x i y k =>
     unless ← isWriteBack x y do emitFieldWrite x (·.usizes[i]?) (← getVarName y)
@@ -5396,9 +5481,7 @@ partial def collectMonoVarTypes (code : Code .pure) (m : Std.HashMap String Expr
         collectMonoVarTypes k m) m
   | _ => m
 
-def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
-  let origParamNames := decl.params.map (·.binderName)
-  let decl ← decl.internalize (uniqueIdents := true)
+def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM Unit := do
   let initKnownBools := ({} : Std.HashMap String Bool).insert "true" true |>.insert "false" false
   let initVarTypes := ({} : Std.HashMap String String).insert "true" "Boolean" |>.insert "false" "Boolean" |>.insert "Unit" "Unit"
   modify fun st => { st with varNames := {}, nameCounter := 0, inlinedJps := {}, blockJps := {}, knownBools := initKnownBools, loopCounter := 0, paps := {}, tuples := {}, materializedTuples := {}, nameStructs := {}, optionElemStructs := {}, fieldVals := {}, fieldReads := {}, used := {}, projSrc := {}, writeBacks := {}, varTypes := initVarTypes, aliases := {}, loopExits := {}, adtVars := {} }
@@ -5608,9 +5691,44 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
       | none => {}
     withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape?, monoVarTypes }) do
       for p in params do discard <| classStructOf? p.fvarId
-      emitCode code
+      -- The Lean body of a `@[kotlin_expr]` declaration is replaced by its template.
+      let tmpl? ← if (Compiler.getKotlinExpr? env decl.name).isSome then
+          emitExternCall? decl.name (params.map (.fvar ·.fvarId)) decl.type
+        else pure none
+      match tmpl? with
+      | some e => emitReturn e (← read).retCast?
+      | none => emitCode code
   emitLn "}"
   emitLn ""
+
+/-- Pairs of corresponding `let` variables of `c` and its internalized copy `c'`. -/
+partial def letFVarPairs (c c' : Code .impure) (acc : Std.HashMap FVarId FVarId := {}) :
+    Std.HashMap FVarId FVarId :=
+  match c, c' with
+  | .let d k, .let d' k' => letFVarPairs k k' (acc.insert d.fvarId d'.fvarId)
+  | .jp d k, .jp d' k' => letFVarPairs k k' (letFVarPairs d.value d'.value acc)
+  | .cases cs, .cases cs' =>
+    (cs.alts.zip cs'.alts).foldl (fun acc (a, a') => letFVarPairs a.getCode a'.getCode acc) acc
+  | .oset (k := k) .., .oset (k := k') .. | .uset (k := k) .., .uset (k := k') ..
+  | .sset (k := k) .., .sset (k := k') .. | .setTag (k := k) .., .setTag (k := k') ..
+  | .inc (k := k) .., .inc (k := k') .. | .dec (k := k) .., .dec (k := k') ..
+  | .del (k := k) .., .del (k := k') .. => letFVarPairs k k' acc
+  | _, _ => acc
+
+def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
+  let origParamNames := decl.params.map (·.binderName)
+  let decl0 := decl
+  let decl ← decl.internalize (uniqueIdents := true)
+  -- Translate the variables of the ownership analysis to the internalized ones.
+  let pairs := match decl0.value, decl.value with
+    | .code c, .code c' => letFVarPairs c c'
+    | _, _ => {}
+  let translate (xs : Std.HashSet FVarId) : Std.HashSet FVarId :=
+    pairs.fold (init := xs) fun acc x y => if xs.contains x then acc.insert y else acc
+  withReader (fun ctx => { ctx with
+      nonExclusiveArraySets := translate ctx.nonExclusiveArraySets
+      rematerialize := translate ctx.rematerialize })
+    (emitFnDeclCore origParamNames decl)
 
 /-- Replaces each `// @LeanMembers(Cls)` line with the members of `Cls`, at the marker's indent. -/
 def spliceMembers (text : String) (members : Std.HashMap String String) : String × Array String := Id.run do
@@ -5889,7 +6007,8 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
     throwError (MessageData.joinSep ownership.errors.toList "\n")
   let ctx : Context := { modName, localDecls := allDecls, otherModuleDecls, declMap,
                          summaries := ownership.summaries, classStructs, extDeclNames,
-                         nonExclusiveArraySets := ownership.nonExclusiveArraySets }
+                         nonExclusiveArraySets := ownership.nonExclusiveArraySets,
+                         rematerialize := ownership.rematerialize }
   let ((), st) ← ((do
     let mut topBuf := ""
     let mut memberBufs : Std.HashMap String String := {}
@@ -6101,7 +6220,8 @@ public def emitKotlinForDecls (modName : Name) (decls : Array Name) : CoreM Stri
         emitLn ""
         emit ftr
   ) : EmitM Unit).run ctx |>.run {} |>.run (phase := .impure)
-  return st.buf
+  let helpers := unboxHelperDefs st.buf
+  return if helpers.isEmpty then st.buf else st.buf ++ "\n" ++ helpers
 
 public def emitKotlin (modName : Name) : CoreM String := do
   emitKotlinForDecls modName (← getLocalImpureDecls)

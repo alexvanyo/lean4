@@ -12,6 +12,7 @@ import Lean.Meta.Transform
 import Lean.Meta.Match.MatcherInfo
 import Init.While
 import Lean.Compiler.ExportAttr
+import Lean.Compiler.KotlinAttrs
 
 public section
 
@@ -52,7 +53,9 @@ def toDecl (declName : Name) : CompilerM (Decl .pure) := do
   let some info ← getDeclInfo? declName | throwError "declaration `{.ofConstName declName}` not found"
   let safe ← declIsNotUnsafe declName
   let env ← getEnv
-  let inlineAttr? := getInlineAttribute? env declName
+  -- Calls to `@[kotlin_expr]` declarations must stay calls for the Kotlin backend to replace them.
+  let inlineAttr? :=
+    if (getKotlinExpr? env declName).isSome then some .noinline else getInlineAttribute? env declName
   let paramsFromTypeBinders (expr : Expr) : CompilerM (Array (Param .pure)) := do
     let mut params := #[]
     let mut currentExpr := expr

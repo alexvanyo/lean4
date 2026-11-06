@@ -86,8 +86,11 @@ inductive RetShape where
   | fresh
   /-- The result is (the object of) parameter `j`. -/
   | param (j : Nat)
-  /-- The result is a `Prod.mk` whose components are parameters (`some j`) or unknown. -/
-  | prod (comps : Array (Option Nat))
+  /--
+  The result is a `Prod.mk` whose components are parameters (`some j`) or not. `fresh[c]` holds if
+  component `c` is not a parameter but freshly allocated and exclusively owned.
+  -/
+  | prod (comps : Array (Option Nat)) (fresh : Array Bool)
   | unknown
   deriving Inhabited, BEq, Repr
 
@@ -96,7 +99,7 @@ def RetShape.isFreshOrExclusiveParam (exclusive : Array Bool) : RetShape → Boo
   | .param i => exclusive[i]?.getD false
   | _ => false
 
-def RetShape.join (exclusive : Array Bool) (s1 s2 : RetShape) : RetShape :=
+partial def RetShape.join (exclusive : Array Bool) (s1 s2 : RetShape) : RetShape :=
   match s1, s2 with
   | .none, s | s, .none => s
   | .fresh, .fresh => .fresh
@@ -104,9 +107,27 @@ def RetShape.join (exclusive : Array Bool) (s1 s2 : RetShape) : RetShape :=
     if i == j then .param i
     else if (exclusive[i]?.getD false) && (exclusive[j]?.getD false) then .fresh
     else .unknown
-  | .prod a, .prod b =>
-    if a.size == b.size then .prod (a.zipWith (fun x y => if x == y then x else Option.none) b)
+  | .prod a fa, .prod b fb =>
+    if a.size == b.size then Id.run do
+      let isFreshOrExcl (c? : Option Nat) (f : Bool) : Bool :=
+        match c? with
+        | some j => exclusive[j]?.getD false
+        | Option.none => f
+      let mut comps := #[]
+      let mut fresh := #[]
+      for h : c in [:a.size] do
+        let x := a[c]
+        let y := b[c]?.getD Option.none
+        if x == y && x.isSome then
+          comps := comps.push x
+          fresh := fresh.push false
+        else
+          comps := comps.push Option.none
+          fresh := fresh.push (isFreshOrExcl x (fa[c]?.getD false) && isFreshOrExcl y (fb[c]?.getD false))
+      return .prod comps fresh
     else .unknown
+  | .prod a fa, .fresh | .fresh, .prod a fa =>
+    RetShape.join exclusive (.prod a fa) (.prod (a.map fun _ => Option.none) (a.map fun _ => true))
   | a, b =>
     if a.isFreshOrExclusiveParam exclusive && b.isFreshOrExclusiveParam exclusive then .fresh
     else .unknown
@@ -114,7 +135,7 @@ def RetShape.join (exclusive : Array Bool) (s1 s2 : RetShape) : RetShape :=
 /-- Parameter `j` identical to the `i`-th component (`none`: the whole result) of the result. -/
 def RetShape.identities : RetShape → Array (Option Nat × Nat)
   | .param j => #[(Option.none, j)]
-  | .prod comps => Id.run do
+  | .prod comps _ => Id.run do
     let mut r := #[]
     for i in [:comps.size] do
       if let some j := comps[i]! then r := r.push (some i, j)
@@ -134,6 +155,11 @@ structure PathState where
   knownFalse : Std.HashSet FVarId := {}
   /-- Variables known to be `true` (results of `isShared` on immutable objects). -/
   knownTrue : Std.HashSet FVarId := {}
+  /--
+  Variables bound to a call of a closed constant with a fresh result. The Kotlin backend computes
+  closed constants on each call, so it can call it again at a use that must be exclusive.
+  -/
+  closedConsts : Std.HashSet FVarId := {}
   deriving Inhabited
 
 structure Ctx where
@@ -157,6 +183,8 @@ structure Out where
   errors : Array MessageData := #[]
   ret : RetShape := .none
   nonExclusiveArraySets : Std.HashSet FVarId := {}
+  /-- Variables of `PathState.closedConsts` that the Kotlin backend must recompute at each use. -/
+  rematerialize : Std.HashSet FVarId := {}
 
 abbrev M := ReaderT Ctx (StateRefT Out CompilerM)
 
@@ -169,6 +197,20 @@ def objOf (st : PathState) (x : FVarId) : PathState × Nat :=
   | none =>
     let (st, i) := newObj st { rc := .top }
     ({ st with vars := st.vars.insert x i }, i)
+
+/--
+Object of the argument `a` at a use that claims it: a fresh object if `a` is a closed constant that
+is not exclusively owned here or is passed more than once (see `PathState.closedConsts`).
+-/
+def claimedArgObj (st : PathState) (a : FVarId) (args : Array (Arg .impure)) : M (PathState × Nat) := do
+  let (st, i) := objOf st a
+  if st.closedConsts.contains a then
+    let o := st.objs[i]!
+    let multi := (args.filter (· == .fvar a)).size > 1
+    if o.rc != .exact 1 || multi then
+      modify fun out => { out with rematerialize := out.rematerialize.insert a }
+      return newObj st { rc := .exact 1, deep := true, isMutableClass := o.isMutableClass }
+  return (st, i)
 
 def bind (st : PathState) (x : FVarId) (i : Nat) : PathState :=
   { st with vars := st.vars.insert x i }
@@ -673,7 +715,7 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       return bind finalSt x i
     if let some ai := inplaceArg? (← getEnv) fn args then
       if let some (Arg.fvar a) := args[ai]? then
-        let (st, i) := objOf st a
+        let (st, i) ← claimedArgObj st a args
         let o := st.objs[i]!
         let hasOverlap := Id.run do
           for h : j in [:args.size] do
@@ -708,7 +750,10 @@ partial def visitLet (st : PathState) (decl : LetDecl .impure) (k : Code .impure
       let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut }
       return bind st x i
     if let some summary := (← read).summaries[fn]? then
-      return ← visitCall st x fn args summary isMut
+      let st ← visitCall st x fn args summary isMut
+      if args.isEmpty && summary.ret == .fresh then
+        return { st with closedConsts := st.closedConsts.insert x }
+      return st
     let st ← consumeArgs st (some fn) args
     if isImmutablePrimOp fn then
       let (st, i) := newObj st { rc := .exact 1, deep := true, isMutableClass := isMut, immutable := true }
@@ -738,10 +783,11 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
   for h : k in [:args.size] do
     match args[k] with
     | .fvar a =>
-      let (st', i) := objOf st a
+      let exclusive := summary.exclusive[k]?.getD false
+      let (st', i) ← if exclusive then claimedArgObj st a args else pure (objOf st a)
       st := st'
       argObjs := argObjs.push (some i)
-      if summary.exclusive[k]?.getD false then
+      if exclusive then
         discard <| claim st i true m!"argument {k + 1} of `{fn}`"
     | .erased => argObjs := argObjs.push none
   -- Verify that no exclusive argument aliases another argument at this call site.
@@ -783,14 +829,15 @@ partial def visitCall (st : PathState) (x : FVarId) (fn : Name) (args : Array (A
     | _ =>
       let (st2, i) := newObj st { rc := .top, isMutableClass := isMut }
       return bind st2 x i
-  | .prod comps =>
+  | .prod comps fresh =>
     let mut children := #[]
     for h : c in [:comps.size] do
       match comps[c] with
       | some j =>
         if let some (some i) := argObjs[j]? then children := children.push (c, i)
       | none =>
-        let (st', i) := newObj st { rc := .top }
+        let (st', i) := newObj st <|
+          if fresh[c]?.getD false then { rc := .exact 1, deep := true } else { rc := .top }
         st := st'
         children := children.push (c, i)
     let (st2, i) := newObj st { rc := .exact 1, children, deep := true, ctor? := some ``Prod.mk }
@@ -833,11 +880,17 @@ partial def visitReturn (st : PathState) (x : FVarId) : M Unit := do
   let shape : RetShape :=
     if let some j := paramOf? i then .param j
     else if o.ctor? == some ``Prod.mk then
-      let comps := (List.range 2).toArray.map fun c =>
-        (o.children.find? (·.1 == c)).bind fun (_, ci) => paramOf? ci
-      if comps.any (·.isSome) then .prod comps
+      let child? (c : Nat) := (o.children.find? (·.1 == c)).map (·.2)
+      let comps := (List.range 2).toArray.map fun c => (child? c).bind paramOf?
+      let fresh := (List.range 2).toArray.map fun c =>
+        match child? c with
+        | some ci =>
+          (paramOf? ci).isNone && isDeepFresh st ctx.paramObjs ci &&
+            o.children.all fun (c', ci') => c' == c || !objectsOverlap st ci ci'
+        | none => false
+      if comps.any (·.isSome) then .prod comps fresh
       else if isDeepFresh st ctx.paramObjs i then .fresh
-      else .prod comps
+      else .prod comps fresh
     else if isDeepFresh st ctx.paramObjs i then
       .fresh
     else .unknown
@@ -884,6 +937,7 @@ structure Result where
   summaries : Std.HashMap Name Summary
   errors : Array MessageData
   nonExclusiveArraySets : Std.HashSet FVarId := {}
+  rematerialize : Std.HashSet FVarId := {}
 
 /--
 Computes ownership summaries for `decls` and checks all in-place updates. `external` returns
@@ -904,13 +958,16 @@ def analyze (decls : Array (Decl .impure)) (memberReceiver : Name → Option Nat
     m.insert d.name { exclusive := d.params.map fun _ => false }
   let mut iter := 0
   let mut allNonExclusiveArraySets := ({} : Std.HashSet FVarId)
+  let mut allRematerialize := ({} : Std.HashSet FVarId)
   repeat
     iter := iter + 1
     let mut changed := false
     let mut errors := #[]
+    allRematerialize := {}
     for d in decls do
       let out ← analyzeDecl d summaries localParams mutableClasses
       allNonExclusiveArraySets := allNonExclusiveArraySets.union out.nonExclusiveArraySets
+      allRematerialize := allRematerialize.union out.rematerialize
       let old := summaries[d.name]!
       let mut exclusive := old.exclusive
       for j in out.requireExclusive do
@@ -941,7 +998,9 @@ def analyze (decls : Array (Decl .impure)) (memberReceiver : Name → Option Nat
               else if isExternal d.name then
                 errors := errors.push m!"Kotlin backend: `{d.name}` is called from Kotlin, but \
                   parameter {j + 1} would need to be exclusively owned"
-      return { summaries, errors, nonExclusiveArraySets := allNonExclusiveArraySets }
-  return { summaries, errors := #[], nonExclusiveArraySets := allNonExclusiveArraySets }
+      return { summaries, errors, nonExclusiveArraySets := allNonExclusiveArraySets,
+               rematerialize := allRematerialize }
+  return { summaries, errors := #[], nonExclusiveArraySets := allNonExclusiveArraySets,
+           rematerialize := allRematerialize }
 
 end Lean.Compiler.LCNF.Kotlin.Ownership
