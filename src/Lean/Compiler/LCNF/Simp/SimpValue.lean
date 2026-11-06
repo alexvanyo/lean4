@@ -7,6 +7,7 @@ module
 
 prelude
 public import Lean.Compiler.LCNF.Simp.SimpM
+import Lean.Compiler.NeverExtractAttr
 
 public section
 
@@ -42,6 +43,8 @@ def simpAppApp? (e : LetValue .pure) : OptionT SimpM (LetValue .pure) := do
   | .const declName us args' =>
     /- If `args` is empty then `g` is an alias that is going to be eliminated by `elimVar?` -/
     guard (!args.isEmpty)
+    /- `g` is kept even if unused (see `isNeverExtractLetDecl`), so merging would duplicate the call. -/
+    guard (!hasNeverExtractAttribute (← getEnv) declName)
     return .const declName us (args' ++ args)
   | .erased => return .erased
   | .proj .. | .lit .. => failure
