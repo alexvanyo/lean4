@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 class Box<T>(val `val`: T) {
     public fun extractVal(): T {
         return (f_Box_extractVal___redArg((this as Box<*>)) as T)
@@ -121,28 +121,20 @@ data class Container<T>(val optItem: PairItem<T>?)
     return (f_swapKeyValue___redArg((kv as KeyValue<*, *>)) as KeyValue<V, K>)
 }
 
-@PublishedApi internal fun f_CustomList_ctorIdx___redArg(x: Any?): java.math.BigInteger {
-    when (x)     {
-        CustomList.Nil ->         {
-            return java.math.BigInteger.ZERO
-        }
-        is CustomList.Cons<*> ->         {
-            return java.math.BigInteger.ONE
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_CustomList_ctorIdx___impl___redArg(p_0: Any?): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (val o = p_0) { is Array<*> -> o[0] as Int; is Boolean -> if (o) 1 else 0; is UByte -> o.toInt(); is Enum<*> -> o.ordinal; else -> 0 })).toLong())
 }
 
-@PublishedApi internal fun f_CustomList_ctorIdx___redArg___boxed(x: Any?): Any? {
-    return f_CustomList_ctorIdx___redArg(x)
+@PublishedApi internal fun f_CustomList_ctorIdx___impl___redArg___boxed(p_0: Any?): Any? {
+    return f_CustomList_ctorIdx___impl___redArg(p_0)
 }
 
-@PublishedApi internal fun f_CustomList_ctorIdx(p_0: Any?, x: Any?): java.math.BigInteger {
-    return f_CustomList_ctorIdx___redArg(x)
+@PublishedApi internal fun <T> f_CustomList_ctorIdx___impl(p_0: CustomList<T>): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (p_0) { CustomList.Nil -> 0; is CustomList.Cons<*> -> 1; else -> error("unreachable") })).toLong())
 }
 
-@PublishedApi internal fun f_CustomList_ctorIdx___boxed(p_0: Any?, x: Any?): Any? {
-    return f_CustomList_ctorIdx(p_0, x)
+@PublishedApi internal fun f_CustomList_ctorIdx___impl___boxed(p_0: Any?, p_1: Any?): Any? {
+    return f_CustomList_ctorIdx___impl((p_1 as CustomList<*>))
 }
 
 @PublishedApi internal fun f_CustomList_ctorElim___redArg(t: Any?, k: Any?): Any? {
@@ -151,9 +143,9 @@ data class Container<T>(val optItem: PairItem<T>?)
             return k
         }
         is CustomList.Cons<*> ->         {
-            val head_116_2 = t.head
-            val tail_117_3 = t.tail
-            return (k as (Any?, Any?) -> Any?)(head_116_2, tail_117_3)
+            val head_115_2 = t.head
+            val tail_116_3 = t.tail
+            return (k as (Any?, Any?) -> Any?)(head_115_2, tail_116_3)
         }
         else ->         { error("unreachable") }
     }
@@ -236,14 +228,14 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_makeGenericMapHolder___redArg___closed__1(): Any? {
-    val v_x_178_1 = f_makeGenericMapHolder___redArg___closed__0()
-    return arrayOf<Any?>(0, java.math.BigInteger.ZERO, v_x_178_1)
+    val v_x_177_1 = f_makeGenericMapHolder___redArg___closed__0()
+    return arrayOf<Any?>(0, java.math.BigInteger.ZERO, v_x_177_1)
 }
 
 @PublishedApi internal fun f_makeGenericMapHolder___redArg(k: String, v: Any?): GenericMapHolder<*> {
-    val v_x_183_1 = f_makeGenericMapHolder___redArg___closed__1()
-    val v_x_184_2 = f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_183_1, k, v)
-    return (GenericMapHolder<Any?>(v_x_184_2) as GenericMapHolder<*>)
+    val v_x_182_1 = f_makeGenericMapHolder___redArg___closed__1()
+    val v_x_183_2 = f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_182_1, k, v)
+    return (GenericMapHolder<Any?>(v_x_183_2) as GenericMapHolder<*>)
 }
 
 @PublishedApi internal fun <T> f_makeGenericMapHolder(k: String, v: T): GenericMapHolder<T> {
@@ -251,8 +243,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_lookupGenericMap___redArg(holder: GenericMapHolder<*>, k: String, defaultVal: Any?): Any? {
-    val entries_193_1 = holder.entries
-    return f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0___redArg(entries_193_1, k, defaultVal)
+    val entries_192_1 = holder.entries
+    return f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0___redArg(entries_192_1, k, defaultVal)
 }
 
 @PublishedApi internal fun <T> f_lookupGenericMap(holder: GenericMapHolder<T>, k: String, defaultVal: T): T {
@@ -260,13 +252,13 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_GenericMapHolder_lookup___redArg(holder: GenericMapHolder<*>, k: String, defaultVal: Any?): Any? {
-    val entries_203_1 = holder.entries
-    return f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0___redArg(entries_203_1, k, defaultVal)
+    val entries_202_1 = holder.entries
+    return f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0___redArg(entries_202_1, k, defaultVal)
 }
 
 @PublishedApi internal fun f_makeGenericTreeMapHolder___redArg(k: String, v: Any?): GenericTreeMapHolder<*> {
-    val v_x_213_1 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, arrayOf<Any?>(1))
-    return (GenericTreeMapHolder<Any?>(v_x_213_1) as GenericTreeMapHolder<*>)
+    val v_x_212_1 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, arrayOf<Any?>(1))
+    return (GenericTreeMapHolder<Any?>(v_x_212_1) as GenericTreeMapHolder<*>)
 }
 
 @PublishedApi internal fun <T> f_makeGenericTreeMapHolder(k: String, v: T): GenericTreeMapHolder<T> {
@@ -276,18 +268,18 @@ data class Container<T>(val optItem: PairItem<T>?)
 @PublishedApi internal tailrec fun f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(t: Any?, k: String, fallback: Any?): Any? {
     when (((t as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_223_2 = (t as Array<*>)[3]
-            val l_224_3 = (t as Array<*>)[4]
-            val r_225_4 = (t as Array<*>)[5]
+            val v_222_2 = (t as Array<*>)[3]
+            val l_223_3 = (t as Array<*>)[4]
+            val r_224_4 = (t as Array<*>)[5]
             when ((run { val c = (k).compareTo(((t as Array<*>)[2] as String)); if (c < 0) 0 else if (c == 0) 1 else 2 }))             {
                 0 ->                 {
-                    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(l_224_3, k, fallback)
+                    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(l_223_3, k, fallback)
                 }
                 1 ->                 {
-                    return v_223_2
+                    return v_222_2
                 }
                 2 ->                 {
-                    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(r_225_4, k, fallback)
+                    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(r_224_4, k, fallback)
                 }
                 else ->                 { error("unreachable") }
             }
@@ -304,8 +296,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_lookupGenericTreeMap___redArg(holder: GenericTreeMapHolder<*>, k: String, defaultVal: Any?): Any? {
-    val entries_236_1 = holder.entries
-    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(entries_236_1, k, defaultVal)
+    val entries_235_1 = holder.entries
+    return f_Std_DTreeMap_Internal_Impl_Const_getD___at___00lookupGenericTreeMap_spec__0___redArg(entries_235_1, k, defaultVal)
 }
 
 @PublishedApi internal fun <T> f_lookupGenericTreeMap(holder: GenericTreeMapHolder<T>, k: String, defaultVal: T): T {
@@ -326,13 +318,13 @@ data class Container<T>(val optItem: PairItem<T>?)
             return
         }
         1 ->         {
-            val key_255_2 = (p_1 as Array<*>)[1]
-            val tail_257_3 = (p_1 as Array<*>)[3]
-            val v_x_262_4 = ((key_255_2 as String)).encodeToByteArray().contentHashCode().toULong()
-            val fold_265_5 = (v_x_262_4 xor (v_x_262_4 shr 32))
-            val v_x_273_6 = (((fold_265_5 xor (fold_265_5 shr 16))).toInt() and ((p_0 as Array<Any?>).size - 1))
-            (p_0 as Array<Any?>)[v_x_273_6] = arrayOf<Any?>(1, key_255_2, (p_1 as Array<*>)[2], (p_0 as Array<Any?>)[v_x_273_6])
-            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2_spec__3___redArg(p_0, tail_257_3)
+            val key_254_2 = (p_1 as Array<*>)[1]
+            val tail_256_3 = (p_1 as Array<*>)[3]
+            val v_x_261_4 = ((key_254_2 as String)).encodeToByteArray().contentHashCode().toULong()
+            val fold_264_5 = (v_x_261_4 xor (v_x_261_4 shr 32))
+            val v_x_272_6 = (((fold_264_5 xor (fold_264_5 shr 16))).toInt() and ((p_0 as Array<Any?>).size - 1))
+            (p_0 as Array<Any?>)[v_x_272_6] = arrayOf<Any?>(1, key_254_2, (p_1 as Array<*>)[2], (p_0 as Array<Any?>)[v_x_272_6])
+            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2_spec__3___redArg(p_0, tail_256_3)
             return
         }
         else ->         { error("unreachable") }
@@ -343,19 +335,19 @@ data class Container<T>(val optItem: PairItem<T>?)
     if (!(i < java.math.BigInteger.valueOf((source as Array<Any?>).size.toLong())))     {
         return
     } else     {
-        val es_286_1 = (source as Array<Any?>)[(i).toInt()]
+        val es_285_1 = (source as Array<Any?>)[(i).toInt()]
         (source as Array<Any?>)[(i).toInt()] = arrayOf<Any?>(0)
-        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2_spec__3___redArg(target, es_286_1)
-        val v_x_291_2 = (i.add(java.math.BigInteger.ONE))
-        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2___redArg(v_x_291_2, source, target)
+        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2_spec__3___redArg(target, es_285_1)
+        val v_x_290_2 = (i.add(java.math.BigInteger.ONE))
+        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2___redArg(v_x_290_2, source, target)
         return
     }
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1___redArg(data: Any?): Any? {
-    val v_x_299_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
-    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2___redArg(java.math.BigInteger.ZERO, data, v_x_299_1)
-    return v_x_299_1
+    val v_x_298_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
+    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1_spec__2___redArg(java.math.BigInteger.ZERO, data, v_x_298_1)
+    return v_x_298_1
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__2___redArg(a: String, b: Any?, p_2: Any?): Any? {
@@ -364,14 +356,14 @@ data class Container<T>(val optItem: PairItem<T>?)
             return p_2
         }
         1 ->         {
-            val key_305_2 = (p_2 as Array<*>)[1]
-            val value_306_3 = (p_2 as Array<*>)[2]
-            val tail_307_4 = (p_2 as Array<*>)[3]
-            if (!((key_305_2 as String) == a))             {
-                val v_x_312_5 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__2___redArg(a, b, tail_307_4)
-                return arrayOf<Any?>(1, key_305_2, value_306_3, v_x_312_5)
+            val key_304_2 = (p_2 as Array<*>)[1]
+            val value_305_3 = (p_2 as Array<*>)[2]
+            val tail_306_4 = (p_2 as Array<*>)[3]
+            if (!((key_304_2 as String) == a))             {
+                val v_x_311_5 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__2___redArg(a, b, tail_306_4)
+                return arrayOf<Any?>(1, key_304_2, value_305_3, v_x_311_5)
             } else             {
-                return arrayOf<Any?>(1, a, b, tail_307_4)
+                return arrayOf<Any?>(1, a, b, tail_306_4)
             }
         }
         else ->         { error("unreachable") }
@@ -384,9 +376,9 @@ data class Container<T>(val optItem: PairItem<T>?)
             return false
         }
         1 ->         {
-            val tail_324_2 = (p_1 as Array<*>)[3]
+            val tail_323_2 = (p_1 as Array<*>)[3]
             if (!(((p_1 as Array<*>)[1] as String) == a))             {
-                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg(a, tail_324_2)
+                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg(a, tail_323_2)
             } else             {
                 return true
             }
@@ -396,32 +388,32 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg___boxed(a: Any?, p_1: Any?): Any? {
-    val res_329_1 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg((a as String), p_1)
-    return res_329_1
+    val res_328_1 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg((a as String), p_1)
+    return res_328_1
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0___redArg(m: Any?, a: String, b: Any?): Any? {
-    val size_334_2 = (m as Array<*>)[1]
-    val buckets_335_3 = (m as Array<*>)[2]
-    val v_x_340_4 = (a).encodeToByteArray().contentHashCode().toULong()
-    val fold_343_5 = (v_x_340_4 xor (v_x_340_4 shr 32))
-    val v_x_351_6 = (((fold_343_5 xor (fold_343_5 shr 16))).toInt() and ((buckets_335_3 as Array<Any?>).size - 1))
-    val bkt_352_7 = (buckets_335_3 as Array<Any?>)[v_x_351_6]
-    val v_x_353_8 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg(a, bkt_352_7)
-    if (!v_x_353_8)     {
-        val size__355_9 = ((size_334_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
-        (buckets_335_3 as Array<Any?>)[v_x_351_6] = arrayOf<Any?>(1, a, b, bkt_352_7)
-        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__355_9.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_335_3 as Array<Any?>).size.toLong())))         {
-            val val_364_10 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1___redArg(buckets_335_3)
-            return arrayOf<Any?>(0, size__355_9, val_364_10)
+    val size_333_2 = (m as Array<*>)[1]
+    val buckets_334_3 = (m as Array<*>)[2]
+    val v_x_339_4 = (a).encodeToByteArray().contentHashCode().toULong()
+    val fold_342_5 = (v_x_339_4 xor (v_x_339_4 shr 32))
+    val v_x_350_6 = (((fold_342_5 xor (fold_342_5 shr 16))).toInt() and ((buckets_334_3 as Array<Any?>).size - 1))
+    val bkt_351_7 = (buckets_334_3 as Array<Any?>)[v_x_350_6]
+    val v_x_352_8 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___redArg(a, bkt_351_7)
+    if (!v_x_352_8)     {
+        val size__354_9 = ((size_333_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
+        (buckets_334_3 as Array<Any?>)[v_x_350_6] = arrayOf<Any?>(1, a, b, bkt_351_7)
+        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__354_9.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_334_3 as Array<Any?>).size.toLong())))         {
+            val val_363_10 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1___redArg(buckets_334_3)
+            return arrayOf<Any?>(0, size__354_9, val_363_10)
         } else         {
-            return arrayOf<Any?>(0, size__355_9, buckets_335_3)
+            return arrayOf<Any?>(0, size__354_9, buckets_334_3)
         }
     } else     {
-        (buckets_335_3 as Array<Any?>)[v_x_351_6] = arrayOf<Any?>(0)
-        val v_x_373_11 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__2___redArg(a, b, bkt_352_7)
-        (buckets_335_3 as Array<Any?>)[v_x_351_6] = v_x_373_11
-        return arrayOf<Any?>(0, size_334_2, buckets_335_3)
+        (buckets_334_3 as Array<Any?>)[v_x_350_6] = arrayOf<Any?>(0)
+        val v_x_372_11 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__2___redArg(a, b, bkt_351_7)
+        (buckets_334_3 as Array<Any?>)[v_x_350_6] = v_x_372_11
+        return arrayOf<Any?>(0, size_333_2, buckets_334_3)
     }
 }
 
@@ -442,8 +434,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0___boxed(p_0: Any?, a: Any?, p_2: Any?): Any? {
-    val res_400_1 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0(p_0, (a as String), p_2)
-    return res_400_1
+    val res_399_1 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__0(p_0, (a as String), p_2)
+    return res_399_1
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00genericMapInsert_spec__0_spec__1(p_0: Any?, data: Any?): Any? {
@@ -470,12 +462,12 @@ data class Container<T>(val optItem: PairItem<T>?)
             return fallback
         }
         1 ->         {
-            val value_423_2 = (p_2 as Array<*>)[2]
-            val tail_424_3 = (p_2 as Array<*>)[3]
+            val value_422_2 = (p_2 as Array<*>)[2]
+            val tail_423_3 = (p_2 as Array<*>)[3]
             if (!(((p_2 as Array<*>)[1] as String) == a))             {
-                return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0_spec__0___redArg(a, fallback, tail_424_3)
+                return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0_spec__0___redArg(a, fallback, tail_423_3)
             } else             {
-                return value_423_2
+                return value_422_2
             }
         }
         else ->         { error("unreachable") }
@@ -487,10 +479,10 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0___redArg(m: Any?, a: String, fallback: Any?): Any? {
-    val buckets_434_2 = (m as Array<*>)[2]
-    val v_x_436_3 = (a).encodeToByteArray().contentHashCode().toULong()
-    val fold_439_4 = (v_x_436_3 xor (v_x_436_3 shr 32))
-    return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0_spec__0___redArg(a, fallback, (buckets_434_2 as Array<Any?>)[(((fold_439_4 xor (fold_439_4 shr 16))).toInt() and ((buckets_434_2 as Array<Any?>).size - 1))])
+    val buckets_433_2 = (m as Array<*>)[2]
+    val v_x_435_3 = (a).encodeToByteArray().contentHashCode().toULong()
+    val fold_438_4 = (v_x_435_3 xor (v_x_435_3 shr 32))
+    return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0_spec__0___redArg(a, fallback, (buckets_433_2 as Array<Any?>)[(((fold_438_4 xor (fold_438_4 shr 16))).toInt() and ((buckets_433_2 as Array<Any?>).size - 1))])
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00genericMapGet_spec__0___redArg___boxed(m: Any?, a: Any?, fallback: Any?): Any? {
@@ -546,8 +538,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_mapWithBox___redArg(k: String, v: Any?): Any? {
-    val v_x_501_1 = f_makeGenericMapHolder___redArg___closed__1()
-    return f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_501_1, k, Box<Any?>(v))
+    val v_x_500_1 = f_makeGenericMapHolder___redArg___closed__1()
+    return f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_500_1, k, Box<Any?>(v))
 }
 
 @PublishedApi internal fun <T> f_mapWithBox(k: String, v: T): Any? {
@@ -555,13 +547,13 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_getBoxValFromMap___redArg(m: Any?, k: String, defaultVal: Any?): Any? {
-    val v_x_511_1 = f_Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0___redArg(m, k)
-    when (((v_x_511_1 as Array<*>)[0] as Int))     {
+    val v_x_510_1 = f_Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0___redArg(m, k)
+    when (((v_x_510_1 as Array<*>)[0] as Int))     {
         0 ->         {
             return defaultVal
         }
         1 ->         {
-            return f_Box_extractVal___redArg(((v_x_511_1 as Array<*>)[1] as Box<*>))
+            return f_Box_extractVal___redArg(((v_x_510_1 as Array<*>)[1] as Box<*>))
         }
         else ->         { error("unreachable") }
     }
@@ -580,8 +572,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_mapWithCustomList___redArg(k: String, v: Any?): Any? {
-    val v_x_530_1 = f_makeGenericMapHolder___redArg___closed__1()
-    return f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_530_1, k, CustomList.Cons<Any?>(v, (CustomList.Nil as CustomList<Any?>)))
+    val v_x_529_1 = f_makeGenericMapHolder___redArg___closed__1()
+    return f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(v_x_529_1, k, CustomList.Cons<Any?>(v, (CustomList.Nil as CustomList<Any?>)))
 }
 
 @PublishedApi internal fun <T> f_mapWithCustomList(k: String, v: T): Any? {
@@ -589,19 +581,19 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_getHeadFromMap___redArg(m: Any?, k: String, defaultVal: Any?): Any? {
-    val v_x_541_1 = f_Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0___redArg(m, k)
-    when (((v_x_541_1 as Array<*>)[0] as Int))     {
+    val v_x_540_1 = f_Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0___redArg(m, k)
+    when (((v_x_540_1 as Array<*>)[0] as Int))     {
         0 ->         {
             return defaultVal
         }
         1 ->         {
-            val val_542_2 = ((v_x_541_1 as Array<*>)[1] as CustomList<*>)
-            when (val_542_2)             {
+            val val_541_2 = ((v_x_540_1 as Array<*>)[1] as CustomList<*>)
+            when (val_541_2)             {
                 CustomList.Nil ->                 {
                     return defaultVal
                 }
                 is CustomList.Cons<*> ->                 {
-                    return val_542_2.head
+                    return val_541_2.head
                 }
                 else ->                 { error("unreachable") }
             }
@@ -623,9 +615,9 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_instBEqBox_beq___at___00Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1_spec__2(p_0: Box<*>, p_1: Box<*>): Boolean {
-    val val_560_1 = p_0.`val`
-    val val_561_2 = p_1.`val`
-    return ((val_560_1 as String) == (val_561_2 as String))
+    val val_559_1 = p_0.`val`
+    val val_560_2 = p_1.`val`
+    return ((val_559_1 as String) == (val_560_2 as String))
 }
 
 @PublishedApi internal tailrec fun f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a: Box<*>, p_1: Any?): Boolean {
@@ -634,10 +626,10 @@ data class Container<T>(val optItem: PairItem<T>?)
             return false
         }
         1 ->         {
-            val tail_567_2 = (p_1 as Array<*>)[3]
-            val v_x_568_3 = f_instBEqBox_beq___at___00Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1_spec__2(((p_1 as Array<*>)[1] as Box<*>), a)
-            if (!v_x_568_3)             {
-                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, tail_567_2)
+            val tail_566_2 = (p_1 as Array<*>)[3]
+            val v_x_567_3 = f_instBEqBox_beq___at___00Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1_spec__2(((p_1 as Array<*>)[1] as Box<*>), a)
+            if (!v_x_567_3)             {
+                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, tail_566_2)
             } else             {
                 return true
             }
@@ -647,8 +639,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(p_0: Box<*>): ULong {
-    val val_571_1 = p_0.`val`
-    return (run { val k = ((val_571_1 as String)).encodeToByteArray().contentHashCode().toULong() * 0xc6a4a7935bd1e995uL; val k2 = (k xor (k shr 47)) * 0xc6a4a7935bd1e995uL; (0uL xor k2) * 0xc6a4a7935bd1e995uL })
+    val val_570_1 = p_0.`val`
+    return (run { val k = ((val_570_1 as String)).encodeToByteArray().contentHashCode().toULong() * 0xc6a4a7935bd1e995uL; val k2 = (k xor (k shr 47)) * 0xc6a4a7935bd1e995uL; (0uL xor k2) * 0xc6a4a7935bd1e995uL })
 }
 
 @PublishedApi internal tailrec fun f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4_spec__5___redArg(p_0: Any?, p_1: Any?): Unit {
@@ -657,15 +649,15 @@ data class Container<T>(val optItem: PairItem<T>?)
             return
         }
         1 ->         {
-            val key_577_2 = ((p_1 as Array<*>)[1] as Box<*>)
-            val value_578_3 = (p_1 as Array<*>)[2]
-            val tail_579_4 = (p_1 as Array<*>)[3]
-            val v_x_583_5 = java.math.BigInteger.valueOf((p_0 as Array<Any?>).size.toLong())
-            val v_x_584_6 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(key_577_2)
-            val fold_587_7 = (v_x_584_6 xor (v_x_584_6 shr 32))
-            val v_x_595_8 = (((fold_587_7 xor (fold_587_7 shr 16))).toInt() and ((v_x_583_5).toInt() - 1))
-            (p_0 as Array<Any?>)[v_x_595_8] = arrayOf<Any?>(1, key_577_2, value_578_3, (p_0 as Array<Any?>)[v_x_595_8])
-            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4_spec__5___redArg(p_0, tail_579_4)
+            val key_576_2 = ((p_1 as Array<*>)[1] as Box<*>)
+            val value_577_3 = (p_1 as Array<*>)[2]
+            val tail_578_4 = (p_1 as Array<*>)[3]
+            val v_x_582_5 = java.math.BigInteger.valueOf((p_0 as Array<Any?>).size.toLong())
+            val v_x_583_6 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(key_576_2)
+            val fold_586_7 = (v_x_583_6 xor (v_x_583_6 shr 32))
+            val v_x_594_8 = (((fold_586_7 xor (fold_586_7 shr 16))).toInt() and ((v_x_582_5).toInt() - 1))
+            (p_0 as Array<Any?>)[v_x_594_8] = arrayOf<Any?>(1, key_576_2, value_577_3, (p_0 as Array<Any?>)[v_x_594_8])
+            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4_spec__5___redArg(p_0, tail_578_4)
             return
         }
         else ->         { error("unreachable") }
@@ -676,38 +668,38 @@ data class Container<T>(val optItem: PairItem<T>?)
     if (!(i < java.math.BigInteger.valueOf((source as Array<Any?>).size.toLong())))     {
         return
     } else     {
-        val es_608_1 = (source as Array<Any?>)[(i).toInt()]
+        val es_607_1 = (source as Array<Any?>)[(i).toInt()]
         (source as Array<Any?>)[(i).toInt()] = arrayOf<Any?>(0)
-        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4_spec__5___redArg(target, es_608_1)
-        val v_x_613_2 = (i.add(java.math.BigInteger.ONE))
-        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4___redArg(v_x_613_2, source, target)
+        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4_spec__5___redArg(target, es_607_1)
+        val v_x_612_2 = (i.add(java.math.BigInteger.ONE))
+        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4___redArg(v_x_612_2, source, target)
         return
     }
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2___redArg(data: Any?): Any? {
-    val v_x_621_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
-    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4___redArg(java.math.BigInteger.ZERO, data, v_x_621_1)
-    return v_x_621_1
+    val v_x_620_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
+    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2_spec__4___redArg(java.math.BigInteger.ZERO, data, v_x_620_1)
+    return v_x_620_1
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0___redArg(m: Any?, a: Box<*>, b: Any?): Any? {
-    val size_627_2 = (m as Array<*>)[1]
-    val buckets_628_3 = (m as Array<*>)[2]
-    val v_x_629_4 = java.math.BigInteger.valueOf((buckets_628_3 as Array<Any?>).size.toLong())
-    val v_x_630_5 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(a)
-    val fold_633_6 = (v_x_630_5 xor (v_x_630_5 shr 32))
-    val v_x_641_7 = (((fold_633_6 xor (fold_633_6 shr 16))).toInt() and ((v_x_629_4).toInt() - 1))
-    val bkt_642_8 = (buckets_628_3 as Array<Any?>)[v_x_641_7]
-    val v_x_643_9 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, bkt_642_8)
-    if (!v_x_643_9)     {
-        val size__648_10 = ((size_627_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
-        (buckets_628_3 as Array<Any?>)[v_x_641_7] = arrayOf<Any?>(1, a, b, bkt_642_8)
-        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__648_10.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_628_3 as Array<Any?>).size.toLong())))         {
-            val val_657_11 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2___redArg(buckets_628_3)
-            return arrayOf<Any?>(0, size__648_10, val_657_11)
+    val size_626_2 = (m as Array<*>)[1]
+    val buckets_627_3 = (m as Array<*>)[2]
+    val v_x_628_4 = java.math.BigInteger.valueOf((buckets_627_3 as Array<Any?>).size.toLong())
+    val v_x_629_5 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(a)
+    val fold_632_6 = (v_x_629_5 xor (v_x_629_5 shr 32))
+    val v_x_640_7 = (((fold_632_6 xor (fold_632_6 shr 16))).toInt() and ((v_x_628_4).toInt() - 1))
+    val bkt_641_8 = (buckets_627_3 as Array<Any?>)[v_x_640_7]
+    val v_x_642_9 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, bkt_641_8)
+    if (!v_x_642_9)     {
+        val size__647_10 = ((size_626_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
+        (buckets_627_3 as Array<Any?>)[v_x_640_7] = arrayOf<Any?>(1, a, b, bkt_641_8)
+        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__647_10.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_627_3 as Array<Any?>).size.toLong())))         {
+            val val_656_11 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__2___redArg(buckets_627_3)
+            return arrayOf<Any?>(0, size__647_10, val_656_11)
         } else         {
-            return arrayOf<Any?>(0, size__648_10, buckets_628_3)
+            return arrayOf<Any?>(0, size__647_10, buckets_627_3)
         }
     } else     {
         return m
@@ -719,15 +711,15 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_makeBoxSet___closed__1(): Any? {
-    val v_x_670_1 = f_makeBoxSet___closed__0()
-    return arrayOf<Any?>(0, java.math.BigInteger.ZERO, v_x_670_1)
+    val v_x_669_1 = f_makeBoxSet___closed__0()
+    return arrayOf<Any?>(0, java.math.BigInteger.ZERO, v_x_669_1)
 }
 
 @PublishedApi internal fun f_makeBoxSet(b1: Box<String>, b2: Box<String>): Any? {
-    val v_x_675_1 = f_makeBoxSet___closed__1()
-    val v_x_676_2 = arrayOf<Any?>(0)
-    val v_x_677_3 = f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0___redArg(v_x_675_1, (b1 as Box<*>), v_x_676_2)
-    return f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0___redArg(v_x_677_3, (b2 as Box<*>), v_x_676_2)
+    val v_x_674_1 = f_makeBoxSet___closed__1()
+    val v_x_675_2 = arrayOf<Any?>(0)
+    val v_x_676_3 = f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0___redArg(v_x_674_1, (b1 as Box<*>), v_x_675_2)
+    return f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0___redArg(v_x_676_3, (b2 as Box<*>), v_x_675_2)
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0(p_0: Any?, m: Any?, a: Box<*>, b: Any?): Any? {
@@ -753,11 +745,11 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_Std_DHashMap_Internal_Raw_u2080_contains___at___00boxSetContains_spec__0___redArg(m: Any?, a: Box<*>): Boolean {
-    val buckets_702_2 = (m as Array<*>)[2]
-    val v_x_703_3 = java.math.BigInteger.valueOf((buckets_702_2 as Array<Any?>).size.toLong())
-    val v_x_704_4 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(a)
-    val fold_707_5 = (v_x_704_4 xor (v_x_704_4 shr 32))
-    return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, (buckets_702_2 as Array<Any?>)[(((fold_707_5 xor (fold_707_5 shr 16))).toInt() and ((v_x_703_3).toInt() - 1))])
+    val buckets_701_2 = (m as Array<*>)[2]
+    val v_x_702_3 = java.math.BigInteger.valueOf((buckets_701_2 as Array<Any?>).size.toLong())
+    val v_x_703_4 = f_instHashableBox_hash___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__0(a)
+    val fold_706_5 = (v_x_703_4 xor (v_x_703_4 shr 32))
+    return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insertIfNew___at___00makeBoxSet_spec__0_spec__1___redArg(a, (buckets_701_2 as Array<Any?>)[(((fold_706_5 xor (fold_706_5 shr 16))).toInt() and ((v_x_702_3).toInt() - 1))])
 }
 
 @PublishedApi internal fun f_boxSetContains(s: Any?, query: Box<String>): Boolean {
@@ -768,62 +760,23 @@ data class Container<T>(val optItem: PairItem<T>?)
     return f_Std_DHashMap_Internal_Raw_u2080_contains___at___00boxSetContains_spec__0___redArg(m, a)
 }
 
-@PublishedApi internal tailrec fun f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(k: String, t: Any?): Boolean {
-    when (((t as Array<*>)[0] as Int))     {
-        0 ->         {
-            val l_728_2 = (t as Array<*>)[4]
-            val r_729_3 = (t as Array<*>)[5]
-            when ((run { val c = (k).compareTo(((t as Array<*>)[2] as String)); if (c < 0) 0 else if (c == 0) 1 else 2 }))             {
-                0 ->                 {
-                    return f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(k, l_728_2)
-                }
-                1 ->                 {
-                    return true
-                }
-                2 ->                 {
-                    return f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(k, r_729_3)
-                }
-                else ->                 { error("unreachable") }
-            }
-        }
-        1 ->         {
-            return false
-        }
-        else ->         { error("unreachable") }
-    }
-}
-
-@PublishedApi internal fun f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg___boxed(k: Any?, t: Any?): Any? {
-    val res_737_1 = f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg((k as String), t)
-    return res_737_1
-}
-
 @PublishedApi internal fun f_makeTreeSetWith(x: String): Any? {
-    val v_x_740_1 = arrayOf<Any?>(1)
-    val v_x_741_2 = f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(x, v_x_740_1)
-    if (!v_x_741_2)     {
-        return f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(x, arrayOf<Any?>(0), v_x_740_1)
+    val v_x_725_1 = arrayOf<Any?>(1)
+    val v_x_726_2 = f_Std_DTreeMap_Internal_Impl_contains___at___00Lean_Json_Parser_objectCore_spec__2___redArg(x, v_x_725_1)
+    if (!v_x_726_2)     {
+        return f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(x, arrayOf<Any?>(0), v_x_725_1)
     } else     {
-        return v_x_740_1
+        return v_x_725_1
     }
-}
-
-@PublishedApi internal fun f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0(p_0: Any?, k: String, t: Any?): Boolean {
-    return f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(k, t)
-}
-
-@PublishedApi internal fun f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___boxed(p_0: Any?, k: Any?, t: Any?): Any? {
-    val res_751_1 = f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0(p_0, (k as String), t)
-    return res_751_1
 }
 
 @PublishedApi internal fun f_treeSetContains(s: Any?, x: String): Boolean {
-    return f_Std_DTreeMap_Internal_Impl_contains___at___00makeTreeSetWith_spec__0___redArg(x, s)
+    return f_Std_DTreeMap_Internal_Impl_contains___at___00Lean_Json_Parser_objectCore_spec__2___redArg(x, s)
 }
 
 @PublishedApi internal fun f_treeSetContains___boxed(s: Any?, x: Any?): Any? {
-    val res_758_1 = f_treeSetContains(s, (x as String))
-    return res_758_1
+    val res_734_1 = f_treeSetContains(s, (x as String))
+    return res_734_1
 }
 
 @PublishedApi internal fun f_instInhabitedPairItem_default___redArg___closed__0(): String {
@@ -831,8 +784,8 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_instInhabitedPairItem_default___redArg(p_0: Any?): PairItem<*> {
-    val v_x_762_1 = ""
-    return (PairItem<Any?>(v_x_762_1, p_0) as PairItem<*>)
+    val v_x_738_1 = ""
+    return (PairItem<Any?>(v_x_738_1, p_0) as PairItem<*>)
 }
 
 @PublishedApi internal fun <T> f_instInhabitedPairItem_default(p_0: Any?): PairItem<T> {
@@ -848,12 +801,12 @@ data class Container<T>(val optItem: PairItem<T>?)
 }
 
 @PublishedApi internal fun f_checkItem___redArg(c: Container<*>, expectedId: String): Boolean {
-    val optItem_774_1 = c.optItem
-    if (optItem_774_1 == null)     {
+    val optItem_750_1 = c.optItem
+    if (optItem_750_1 == null)     {
         return false
     } else     {
-        val id_777_2 = optItem_774_1.id
-        return (expectedId == id_777_2)
+        val id_753_2 = optItem_750_1.id
+        return (expectedId == id_753_2)
     }
 }
 
@@ -873,8 +826,8 @@ data class Container<T>(val optItem: PairItem<T>?)
             return (Container<Any?>((fallback as PairItem<Any?>?)) as Container<*>)
         }
     } else     {
-        val optItem_791_1 = c.optItem
-        return (Container<Any?>((optItem_791_1 as PairItem<Any?>?)) as Container<*>)
+        val optItem_767_1 = c.optItem
+        return (Container<Any?>((optItem_767_1 as PairItem<Any?>?)) as Container<*>)
     }
 }
 
@@ -882,89 +835,114 @@ data class Container<T>(val optItem: PairItem<T>?)
     return (f_stepContainer___redArg((c as Container<*>), (fallback as PairItem<*>?), cond1, cond2) as Container<T>)
 }
 
+private tailrec fun f_Std_DTreeMap_Internal_Impl_contains___at___00Lean_Json_Parser_objectCore_spec__2___redArg(k: String, t: Any?): Boolean {
+    when (((t as Array<*>)[0] as Int))     {
+        0 ->         {
+            val l_784_2 = (t as Array<*>)[4]
+            val r_785_3 = (t as Array<*>)[5]
+            when ((run { val c = (k).compareTo(((t as Array<*>)[2] as String)); if (c < 0) 0 else if (c == 0) 1 else 2 }))             {
+                0 ->                 {
+                    return f_Std_DTreeMap_Internal_Impl_contains___at___00Lean_Json_Parser_objectCore_spec__2___redArg(k, l_784_2)
+                }
+                1 ->                 {
+                    return true
+                }
+                2 ->                 {
+                    return f_Std_DTreeMap_Internal_Impl_contains___at___00Lean_Json_Parser_objectCore_spec__2___redArg(k, r_785_3)
+                }
+                else ->                 { error("unreachable") }
+            }
+        }
+        1 ->         {
+            return false
+        }
+        else ->         { error("unreachable") }
+    }
+}
+
 private fun f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k: String, v: Any?, t: Any?): Any? {
     when (((t as Array<*>)[0] as Int))     {
         0 ->         {
-            val size_808_16 = (t as Array<*>)[1]
-            val k_809_17 = (t as Array<*>)[2]
-            val v_810_18 = (t as Array<*>)[3]
-            val l_811_13 = (t as Array<*>)[4]
-            val r_812_6 = (t as Array<*>)[5]
-            when ((run { val c = (k).compareTo((k_809_17 as String)); if (c < 0) 0 else if (c == 0) 1 else 2 }))             {
+            val size_794_16 = (t as Array<*>)[1]
+            val k_795_17 = (t as Array<*>)[2]
+            val v_796_18 = (t as Array<*>)[3]
+            val l_797_13 = (t as Array<*>)[4]
+            val r_798_6 = (t as Array<*>)[5]
+            when ((run { val c = (k).compareTo((k_795_17 as String)); if (c < 0) 0 else if (c == 0) 1 else 2 }))             {
                 0 ->                 {
-                    val impl_814_5 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, l_811_13)
-                    when (((r_812_6 as Array<*>)[0] as Int))                     {
+                    val impl_800_5 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, l_797_13)
+                    when (((r_798_6 as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val size_816_19 = (r_812_6 as Array<*>)[1]
-                            val size_817_20 = (impl_814_5 as Array<*>)[1]
-                            val k_818_21 = (impl_814_5 as Array<*>)[2]
-                            val v_819_22 = (impl_814_5 as Array<*>)[3]
-                            val l_820_4 = (impl_814_5 as Array<*>)[4]
-                            val r_821_3 = (impl_814_5 as Array<*>)[5]
-                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_816_19 as java.math.BigInteger))) < (size_817_20 as java.math.BigInteger)))                             {
-                                return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_817_20 as java.math.BigInteger))).add((size_816_19 as java.math.BigInteger))), k_809_17, v_810_18, impl_814_5, r_812_6)
+                            val size_802_19 = (r_798_6 as Array<*>)[1]
+                            val size_803_20 = (impl_800_5 as Array<*>)[1]
+                            val k_804_21 = (impl_800_5 as Array<*>)[2]
+                            val v_805_22 = (impl_800_5 as Array<*>)[3]
+                            val l_806_4 = (impl_800_5 as Array<*>)[4]
+                            val r_807_3 = (impl_800_5 as Array<*>)[5]
+                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_802_19 as java.math.BigInteger))) < (size_803_20 as java.math.BigInteger)))                             {
+                                return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_803_20 as java.math.BigInteger))).add((size_802_19 as java.math.BigInteger))), k_795_17, v_796_18, impl_800_5, r_798_6)
                             } else                             {
-                                val size_828_23 = (if (l_820_4 is Pair<*, *>) l_820_4.first else (l_820_4 as Array<*>)[1])
-                                val size_829_24 = (if (r_821_3 is Pair<*, *>) r_821_3.first else (r_821_3 as Array<*>)[1])
-                                val k_830_25 = (if (r_821_3 is Pair<*, *>) r_821_3.second else (r_821_3 as Array<*>)[2])
-                                val v_831_26 = (r_821_3 as Array<*>)[3]
-                                val l_832_2 = (r_821_3 as Array<*>)[4]
-                                val r_833_1 = (r_821_3 as Array<*>)[5]
-                                if (!((size_829_24 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_828_23 as java.math.BigInteger)))))                                 {
-                                    val v_x_838_27 = ((java.math.BigInteger.ONE.add((size_817_20 as java.math.BigInteger))).add((size_816_19 as java.math.BigInteger)))
-                                    val v_y_840_28: Any?
-                                    val v_y_841_29: Any?
-                                    val v_y_842_30: Any?
-                                    val v_x_846_31 = (java.math.BigInteger.ONE.add((size_828_23 as java.math.BigInteger)))
-                                    val v_y_848_32: Any?
-                                    when (((l_832_2 as Array<*>)[0] as Int))                                     {
+                                val size_814_23 = (if (l_806_4 is Pair<*, *>) l_806_4.first else (l_806_4 as Array<*>)[1])
+                                val size_815_24 = (if (r_807_3 is Pair<*, *>) r_807_3.first else (r_807_3 as Array<*>)[1])
+                                val k_816_25 = (if (r_807_3 is Pair<*, *>) r_807_3.second else (r_807_3 as Array<*>)[2])
+                                val v_817_26 = (r_807_3 as Array<*>)[3]
+                                val l_818_2 = (r_807_3 as Array<*>)[4]
+                                val r_819_1 = (r_807_3 as Array<*>)[5]
+                                if (!((size_815_24 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_814_23 as java.math.BigInteger)))))                                 {
+                                    val v_x_824_27 = ((java.math.BigInteger.ONE.add((size_803_20 as java.math.BigInteger))).add((size_802_19 as java.math.BigInteger)))
+                                    val v_y_826_28: Any?
+                                    val v_y_827_29: Any?
+                                    val v_y_828_30: Any?
+                                    val v_x_832_31 = (java.math.BigInteger.ONE.add((size_814_23 as java.math.BigInteger)))
+                                    val v_y_834_32: Any?
+                                    when (((l_818_2 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_854_33 = (l_832_2 as Array<*>)[1]
-                                            v_y_848_32 = size_854_33
+                                            val size_840_33 = (l_818_2 as Array<*>)[1]
+                                            v_y_834_32 = size_840_33
                                         }
                                         1 ->                                         {
-                                            v_y_848_32 = java.math.BigInteger.ZERO
+                                            v_y_834_32 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
-                                    val v_x_849_34 = (v_x_846_31.add((v_y_848_32 as java.math.BigInteger)))
-                                    val v_x_850_35 = arrayOf<Any?>(0, v_x_849_34, k_818_21, v_819_22, l_820_4, l_832_2)
-                                    val v_x_851_36 = (java.math.BigInteger.ONE.add((size_816_19 as java.math.BigInteger)))
-                                    when (((r_833_1 as Array<*>)[0] as Int))                                     {
+                                    val v_x_835_34 = (v_x_832_31.add((v_y_834_32 as java.math.BigInteger)))
+                                    val v_x_836_35 = arrayOf<Any?>(0, v_x_835_34, k_804_21, v_805_22, l_806_4, l_818_2)
+                                    val v_x_837_36 = (java.math.BigInteger.ONE.add((size_802_19 as java.math.BigInteger)))
+                                    when (((r_819_1 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_852_37 = (r_833_1 as Array<*>)[1]
-                                            v_y_840_28 = v_x_851_36
-                                            v_y_841_29 = v_x_850_35
-                                            v_y_842_30 = size_852_37
+                                            val size_838_37 = (r_819_1 as Array<*>)[1]
+                                            v_y_826_28 = v_x_837_36
+                                            v_y_827_29 = v_x_836_35
+                                            v_y_828_30 = size_838_37
                                         }
                                         1 ->                                         {
-                                            v_y_840_28 = v_x_851_36
-                                            v_y_841_29 = v_x_850_35
-                                            v_y_842_30 = java.math.BigInteger.ZERO
+                                            v_y_826_28 = v_x_837_36
+                                            v_y_827_29 = v_x_836_35
+                                            v_y_828_30 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
-                                    return arrayOf<Any?>(0, v_x_838_27, k_830_25, v_831_26, v_y_841_29, arrayOf<Any?>(0, ((v_y_840_28 as java.math.BigInteger).add((v_y_842_30 as java.math.BigInteger))), k_809_17, v_810_18, r_833_1, r_812_6))
+                                    return arrayOf<Any?>(0, v_x_824_27, k_816_25, v_817_26, v_y_827_29, arrayOf<Any?>(0, ((v_y_826_28 as java.math.BigInteger).add((v_y_828_30 as java.math.BigInteger))), k_795_17, v_796_18, r_819_1, r_798_6))
                                 } else                                 {
-                                    return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_817_20 as java.math.BigInteger))).add((size_816_19 as java.math.BigInteger))), k_818_21, v_819_22, l_820_4, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_816_19 as java.math.BigInteger))).add((size_829_24 as java.math.BigInteger))), k_809_17, v_810_18, r_821_3, r_812_6))
+                                    return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_803_20 as java.math.BigInteger))).add((size_802_19 as java.math.BigInteger))), k_804_21, v_805_22, l_806_4, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_802_19 as java.math.BigInteger))).add((size_815_24 as java.math.BigInteger))), k_795_17, v_796_18, r_807_3, r_798_6))
                                 }
                             }
                         }
                         1 ->                         {
-                            val l_862_38 = (impl_814_5 as Array<*>)[4]
-                            when (((l_862_38 as Array<*>)[0] as Int))                             {
+                            val l_848_38 = (impl_800_5 as Array<*>)[4]
+                            when (((l_848_38 as Array<*>)[0] as Int))                             {
                                 0 ->                                 {
-                                    val r_863_39 = (impl_814_5 as Array<*>)[5]
-                                    return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (impl_814_5 as Array<*>)[2], (impl_814_5 as Array<*>)[3], l_862_38, arrayOf<Any?>(0, java.math.BigInteger.ONE, k_809_17, v_810_18, r_863_39, r_863_39))
+                                    val r_849_39 = (impl_800_5 as Array<*>)[5]
+                                    return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (impl_800_5 as Array<*>)[2], (impl_800_5 as Array<*>)[3], l_848_38, arrayOf<Any?>(0, java.math.BigInteger.ONE, k_795_17, v_796_18, r_849_39, r_849_39))
                                 }
                                 1 ->                                 {
-                                    val r_869_7 = (impl_814_5 as Array<*>)[5]
-                                    when (((r_869_7 as Array<*>)[0] as Int))                                     {
+                                    val r_855_7 = (impl_800_5 as Array<*>)[5]
+                                    when (((r_855_7 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r_869_7 as Array<*>)[2], (r_869_7 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, (impl_814_5 as Array<*>)[2], (impl_814_5 as Array<*>)[3], l_862_38, l_862_38), arrayOf<Any?>(0, java.math.BigInteger.ONE, k_809_17, v_810_18, l_862_38, l_862_38))
+                                            return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r_855_7 as Array<*>)[2], (r_855_7 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, (impl_800_5 as Array<*>)[2], (impl_800_5 as Array<*>)[3], l_848_38, l_848_38), arrayOf<Any?>(0, java.math.BigInteger.ONE, k_795_17, v_796_18, l_848_38, l_848_38))
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, java.math.BigInteger.TWO, k_809_17, v_810_18, impl_814_5, r_869_7)
+                                            return arrayOf<Any?>(0, java.math.BigInteger.TWO, k_795_17, v_796_18, impl_800_5, r_855_7)
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
@@ -976,83 +954,83 @@ private fun f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0
                     }
                 }
                 1 ->                 {
-                    return arrayOf<Any?>(0, size_808_16, k, v, l_811_13, r_812_6)
+                    return arrayOf<Any?>(0, size_794_16, k, v, l_797_13, r_798_6)
                 }
                 2 ->                 {
-                    val impl_881_12 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, r_812_6)
-                    when (((l_811_13 as Array<*>)[0] as Int))                     {
+                    val impl_867_12 = f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0___redArg(k, v, r_798_6)
+                    when (((l_797_13 as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val size_883_40 = (l_811_13 as Array<*>)[1]
-                            val size_884_41 = (impl_881_12 as Array<*>)[1]
-                            val k_885_42 = (impl_881_12 as Array<*>)[2]
-                            val v_886_43 = (impl_881_12 as Array<*>)[3]
-                            val l_887_11 = (impl_881_12 as Array<*>)[4]
-                            val r_888_10 = (impl_881_12 as Array<*>)[5]
-                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_883_40 as java.math.BigInteger))) < (size_884_41 as java.math.BigInteger)))                             {
-                                return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_883_40 as java.math.BigInteger))).add((size_884_41 as java.math.BigInteger))), k_809_17, v_810_18, l_811_13, impl_881_12)
+                            val size_869_40 = (l_797_13 as Array<*>)[1]
+                            val size_870_41 = (impl_867_12 as Array<*>)[1]
+                            val k_871_42 = (impl_867_12 as Array<*>)[2]
+                            val v_872_43 = (impl_867_12 as Array<*>)[3]
+                            val l_873_11 = (impl_867_12 as Array<*>)[4]
+                            val r_874_10 = (impl_867_12 as Array<*>)[5]
+                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_869_40 as java.math.BigInteger))) < (size_870_41 as java.math.BigInteger)))                             {
+                                return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_869_40 as java.math.BigInteger))).add((size_870_41 as java.math.BigInteger))), k_795_17, v_796_18, l_797_13, impl_867_12)
                             } else                             {
-                                val size_895_44 = (if (l_887_11 is Pair<*, *>) l_887_11.first else (l_887_11 as Array<*>)[1])
-                                val k_896_45 = (if (l_887_11 is Pair<*, *>) l_887_11.second else (l_887_11 as Array<*>)[2])
-                                val v_897_46 = (l_887_11 as Array<*>)[3]
-                                val l_898_9 = (l_887_11 as Array<*>)[4]
-                                val r_899_8 = (l_887_11 as Array<*>)[5]
-                                val size_900_47 = (if (r_888_10 is Pair<*, *>) r_888_10.first else (r_888_10 as Array<*>)[1])
-                                if (!((size_895_44 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_900_47 as java.math.BigInteger)))))                                 {
-                                    val v_x_904_48 = (java.math.BigInteger.ONE.add((size_883_40 as java.math.BigInteger)))
-                                    val v_x_905_49 = (v_x_904_48.add((size_884_41 as java.math.BigInteger)))
-                                    val v_y_907_50: Any?
-                                    val v_y_908_51: Any?
-                                    val v_y_909_52: Any?
-                                    val v_y_914_53: Any?
-                                    when (((l_898_9 as Array<*>)[0] as Int))                                     {
+                                val size_881_44 = (if (l_873_11 is Pair<*, *>) l_873_11.first else (l_873_11 as Array<*>)[1])
+                                val k_882_45 = (if (l_873_11 is Pair<*, *>) l_873_11.second else (l_873_11 as Array<*>)[2])
+                                val v_883_46 = (l_873_11 as Array<*>)[3]
+                                val l_884_9 = (l_873_11 as Array<*>)[4]
+                                val r_885_8 = (l_873_11 as Array<*>)[5]
+                                val size_886_47 = (if (r_874_10 is Pair<*, *>) r_874_10.first else (r_874_10 as Array<*>)[1])
+                                if (!((size_881_44 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_886_47 as java.math.BigInteger)))))                                 {
+                                    val v_x_890_48 = (java.math.BigInteger.ONE.add((size_869_40 as java.math.BigInteger)))
+                                    val v_x_891_49 = (v_x_890_48.add((size_870_41 as java.math.BigInteger)))
+                                    val v_y_893_50: Any?
+                                    val v_y_894_51: Any?
+                                    val v_y_895_52: Any?
+                                    val v_y_900_53: Any?
+                                    when (((l_884_9 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_920_54 = (l_898_9 as Array<*>)[1]
-                                            v_y_914_53 = size_920_54
+                                            val size_906_54 = (l_884_9 as Array<*>)[1]
+                                            v_y_900_53 = size_906_54
                                         }
                                         1 ->                                         {
-                                            v_y_914_53 = java.math.BigInteger.ZERO
+                                            v_y_900_53 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
-                                    val v_x_915_55 = (v_x_904_48.add((v_y_914_53 as java.math.BigInteger)))
-                                    val v_x_916_56 = arrayOf<Any?>(0, v_x_915_55, k_809_17, v_810_18, l_811_13, l_898_9)
-                                    val v_x_917_57 = (java.math.BigInteger.ONE.add((size_900_47 as java.math.BigInteger)))
-                                    when (((r_899_8 as Array<*>)[0] as Int))                                     {
+                                    val v_x_901_55 = (v_x_890_48.add((v_y_900_53 as java.math.BigInteger)))
+                                    val v_x_902_56 = arrayOf<Any?>(0, v_x_901_55, k_795_17, v_796_18, l_797_13, l_884_9)
+                                    val v_x_903_57 = (java.math.BigInteger.ONE.add((size_886_47 as java.math.BigInteger)))
+                                    when (((r_885_8 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_918_58 = (r_899_8 as Array<*>)[1]
-                                            v_y_907_50 = v_x_917_57
-                                            v_y_908_51 = v_x_916_56
-                                            v_y_909_52 = size_918_58
+                                            val size_904_58 = (r_885_8 as Array<*>)[1]
+                                            v_y_893_50 = v_x_902_56
+                                            v_y_894_51 = v_x_903_57
+                                            v_y_895_52 = size_904_58
                                         }
                                         1 ->                                         {
-                                            v_y_907_50 = v_x_917_57
-                                            v_y_908_51 = v_x_916_56
-                                            v_y_909_52 = java.math.BigInteger.ZERO
+                                            v_y_893_50 = v_x_902_56
+                                            v_y_894_51 = v_x_903_57
+                                            v_y_895_52 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
-                                    return arrayOf<Any?>(0, v_x_905_49, k_896_45, v_897_46, v_y_908_51, arrayOf<Any?>(0, ((v_y_907_50 as java.math.BigInteger).add((v_y_909_52 as java.math.BigInteger))), k_885_42, v_886_43, r_899_8, r_888_10))
+                                    return arrayOf<Any?>(0, v_x_891_49, k_882_45, v_883_46, v_y_893_50, arrayOf<Any?>(0, ((v_y_894_51 as java.math.BigInteger).add((v_y_895_52 as java.math.BigInteger))), k_871_42, v_872_43, r_885_8, r_874_10))
                                 } else                                 {
-                                    val v_x_922_59 = (java.math.BigInteger.ONE.add((size_883_40 as java.math.BigInteger)))
-                                    return arrayOf<Any?>(0, (v_x_922_59.add((size_884_41 as java.math.BigInteger))), k_885_42, v_886_43, arrayOf<Any?>(0, (v_x_922_59.add((size_895_44 as java.math.BigInteger))), k_809_17, v_810_18, l_811_13, l_887_11), r_888_10)
+                                    val v_x_908_59 = (java.math.BigInteger.ONE.add((size_869_40 as java.math.BigInteger)))
+                                    return arrayOf<Any?>(0, (v_x_908_59.add((size_870_41 as java.math.BigInteger))), k_871_42, v_872_43, arrayOf<Any?>(0, (v_x_908_59.add((size_881_44 as java.math.BigInteger))), k_795_17, v_796_18, l_797_13, l_873_11), r_874_10)
                                 }
                             }
                         }
                         1 ->                         {
-                            val l_927_14 = (impl_881_12 as Array<*>)[4]
-                            when (((l_927_14 as Array<*>)[0] as Int))                             {
+                            val l_913_14 = (impl_867_12 as Array<*>)[4]
+                            when (((l_913_14 as Array<*>)[0] as Int))                             {
                                 0 ->                                 {
-                                    val r_928_60 = (impl_881_12 as Array<*>)[5]
-                                    return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l_927_14 as Array<*>)[2], (l_927_14 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k_809_17, v_810_18, r_928_60, r_928_60), arrayOf<Any?>(0, java.math.BigInteger.ONE, (impl_881_12 as Array<*>)[2], (impl_881_12 as Array<*>)[3], r_928_60, r_928_60))
+                                    val r_914_60 = (impl_867_12 as Array<*>)[5]
+                                    return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l_913_14 as Array<*>)[2], (l_913_14 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k_795_17, v_796_18, r_914_60, r_914_60), arrayOf<Any?>(0, java.math.BigInteger.ONE, (impl_867_12 as Array<*>)[2], (impl_867_12 as Array<*>)[3], r_914_60, r_914_60))
                                 }
                                 1 ->                                 {
-                                    val r_937_61 = (impl_881_12 as Array<*>)[5]
-                                    when (((r_937_61 as Array<*>)[0] as Int))                                     {
+                                    val r_923_61 = (impl_867_12 as Array<*>)[5]
+                                    when (((r_923_61 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (impl_881_12 as Array<*>)[2], (impl_881_12 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k_809_17, v_810_18, l_927_14, l_927_14), r_937_61)
+                                            return arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (impl_867_12 as Array<*>)[2], (impl_867_12 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k_795_17, v_796_18, l_913_14, l_913_14), r_923_61)
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, java.math.BigInteger.TWO, k_809_17, v_810_18, r_937_61, impl_881_12)
+                                            return arrayOf<Any?>(0, java.math.BigInteger.TWO, k_795_17, v_796_18, r_923_61, impl_867_12)
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
@@ -1074,26 +1052,26 @@ private fun f_Std_DTreeMap_Internal_Impl_insert___at___00Lean_Json_mkObj_spec__0
 }
 
 private fun f_Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0___redArg(m: Any?, a: String): Any? {
-    val buckets_949_2 = (m as Array<*>)[2]
-    val v_x_951_3 = (a).encodeToByteArray().contentHashCode().toULong()
-    val fold_954_4 = (v_x_951_3 xor (v_x_951_3 shr 32))
-    return f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0_spec__0___redArg(a, (buckets_949_2 as Array<Any?>)[(((fold_954_4 xor (fold_954_4 shr 16))).toInt() and ((buckets_949_2 as Array<Any?>).size - 1))])
+    val buckets_935_2 = (m as Array<*>)[2]
+    val v_x_937_3 = (a).encodeToByteArray().contentHashCode().toULong()
+    val fold_940_4 = (v_x_937_3 xor (v_x_937_3 shr 32))
+    return f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0_spec__0___redArg(a, (buckets_935_2 as Array<Any?>)[(((fold_940_4 xor (fold_940_4 shr 16))).toInt() and ((buckets_935_2 as Array<Any?>).size - 1))])
 }
 
 private tailrec fun f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0_spec__0___redArg(a: String, p_1: Any?): Any? {
     when (((p_1 as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_x_967_2 = arrayOf<Any?>(0)
-            return v_x_967_2
+            val v_x_953_2 = arrayOf<Any?>(0)
+            return v_x_953_2
         }
         1 ->         {
-            val value_969_3 = (p_1 as Array<*>)[2]
-            val tail_970_4 = (p_1 as Array<*>)[3]
+            val value_955_3 = (p_1 as Array<*>)[2]
+            val tail_956_4 = (p_1 as Array<*>)[3]
             if (!(((p_1 as Array<*>)[1] as String) == a))             {
-                return f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0_spec__0___redArg(a, tail_970_4)
+                return f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHashMap_Internal_Raw_u2080_Const_get_x3f___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_resolveKnownBool_spec__0_spec__0___redArg(a, tail_956_4)
             } else             {
-                val v_x_973_5 = arrayOf<Any?>(1, value_969_3)
-                return v_x_973_5
+                val v_x_959_5 = arrayOf<Any?>(1, value_955_3)
+                return v_x_959_5
             }
         }
         else ->         { error("unreachable") }
@@ -1101,27 +1079,27 @@ private tailrec fun f_Std_DHashMap_Internal_AssocList_get_x3f___at___00Std_DHash
 }
 
 private fun f_Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0___redArg(m: Any?, a: String, b: Any?): Any? {
-    val size_977_2 = (m as Array<*>)[1]
-    val buckets_978_3 = (m as Array<*>)[2]
-    val v_x_980_4 = (a).encodeToByteArray().contentHashCode().toULong()
-    val fold_983_5 = (v_x_980_4 xor (v_x_980_4 shr 32))
-    val v_x_991_6 = (((fold_983_5 xor (fold_983_5 shr 16))).toInt() and ((buckets_978_3 as Array<Any?>).size - 1))
-    val bkt_992_7 = (buckets_978_3 as Array<Any?>)[v_x_991_6]
-    val v_x_993_8 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__0___redArg(a, bkt_992_7)
-    if (!v_x_993_8)     {
-        val size__995_9 = ((size_977_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
-        (buckets_978_3 as Array<Any?>)[v_x_991_6] = arrayOf<Any?>(1, a, b, bkt_992_7)
-        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__995_9.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_978_3 as Array<Any?>).size.toLong())))         {
-            val val_1004_10 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1___redArg(buckets_978_3)
-            return arrayOf<Any?>(0, size__995_9, val_1004_10)
+    val size_963_2 = (m as Array<*>)[1]
+    val buckets_964_3 = (m as Array<*>)[2]
+    val v_x_966_4 = (a).encodeToByteArray().contentHashCode().toULong()
+    val fold_969_5 = (v_x_966_4 xor (v_x_966_4 shr 32))
+    val v_x_977_6 = (((fold_969_5 xor (fold_969_5 shr 16))).toInt() and ((buckets_964_3 as Array<Any?>).size - 1))
+    val bkt_978_7 = (buckets_964_3 as Array<Any?>)[v_x_977_6]
+    val v_x_979_8 = f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__0___redArg(a, bkt_978_7)
+    if (!v_x_979_8)     {
+        val size__981_9 = ((size_963_2 as java.math.BigInteger).add(java.math.BigInteger.ONE))
+        (buckets_964_3 as Array<Any?>)[v_x_977_6] = arrayOf<Any?>(1, a, b, bkt_978_7)
+        if (!((if (java.math.BigInteger.valueOf(3L) == java.math.BigInteger.ZERO) java.math.BigInteger.ZERO else ((size__981_9.multiply(java.math.BigInteger.valueOf(4L)))).divide(java.math.BigInteger.valueOf(3L))) <= java.math.BigInteger.valueOf((buckets_964_3 as Array<Any?>).size.toLong())))         {
+            val val_990_10 = f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1___redArg(buckets_964_3)
+            return arrayOf<Any?>(0, size__981_9, val_990_10)
         } else         {
-            return arrayOf<Any?>(0, size__995_9, buckets_978_3)
+            return arrayOf<Any?>(0, size__981_9, buckets_964_3)
         }
     } else     {
-        (buckets_978_3 as Array<Any?>)[v_x_991_6] = arrayOf<Any?>(0)
-        val v_x_1009_11 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__2___redArg(a, b, bkt_992_7)
-        (buckets_978_3 as Array<Any?>)[v_x_991_6] = v_x_1009_11
-        return arrayOf<Any?>(0, size_977_2, buckets_978_3)
+        (buckets_964_3 as Array<Any?>)[v_x_977_6] = arrayOf<Any?>(0)
+        val v_x_995_11 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__2___redArg(a, b, bkt_978_7)
+        (buckets_964_3 as Array<Any?>)[v_x_977_6] = v_x_995_11
+        return arrayOf<Any?>(0, size_963_2, buckets_964_3)
     }
 }
 
@@ -1131,14 +1109,14 @@ private fun f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Inte
             return p_2
         }
         1 ->         {
-            val key_1015_2 = (p_2 as Array<*>)[1]
-            val value_1016_3 = (p_2 as Array<*>)[2]
-            val tail_1017_4 = (p_2 as Array<*>)[3]
-            if (!((key_1015_2 as String) == a))             {
-                val v_x_1019_5 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__2___redArg(a, b, tail_1017_4)
-                return arrayOf<Any?>(1, key_1015_2, value_1016_3, v_x_1019_5)
+            val key_1001_2 = (p_2 as Array<*>)[1]
+            val value_1002_3 = (p_2 as Array<*>)[2]
+            val tail_1003_4 = (p_2 as Array<*>)[3]
+            if (!((key_1001_2 as String) == a))             {
+                val v_x_1005_5 = f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__2___redArg(a, b, tail_1003_4)
+                return arrayOf<Any?>(1, key_1001_2, value_1002_3, v_x_1005_5)
             } else             {
-                return arrayOf<Any?>(1, a, b, tail_1017_4)
+                return arrayOf<Any?>(1, a, b, tail_1003_4)
             }
         }
         else ->         { error("unreachable") }
@@ -1146,20 +1124,20 @@ private fun f_Std_DHashMap_Internal_AssocList_replace___at___00Std_DHashMap_Inte
 }
 
 private fun f_Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1___redArg(data: Any?): Any? {
-    val v_x_1028_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
-    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2___redArg(java.math.BigInteger.ZERO, data, v_x_1028_1)
-    return v_x_1028_1
+    val v_x_1014_1 = arrayOfNulls<Any?>(((java.math.BigInteger.valueOf((data as Array<Any?>).size.toLong()).multiply(java.math.BigInteger.TWO))).toInt()).also { it.fill(arrayOf<Any?>(0)) }
+    f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2___redArg(java.math.BigInteger.ZERO, data, v_x_1014_1)
+    return v_x_1014_1
 }
 
 private tailrec fun f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2___redArg(i: java.math.BigInteger, source: Any?, target: Any?): Unit {
     if (!(i < java.math.BigInteger.valueOf((source as Array<Any?>).size.toLong())))     {
         return
     } else     {
-        val es_1036_1 = (source as Array<Any?>)[(i).toInt()]
+        val es_1022_1 = (source as Array<Any?>)[(i).toInt()]
         (source as Array<Any?>)[(i).toInt()] = arrayOf<Any?>(0)
-        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2_spec__3___redArg(target, es_1036_1)
-        val v_x_1041_2 = (i.add(java.math.BigInteger.ONE))
-        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2___redArg(v_x_1041_2, source, target)
+        f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2_spec__3___redArg(target, es_1022_1)
+        val v_x_1027_2 = (i.add(java.math.BigInteger.ONE))
+        f___private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2___redArg(v_x_1027_2, source, target)
         return
     }
 }
@@ -1170,13 +1148,13 @@ private tailrec fun f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_
             return
         }
         1 ->         {
-            val key_1045_2 = (p_1 as Array<*>)[1]
-            val tail_1047_3 = (p_1 as Array<*>)[3]
-            val v_x_1049_4 = ((key_1045_2 as String)).encodeToByteArray().contentHashCode().toULong()
-            val fold_1052_5 = (v_x_1049_4 xor (v_x_1049_4 shr 32))
-            val v_x_1060_6 = (((fold_1052_5 xor (fold_1052_5 shr 16))).toInt() and ((p_0 as Array<Any?>).size - 1))
-            (p_0 as Array<Any?>)[v_x_1060_6] = arrayOf<Any?>(1, key_1045_2, (p_1 as Array<*>)[2], (p_0 as Array<Any?>)[v_x_1060_6])
-            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2_spec__3___redArg(p_0, tail_1047_3)
+            val key_1031_2 = (p_1 as Array<*>)[1]
+            val tail_1033_3 = (p_1 as Array<*>)[3]
+            val v_x_1035_4 = ((key_1031_2 as String)).encodeToByteArray().contentHashCode().toULong()
+            val fold_1038_5 = (v_x_1035_4 xor (v_x_1035_4 shr 32))
+            val v_x_1046_6 = (((fold_1038_5 xor (fold_1038_5 shr 16))).toInt() and ((p_0 as Array<Any?>).size - 1))
+            (p_0 as Array<Any?>)[v_x_1046_6] = arrayOf<Any?>(1, key_1031_2, (p_1 as Array<*>)[2], (p_0 as Array<Any?>)[v_x_1046_6])
+            f_Std_DHashMap_Internal_AssocList_foldlM___at___00__private_Std_Data_DHashMap_Internal_Defs_0__Std_DHashMap_Internal_Raw_u2080_expand_go___at___00Std_DHashMap_Internal_Raw_u2080_expand___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__1_spec__2_spec__3___redArg(p_0, tail_1033_3)
             return
         }
         else ->         { error("unreachable") }
@@ -1189,9 +1167,9 @@ private tailrec fun f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHas
             return false
         }
         1 ->         {
-            val tail_1069_2 = (p_1 as Array<*>)[3]
+            val tail_1055_2 = (p_1 as Array<*>)[3]
             if (!(((p_1 as Array<*>)[1] as String) == a))             {
-                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__0___redArg(a, tail_1069_2)
+                return f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHashMap_Internal_Raw_u2080_insert___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_recordVarType_spec__0_spec__0___redArg(a, tail_1055_2)
             } else             {
                 return true
             }
@@ -1201,10 +1179,10 @@ private tailrec fun f_Std_DHashMap_Internal_AssocList_contains___at___00Std_DHas
 }
 
 private fun f_Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0___redArg(m: Any?, a: String, fallback: Any?): Any? {
-    val buckets_1075_2 = (m as Array<*>)[2]
-    val v_x_1077_3 = (a).encodeToByteArray().contentHashCode().toULong()
-    val fold_1080_4 = (v_x_1077_3 xor (v_x_1077_3 shr 32))
-    return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0_spec__0___redArg(a, fallback, (buckets_1075_2 as Array<Any?>)[(((fold_1080_4 xor (fold_1080_4 shr 16))).toInt() and ((buckets_1075_2 as Array<Any?>).size - 1))])
+    val buckets_1061_2 = (m as Array<*>)[2]
+    val v_x_1063_3 = (a).encodeToByteArray().contentHashCode().toULong()
+    val fold_1066_4 = (v_x_1063_3 xor (v_x_1063_3 shr 32))
+    return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0_spec__0___redArg(a, fallback, (buckets_1061_2 as Array<Any?>)[(((fold_1066_4 xor (fold_1066_4 shr 16))).toInt() and ((buckets_1061_2 as Array<Any?>).size - 1))])
 }
 
 private tailrec fun f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0_spec__0___redArg(a: String, fallback: Any?, p_2: Any?): Any? {
@@ -1213,12 +1191,12 @@ private tailrec fun f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap
             return fallback
         }
         1 ->         {
-            val value_1095_2 = (p_2 as Array<*>)[2]
-            val tail_1096_3 = (p_2 as Array<*>)[3]
+            val value_1081_2 = (p_2 as Array<*>)[2]
+            val tail_1082_3 = (p_2 as Array<*>)[3]
             if (!(((p_2 as Array<*>)[1] as String) == a))             {
-                return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0_spec__0___redArg(a, fallback, tail_1096_3)
+                return f_Std_DHashMap_Internal_AssocList_getD___at___00Std_DHashMap_Internal_Raw_u2080_Const_getD___at___00__private_Lean_Compiler_LCNF_EmitKotlin_0__Lean_Compiler_LCNF_Kotlin_emitReturn_go_spec__0_spec__0___redArg(a, fallback, tail_1082_3)
             } else             {
-                return value_1095_2
+                return value_1081_2
             }
         }
         else ->         { error("unreachable") }

@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal fun f_myStrictAnd(a: Boolean, b: Boolean): Boolean {
     if (!a)     {
         return false
@@ -49,9 +49,11 @@
 }
 
 @PublishedApi internal fun f_condBranch___boxed(x: Any?, y: Any?): Any? {
-    val x_boxed_31_1 = (x as UInt)
-    val y_boxed_32_2 = (y as UInt)
+    val x_boxed_31_1 = leanUnboxUInt(x)
+    val y_boxed_32_2 = leanUnboxUInt(y)
     val res_33_3 = f_condBranch(x_boxed_31_1, y_boxed_32_2)
     return res_33_3
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

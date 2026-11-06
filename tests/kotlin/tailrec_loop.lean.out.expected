@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal tailrec fun f_countUp(x: UInt, y: UInt): UInt {
     if (!(x == 0u))     {
         return f_countUp((x - 1u), (y + 2u))
@@ -10,8 +10,8 @@
 }
 
 @PublishedApi internal fun f_countUp___boxed(x: Any?, y: Any?): Any? {
-    val x_boxed_12_1 = (x as UInt)
-    val y_boxed_13_2 = (y as UInt)
+    val x_boxed_12_1 = leanUnboxUInt(x)
+    val y_boxed_13_2 = leanUnboxUInt(y)
     val res_14_3 = f_countUp(x_boxed_12_1, y_boxed_13_2)
     return res_14_3
 }
@@ -25,9 +25,11 @@
 }
 
 @PublishedApi internal fun f_foldBits___boxed(n: Any?, acc: Any?): Any? {
-    val n_boxed_28_1 = (n as UInt)
-    val acc_boxed_29_2 = (acc as UInt)
+    val n_boxed_28_1 = leanUnboxUInt(n)
+    val acc_boxed_29_2 = leanUnboxUInt(acc)
     val res_30_3 = f_foldBits(n_boxed_28_1, acc_boxed_29_2)
     return res_30_3
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

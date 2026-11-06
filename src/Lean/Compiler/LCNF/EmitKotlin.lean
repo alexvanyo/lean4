@@ -135,6 +135,8 @@ structure Context where
   nonExclusiveArraySets : Std.HashSet FVarId := {}
   /-- Closed-constant variables that are recomputed at each use (see `Ownership.analyze`). -/
   rematerialize : Std.HashSet FVarId := {}
+  /-- `unbox` results in `_boxed` wrappers that are passed for a parameter of Kotlin enum type. -/
+  unboxEnums : Std.HashMap FVarId String := {}
 
 structure State where
   buf : String := ""
@@ -717,8 +719,52 @@ def formatNatLit (n : Nat) : String :=
   else if n <= 9223372036854775807 then s!"java.math.BigInteger.valueOf({n}L)"
   else s!"java.math.BigInteger(\"{n}\")"
 
+/-- Constructor index (`getObjTagNat`) of the Kotlin value `x` of static Kotlin type `ty`, as an `Int`. -/
+def objTagExpr (x ty : String) : EmitM String := do
+  let env ← getEnv
+  if ty.endsWith "?" && ty != "Any?" then
+    return s!"(if ({x} == null) 0 else 1)"
+  let base := String.ofList (ty.toList.takeWhile (· != '<') |>.filter (· != ' '))
+  if let some n := (← read).classStructs[base]? then
+    if Compiler.isKotlinEnum env n then
+      return s!"({x} as {base}).ordinal"
+    if Compiler.isKotlinInductive env n then
+      if let some iv := isInductiveCore? env n then
+        let spec := (Compiler.getKotlinClassSpec? env n).get!
+        let cls := spec.baseClassName
+        let star := if iv.numParams > 0 then s!"<{String.intercalate ", " (List.replicate iv.numParams "*")}>" else ""
+        let mut alts := #[]
+        for h : i in [:iv.ctors.length] do
+          let ctor := iv.ctors[i]
+          let variant := toPascalCase ctor.getString!
+          let isObj := match env.find? ctor with
+            | some (.ctorInfo cv) => cv.numFields == 0
+            | _ => false
+          alts := alts.push (if isObj then s!"{cls}.{variant} -> {i}" else s!"is {cls}.{variant}{star} -> {i}")
+        alts := alts.push "else -> error(\"unreachable\")"
+        return s!"(when ({x}) \{ {String.intercalate "; " alts.toList} })"
+    return "0"
+  match ty with
+  | "UByte" | "UShort" | "UInt" => return s!"({x}).toInt()"
+  | "Boolean" => return s!"(if ({x}) 1 else 0)"
+  | "Array<Any?>" => return s!"({x}[0] as Int)"
+  | _ => pure ()
+  return s!"(when (val o = {x}) \{ is Array<*> -> o[0] as Int; is Boolean -> if (o) 1 else 0; is UByte -> o.toInt(); is Enum<*> -> o.ordinal; else -> 0 })"
+
+/-- Declarations implemented by Kotlin primitives whose trailing proof arguments are erased. -/
+def hasTrailingProofArgs (fn : Name) : Bool :=
+  fn == `String.getUTF8Byte || fn == `String.decodeChar ||
+    fn == `String.Slice.Pattern.Internal.memcmpStr || fn == `String.Slice.Pattern.Internal.memcmpStrLt
+
 def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option String) := do
   let fn := match fn with | .str p "_boxed" => p | _ => fn
+  let args := if hasTrailingProofArgs fn then
+      (args.toList.reverse.dropWhile (· matches .erased)).reverse.toArray
+    else args
+  if fn == `getObjTagNat && !args.isEmpty then
+    let x ← toKotlinArg args.back!
+    let ty := (← get).varTypes[x]?.getD "Any?"
+    return some s!"java.math.BigInteger.valueOf(({← objTagExpr x ty}).toLong())"
   if fn == `lcUnreachable || fn == `lcUnreachable._redArg then
     return some "(error(\"unreachable code\") as Any?)"
   let fnStr := fn.toString
@@ -1492,6 +1538,8 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
       return some s!"(\"PANIC at \" + {← castIfNeeded a1 "String"} + \" \" + {← castIfNeeded a0 "String"} + \":\" + ({a2}).toString() + \":\" + ({a3}).toString() + \": \" + {← castIfNeeded a4 "String"})"
     if fn == `String.Slice.Pattern.Internal.memcmpStr then
       return some s!"({← castIfNeeded a0 "String"}).encodeToByteArray().copyOfRange({← fromNatTo a2 "Int"}, {← fromNatTo a2 "Int"} + {← fromNatTo a4 "Int"}).contentEquals(({← castIfNeeded a1 "String"}).encodeToByteArray().copyOfRange({← fromNatTo a3 "Int"}, {← fromNatTo a3 "Int"} + {← fromNatTo a4 "Int"}))"
+    if fn == `String.Slice.Pattern.Internal.memcmpStrLt then
+      return some s!"(run \{ val x = ({← castIfNeeded a0 "String"}).encodeToByteArray(); val y = ({← castIfNeeded a1 "String"}).encodeToByteArray(); val bx = {← fromNatTo a2 "Int"}; val by = {← fromNatTo a3 "Int"}; val n = {← fromNatTo a4 "Int"}; var i = 0; var r = 0; while (i < n && r == 0) \{ r = (x[bx + i].toInt() and 0xFF) - (y[by + i].toInt() and 0xFF); i++ }; r < 0 })"
   if args.size == 6 then
     if fn == `ByteArray.copySlice then
       let a0 ← toKotlinArg args[0]!
@@ -1887,6 +1935,18 @@ def getFnParamKotlinTypes (env : Environment) (fn : Name) : CoreM (Array String)
             if t0 != "Any?" && !t0.endsWith "?" && !typeParamMap.values.contains t0 then
               return s!"{t0}?"
         return "Any?"
+
+/-- Replaces the identifier tokens of `s` that are in `idents` by `r`. -/
+def replaceIdents (s : String) (idents : Array String) (r : String) : String := Id.run do
+  let mut out := ""
+  let mut cur := ""
+  for c in s.toList ++ [' '] do
+    if c.isAlphanum || c == '_' then cur := cur.push c
+    else
+      out := out ++ (if idents.contains cur then r else cur)
+      cur := ""
+      out := out.push c
+  return (out.dropEnd 1).toString
 
 def identTokens (s : String) : Std.HashSet String :=
   let (set, cur) := s.foldl (init := (({} : Std.HashSet String), "")) fun (set, cur) c =>
@@ -2453,11 +2513,35 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
       if isAux then return #[]
       let baseFn := match fn with | .str p "_redArg" => p | _ => fn
       return (← getDeclTypeParams (← getEnv) baseFn).map (·.2) : CoreM (Array String))
+    let isMember := (Compiler.getKotlinMemberInfo? (← getEnv) fn).isSome
+    let mentionsTypeParam (kt : String) : Bool := declaredTypeParams.any (identTokens kt).contains
+    -- Kotlin cannot infer a type parameter that no parameter type mentions: pass `Any?` explicitly.
+    let explicitTypeArgs := !isMember && !declaredTypeParams.isEmpty &&
+      !declaredTypeParams.all fun tp => declaredParamTys.any fun kt => (identTokens kt).contains tp
     let mut argStrs : Array String := #[]
     for i in [:runtimeArgs.size] do
       let fullIdx := runtimeIdxs[i]!
       let aStr ← toKotlinArg runtimeArgs[i]!
-      let expectedTy? := match impureParams?.bind (·[fullIdx]?) with
+      -- The declaration's own parameter type (see `emitFnDecl`), with the callee's type parameters
+      -- instantiated to `Any?` or captured by a star projection.
+      let declaredTy? := declaredParamTys[i]?.bind fun kt =>
+        if kt == "Any?" then none
+        else if !mentionsTypeParam kt then some kt
+        else if isMember then none
+        else if explicitTypeArgs then some (replaceIdents kt declaredTypeParams "Any?")
+        else
+          -- A star projection is only valid as a type argument of a class type.
+          let starred := replaceIdents kt declaredTypeParams "*"
+          if starred.startsWith "*" || kt.contains '(' then none else some starred
+      let declaredTy? ← match declaredTy? with
+        | some kt =>
+          if mentionsTypeParam kt || explicitTypeArgs then
+            -- Only cast untyped arguments: a typed argument determines the type parameter itself.
+            let aTy := (← get).varTypes[aStr]?.getD "Any?"
+            pure (if aTy == "Any?" then some kt else none)
+          else pure (some kt)
+        | none => pure none
+      let expectedTy? := declaredTy?.orElse fun _ => match impureParams?.bind (·[fullIdx]?) with
         | some p =>
           let kt := toKotlinType p.type
           if kt != "Any?" then some kt else none
@@ -2468,18 +2552,15 @@ partial def emitLetValue (decl : LetDecl .impure) : EmitM String := do
         | none => none
       let expectedTy? := expectedTy?.orElse fun _ =>
         fnParamTys[i]?.bind fun kt => if kt != "Any?" then some kt else none
-      -- The type the callee declares the parameter with, so that an `Any?` argument (such as a
-      -- parameter of a `_boxed` wrapper) is cast to it, unless it names a type parameter of the
-      -- callee, which is not in scope here.
-      let expectedTy? := expectedTy?.orElse fun _ =>
-        declaredParamTys[i]?.bind fun kt =>
-          if kt == "Any?" || declaredTypeParams.any (identTokens kt).contains then none else some kt
       let aStr ← match expectedTy? with
         | some expectedTy => castIfNeeded aStr expectedTy
         | none => pure aStr
       argStrs := argStrs.push aStr
     let argStr := String.intercalate ", " argStrs.toList
-    return s!"{fnName}({argStr})"
+    let typeArgStr := if explicitTypeArgs then
+        s!"<{String.intercalate ", " (declaredTypeParams.map fun _ => "Any?").toList}>"
+      else ""
+    return s!"{fnName}{typeArgStr}({argStr})"
   | .fvar fvarId args =>
     let fnName ← getVarName fvarId
     let paramTys? := ((← get).varTypes[fnName]?).bind parseKotlinFnType? |>.map (·.1)
@@ -4305,6 +4386,12 @@ partial def isNonNegEarlyExit? (fv : FVarId) (code : Code .impure)
 mutual
 
 partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : EmitM Unit := do
+  if let (.unbox y, some cls) := (decl.value, (← read).unboxEnums[decl.fvarId]?) then
+    let n ← getVarName decl.fvarId
+    recordVarType n cls
+    emitLn s!"val {n} = ({← getVarName y} as {cls})"
+    emitCode k
+    return
   if (← read).rematerialize.contains decl.fvarId then
     let rhs ← emitLetValue decl
     recordVarType rhs (← inferLetKotlinType decl)
@@ -5715,6 +5802,35 @@ partial def letFVarPairs (c c' : Code .impure) (acc : Std.HashMap FVarId FVarId 
   | .del (k := k) .., .del (k := k') .. => letFVarPairs k k' acc
   | _, _ => acc
 
+/--
+The `unbox` results of a `_boxed` wrapper body `code` that are passed for a parameter that the callee
+declares with a Kotlin enum type. Kotlin enum values are not boxed scalars.
+-/
+partial def collectUnboxEnums (code : Code .impure) : EmitM (Std.HashMap FVarId String) := do
+  let env ← getEnv
+  let rec go (c : Code .impure) (unboxes : Std.HashSet FVarId) (acc : Std.HashMap FVarId String) :
+      EmitM (Std.HashMap FVarId String) := do
+    match c with
+    | .let d k =>
+      match d.value with
+      | .unbox _ => go k (unboxes.insert d.fvarId) acc
+      | .fap f args =>
+        let declared ← getFnDeclaredParamKotlinTypes env f
+        let mask ← (Meta.MetaM.run' (getDeclTypeParamMask env f) : CoreM (Array Bool))
+        let mut acc := acc
+        let idxs := runtimeIndices mask args.size
+        for h : i in [:idxs.size] do
+          if let some (.fvar a) := args[idxs[i]]? then
+            if unboxes.contains a then
+              if let some kt := declared[i]? then
+                if let some n := (← read).classStructs[kt]? then
+                  if Compiler.isKotlinEnum env n then acc := acc.insert a kt
+        go k unboxes acc
+      | _ => go k unboxes acc
+    | .inc (k := k) .. | .dec (k := k) .. | .del (k := k) .. => go k unboxes acc
+    | _ => return acc
+  go code {} {}
+
 def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let origParamNames := decl.params.map (·.binderName)
   let decl0 := decl
@@ -5725,9 +5841,13 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
     | _, _ => {}
   let translate (xs : Std.HashSet FVarId) : Std.HashSet FVarId :=
     pairs.fold (init := xs) fun acc x y => if xs.contains x then acc.insert y else acc
+  let unboxEnums ← match decl.name, decl.value with
+    | .str _ "_boxed", .code c => collectUnboxEnums c
+    | _, _ => pure {}
   withReader (fun ctx => { ctx with
       nonExclusiveArraySets := translate ctx.nonExclusiveArraySets
-      rematerialize := translate ctx.rematerialize })
+      rematerialize := translate ctx.rematerialize
+      unboxEnums })
     (emitFnDeclCore origParamNames decl)
 
 /-- Replaces each `// @LeanMembers(Cls)` line with the members of `Cls`, at the marker's indent. -/

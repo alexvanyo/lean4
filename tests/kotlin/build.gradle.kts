@@ -79,8 +79,15 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    targetCompatibility = "26"
+// Pin both targets: Kotlin caps its default target below recent JDKs, which Gradle rejects as inconsistent.
+java {
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
 tasks.test {

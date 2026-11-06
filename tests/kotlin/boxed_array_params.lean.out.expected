@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal fun f_sumFrom___boxed__const__1(): Any? {
     return 0uL
 }
@@ -10,13 +10,13 @@
 }
 
 @PublishedApi internal fun f_sumFrom(xs: Array<Any?>, ys: Array<Any?>, i: java.math.BigInteger, bias: UInt): ULong {
-    val v_x_11_1 = (xs[(i).toInt()] as UInt)
-    val v_x_16_2 = (ys[(i).toInt()] as ULong)
+    val v_x_11_1 = leanUnboxUInt(xs[(i).toInt()])
+    val v_x_16_2 = leanUnboxULong(ys[(i).toInt()])
     return (((v_x_11_1 + bias)).toULong() + v_x_16_2)
 }
 
 @PublishedApi internal fun f_sumFrom___boxed(xs: Any?, ys: Any?, i: Any?, bias: Any?): Any? {
-    val bias_boxed_22_1 = (bias as UInt)
+    val bias_boxed_22_1 = leanUnboxUInt(bias)
     val res_23_2 = f_sumFrom((xs as Array<Any?>), (ys as Array<Any?>), (i as java.math.BigInteger), bias_boxed_22_1)
     return res_23_2
 }
@@ -29,7 +29,7 @@
         1 ->         {
             val head_29_2 = (p_1 as Array<*>)[1]
             val tail_30_3 = (p_1 as Array<*>)[2]
-            val v_x_34_4 = (head_29_2 as UByte)
+            val v_x_34_4 = leanUnboxUByte(head_29_2)
             if (!(limit < v_x_34_4))             {
                 return f_List_filterTR_loop___at___00countAbove_spec__0(limit, tail_30_3, p_2)
             } else             {
@@ -41,7 +41,7 @@
 }
 
 @PublishedApi internal fun f_List_filterTR_loop___at___00countAbove_spec__0___boxed(limit: Any?, p_1: Any?, p_2: Any?): Any? {
-    val limit_boxed_45_1 = (limit as UByte)
+    val limit_boxed_45_1 = leanUnboxUByte(limit)
     return f_List_filterTR_loop___at___00countAbove_spec__0(limit_boxed_45_1, p_1, p_2)
 }
 
@@ -82,7 +82,7 @@
 }
 
 @PublishedApi internal fun f_countAbove___boxed(bs: Any?, fs: Any?, limit: Any?, scale: Any?): Any? {
-    val limit_boxed_87_1 = (limit as UByte)
+    val limit_boxed_87_1 = leanUnboxUByte(limit)
     val scale_boxed_88_2 = (scale as Double)
     val res_89_3 = f_countAbove((bs as ByteArray), (fs as DoubleArray), limit_boxed_87_1, scale_boxed_88_2)
     return res_89_3
@@ -144,3 +144,7 @@ private tailrec fun f_ByteArray_toList_loop(bs: ByteArray, i: java.math.BigInteg
     }
 }
 
+
+private inline fun leanUnboxUByte(x: Any?): UByte = if (x is Byte) x.toUByte() else x as UByte
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt
+private inline fun leanUnboxULong(x: Any?): ULong = if (x is Long) x.toULong() else x as ULong

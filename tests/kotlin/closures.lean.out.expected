@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal inline fun f_applyTwice(f: (UInt) -> UInt, x: UInt): UInt {
     val v_x_4_1 = f(x)
     val v_x_5_2 = f(v_x_4_1)
@@ -8,7 +8,7 @@
 }
 
 @PublishedApi internal fun f_applyTwice___boxed(f: Any?, x: Any?): Any? {
-    val x_boxed_9_1 = (x as UInt)
+    val x_boxed_9_1 = leanUnboxUInt(x)
     val res_10_2 = f_applyTwice((f as (UInt) -> UInt), x_boxed_9_1)
     return res_10_2
 }
@@ -18,8 +18,8 @@
 }
 
 @PublishedApi internal fun f_makeAdder___boxed(delta: Any?, x: Any?): Any? {
-    val delta_boxed_17_1 = (delta as UInt)
-    val x_boxed_18_2 = (x as UInt)
+    val delta_boxed_17_1 = leanUnboxUInt(delta)
+    val x_boxed_18_2 = leanUnboxUInt(x)
     val res_19_3 = f_makeAdder(delta_boxed_17_1, x_boxed_18_2)
     return res_19_3
 }
@@ -29,7 +29,7 @@
 }
 
 @PublishedApi internal fun f_testClosureApp___boxed(inputVal: Any?): Any? {
-    val inputVal_boxed_26_1 = (inputVal as UInt)
+    val inputVal_boxed_26_1 = leanUnboxUInt(inputVal)
     val res_27_2 = f_testClosureApp(inputVal_boxed_26_1)
     return res_27_2
 }
@@ -41,7 +41,7 @@
 }
 
 @PublishedApi internal fun f_applyTwiceNoInline___boxed(f: Any?, x: Any?): Any? {
-    val x_boxed_37_1 = (x as UInt)
+    val x_boxed_37_1 = leanUnboxUInt(x)
     val res_38_2 = f_applyTwiceNoInline((f as (UInt) -> UInt), x_boxed_37_1)
     return res_38_2
 }
@@ -51,8 +51,8 @@
 }
 
 @PublishedApi internal fun f_testNoInlineClosure___lam__0___boxed(p_0: Any?, p_1: Any?): Any? {
-    val v_x_15_boxed_45_1 = (p_0 as UInt)
-    val v_y_16_boxed_46_2 = (p_1 as UInt)
+    val v_x_15_boxed_45_1 = leanUnboxUInt(p_0)
+    val v_y_16_boxed_46_2 = leanUnboxUInt(p_1)
     val res_47_3 = f_testNoInlineClosure___lam__0(v_x_15_boxed_45_1, v_y_16_boxed_46_2)
     return res_47_3
 }
@@ -71,7 +71,7 @@
 }
 
 @PublishedApi internal fun f_testNoInlineClosure___boxed(inputVal: Any?): Any? {
-    val inputVal_boxed_57_1 = (inputVal as UInt)
+    val inputVal_boxed_57_1 = leanUnboxUInt(inputVal)
     val res_58_2 = f_testNoInlineClosure(inputVal_boxed_57_1)
     return res_58_2
 }
@@ -82,8 +82,8 @@
 }
 
 @PublishedApi internal fun f_applyBinary___boxed(g: Any?, a: Any?, b: Any?): Any? {
-    val a_boxed_70_1 = (a as UInt)
-    val b_boxed_71_2 = (b as UInt)
+    val a_boxed_70_1 = leanUnboxUInt(a)
+    val b_boxed_71_2 = leanUnboxUInt(b)
     val res_72_3 = f_applyBinary((g as (UInt, UInt) -> UInt), a_boxed_70_1, b_boxed_71_2)
     return res_72_3
 }
@@ -100,18 +100,18 @@
 
 @PublishedApi internal fun f_chooseFn___boxed(b: Any?, f: Any?, g: Any?, p_3: Any?): Any? {
     val b_boxed_88_1 = (b as Boolean)
-    val a_17_boxed_89_2 = (p_3 as UInt)
+    val a_17_boxed_89_2 = leanUnboxUInt(p_3)
     val res_90_3 = f_chooseFn(b_boxed_88_1, (f as (UInt) -> UInt), (g as (UInt) -> UInt), a_17_boxed_89_2)
     return res_90_3
 }
 
 @PublishedApi internal fun f_applyErased(f: Any?, x: UInt): UInt {
     val v_x_95_1 = (f as (Any?) -> Any?)(x)
-    return (v_x_95_1 as UInt)
+    return leanUnboxUInt(v_x_95_1)
 }
 
 @PublishedApi internal fun f_applyErased___boxed(f: Any?, x: Any?): Any? {
-    val x_boxed_99_1 = (x as UInt)
+    val x_boxed_99_1 = leanUnboxUInt(x)
     val res_100_2 = f_applyErased((f as (UInt) -> UInt), x_boxed_99_1)
     return res_100_2
 }
@@ -237,3 +237,5 @@ private fun f_runST___redArg(x: (Any?, Any?) -> Any?): Any? {
     return x(null, null)
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

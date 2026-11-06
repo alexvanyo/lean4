@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 class Triple(var fst: Int, var snd: Int, var thd: Int) {
 public fun sumFields(): Int {
     val fst_2_1 = fst
@@ -17,8 +17,8 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_makePair___boxed(a: Any?, b: Any?): Any? {
-    val a_boxed_18_1 = (a as UInt)
-    val b_boxed_19_2 = (b as UInt)
+    val a_boxed_18_1 = leanUnboxUInt(a)
+    val b_boxed_19_2 = leanUnboxUInt(b)
     return f_makePair(a_boxed_18_1, b_boxed_19_2)
 }
 
@@ -27,7 +27,7 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_sumPair___boxed(p: Any?): Any? {
-    val res_28_1 = f_sumPair((run { val _p = p as Pair<*, *>; Pair((_p.first as UInt), (_p.second as UInt)) }))
+    val res_28_1 = f_sumPair((run { val _p = p as Pair<*, *>; Pair(leanUnboxUInt(_p.first), leanUnboxUInt(_p.second)) }))
     return res_28_1
 }
 
@@ -41,8 +41,8 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_roundTripPair___boxed(a: Any?, b: Any?): Any? {
-    val a_boxed_46_1 = (a as UInt)
-    val b_boxed_47_2 = (b as UInt)
+    val a_boxed_46_1 = leanUnboxUInt(a)
+    val b_boxed_47_2 = leanUnboxUInt(b)
     val res_48_3 = f_roundTripPair(a_boxed_46_1, b_boxed_47_2)
     return res_48_3
 }
@@ -52,8 +52,8 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_nestedPair___boxed(a: Any?, b: Any?, c: Any?): Any? {
-    val a_boxed_60_1 = (a as UInt)
-    val b_boxed_61_2 = (b as Int)
+    val a_boxed_60_1 = leanUnboxUInt(a)
+    val b_boxed_61_2 = leanUnboxInt(b)
     return f_nestedPair(a_boxed_60_1, b_boxed_61_2, (c as String))
 }
 
@@ -71,6 +71,9 @@ public fun sumFields(): Int {
 }
 
 @PublishedApi internal fun f_readNestedPair___boxed(p: Any?): Any? {
-    return f_readNestedPair((run { val _p = p as Pair<*, *>; Pair((_p.first as UInt), (run { val _p = (_p.second) as Pair<*, *>; Pair((_p.first as Int), (_p.second as String)) })) }))
+    return f_readNestedPair((run { val _p = p as Pair<*, *>; Pair(leanUnboxUInt(_p.first), (run { val _p = (_p.second) as Pair<*, *>; Pair(leanUnboxInt(_p.first), (_p.second as String)) })) }))
 }
 
+
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

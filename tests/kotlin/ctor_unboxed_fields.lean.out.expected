@@ -1,39 +1,31 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 sealed class Frame {
     class Node(val id: UInt, val x: Long, val fuel: UInt) : Frame()
     class Leaf(val bits: ULong, val x: Long) : Frame()
 }
 
-@PublishedApi internal fun f_Frame_ctorIdx(x: Any?): java.math.BigInteger {
-    when (x)     {
-        is Frame.Node ->         {
-            return java.math.BigInteger.ZERO
-        }
-        is Frame.Leaf ->         {
-            return java.math.BigInteger.ONE
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_Frame_ctorIdx___impl(p_0: Frame): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (p_0) { is Frame.Node -> 0; is Frame.Leaf -> 1; else -> error("unreachable") })).toLong())
 }
 
-@PublishedApi internal fun f_Frame_ctorIdx___boxed(x: Any?): Any? {
-    return f_Frame_ctorIdx(x)
+@PublishedApi internal fun f_Frame_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    return f_Frame_ctorIdx___impl((p_0 as Frame))
 }
 
 @PublishedApi internal fun f_Frame_ctorElim___redArg(t: Any?, k: Any?): Any? {
     when (t)     {
         is Frame.Node ->         {
-            val id_8_2 = t.id
-            val x_9_3 = t.x
-            val fuel_10_4 = t.fuel
-            return (k as (Any?, Any?, Any?) -> Any?)(id_8_2, x_9_3, fuel_10_4)
+            val id_7_2 = t.id
+            val x_8_3 = t.x
+            val fuel_9_4 = t.fuel
+            return (k as (Any?, Any?, Any?) -> Any?)(id_7_2, x_8_3, fuel_9_4)
         }
         is Frame.Leaf ->         {
-            val bits_15_5 = t.bits
-            val x_16_6 = t.x
-            return (k as (Any?, Any?) -> Any?)(bits_15_5, x_16_6)
+            val bits_14_5 = t.bits
+            val x_15_6 = t.x
+            return (k as (Any?, Any?) -> Any?)(bits_14_5, x_15_6)
         }
         else ->         { error("unreachable") }
     }
@@ -92,48 +84,40 @@ sealed class Frame {
 }
 
 @PublishedApi internal fun f_frameChildren(ids: Any?, bits: Any?, x: Long, half: Long, fuel: UInt): Any? {
-    val v_x_78_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
-    val v_x_81_2 = (fuel - 1u)
-    val v_x_83_3 = (v_x_78_1 as UInt)
-    val v_x_82_4 = Frame.Node(v_x_83_3, x, v_x_81_2)
-    val v_x_85_5 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
-    val v_x_86_6 = (x + half)
-    val v_x_88_7 = (v_x_85_5 as UInt)
-    val v_x_87_8 = Frame.Node(v_x_88_7, v_x_86_6, v_x_81_2)
-    val v_x_90_9 = f_List_getD___redArg(bits, java.math.BigInteger.ZERO, 0uL)
-    val v_x_92_10 = (v_x_90_9 as ULong)
-    return arrayOf<Any?>(1, v_x_82_4, arrayOf<Any?>(1, v_x_87_8, arrayOf<Any?>(1, Frame.Leaf(v_x_92_10, v_x_86_6), arrayOf<Any?>(0))))
+    val v_x_77_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
+    val v_x_80_2 = (fuel - 1u)
+    val v_x_82_3 = leanUnboxUInt(v_x_77_1)
+    val v_x_81_4 = Frame.Node(v_x_82_3, x, v_x_80_2)
+    val v_x_84_5 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
+    val v_x_85_6 = (x + half)
+    val v_x_87_7 = leanUnboxUInt(v_x_84_5)
+    val v_x_86_8 = Frame.Node(v_x_87_7, v_x_85_6, v_x_80_2)
+    val v_x_89_9 = f_List_getD___redArg(bits, java.math.BigInteger.ZERO, 0uL)
+    val v_x_91_10 = leanUnboxULong(v_x_89_9)
+    return arrayOf<Any?>(1, v_x_81_4, arrayOf<Any?>(1, v_x_86_8, arrayOf<Any?>(1, Frame.Leaf(v_x_91_10, v_x_85_6), arrayOf<Any?>(0))))
 }
 
 @PublishedApi internal fun f_frameChildren___boxed(ids: Any?, bits: Any?, x: Any?, half: Any?, fuel: Any?): Any? {
-    val x_boxed_102_1 = (x as Long)
-    val half_boxed_103_2 = (half as Long)
-    val fuel_boxed_104_3 = (fuel as UInt)
-    return f_frameChildren(ids, bits, x_boxed_102_1, half_boxed_103_2, fuel_boxed_104_3)
+    val x_boxed_101_1 = leanUnboxLong(x)
+    val half_boxed_102_2 = leanUnboxLong(half)
+    val fuel_boxed_103_3 = leanUnboxUInt(fuel)
+    return f_frameChildren(ids, bits, x_boxed_101_1, half_boxed_102_2, fuel_boxed_103_3)
 }
 
-@PublishedApi internal fun f_Cell_ctorIdx(x: Any?): java.math.BigInteger {
-    when (((x as Array<*>)[0] as Int))     {
-        0 ->         {
-            return java.math.BigInteger.ZERO
-        }
-        1 ->         {
-            return java.math.BigInteger.ONE
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_Cell_ctorIdx___impl(p_0: Any?): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (val o = p_0) { is Array<*> -> o[0] as Int; is Boolean -> if (o) 1 else 0; is UByte -> o.toInt(); is Enum<*> -> o.ordinal; else -> 0 })).toLong())
 }
 
-@PublishedApi internal fun f_Cell_ctorIdx___boxed(x: Any?): Any? {
-    return f_Cell_ctorIdx(x)
+@PublishedApi internal fun f_Cell_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    return f_Cell_ctorIdx___impl(p_0)
 }
 
 @PublishedApi internal fun f_Cell_ctorElim___redArg(t: Any?, k: Any?): Any? {
     when (((t as Array<*>)[0] as Int))     {
         0 ->         {
-            val id_113_2 = ((t as Array<*>)[9] as UInt)
-            val x_114_3 = ((t as Array<*>)[1] as Long)
-            return (k as (Any?, Any?) -> Any?)(id_113_2, x_114_3)
+            val id_111_2 = leanUnboxUInt((t as Array<*>)[9])
+            val x_112_3 = leanUnboxLong((t as Array<*>)[1])
+            return (k as (Any?, Any?) -> Any?)(id_111_2, x_112_3)
         }
         1 ->         {
             return k
@@ -191,26 +175,26 @@ sealed class Frame {
 }
 
 @PublishedApi internal fun f_cellChildren(ids: Any?, x: Long, half: Long): Any? {
-    val v_x_173_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
-    val v_x_175_2 = (v_x_173_1 as UInt)
-    val v_x_174_3 = arrayOf<Any?>(0, x, null, null, null, null, null, null, null, v_x_175_2)
-    val v_x_178_4 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
-    val v_x_181_5 = (v_x_178_4 as UInt)
-    val v_x_180_6 = arrayOf<Any?>(0, (x + half), null, null, null, null, null, null, null, v_x_181_5)
-    val v_x_182_7 = f_cellChildren___closed__0()
-    return arrayOf<Any?>(1, v_x_174_3, arrayOf<Any?>(1, v_x_180_6, v_x_182_7))
+    val v_x_171_1 = f_List_getD___redArg(ids, java.math.BigInteger.ZERO, 0u)
+    val v_x_173_2 = leanUnboxUInt(v_x_171_1)
+    val v_x_172_3 = arrayOf<Any?>(0, x, null, null, null, null, null, null, null, v_x_173_2)
+    val v_x_176_4 = f_List_getD___redArg(ids, java.math.BigInteger.ONE, 0u)
+    val v_x_179_5 = leanUnboxUInt(v_x_176_4)
+    val v_x_178_6 = arrayOf<Any?>(0, (x + half), null, null, null, null, null, null, null, v_x_179_5)
+    val v_x_180_7 = f_cellChildren___closed__0()
+    return arrayOf<Any?>(1, v_x_172_3, arrayOf<Any?>(1, v_x_178_6, v_x_180_7))
 }
 
 @PublishedApi internal fun f_cellChildren___boxed(ids: Any?, x: Any?, half: Any?): Any? {
-    val x_boxed_188_1 = (x as Long)
-    val half_boxed_189_2 = (half as Long)
-    return f_cellChildren(ids, x_boxed_188_1, half_boxed_189_2)
+    val x_boxed_186_1 = leanUnboxLong(x)
+    val half_boxed_187_2 = leanUnboxLong(half)
+    return f_cellChildren(ids, x_boxed_186_1, half_boxed_187_2)
 }
 
 @PublishedApi internal fun f_cellId(p_0: Any?): UInt {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
-            return ((p_0 as Array<*>)[9] as UInt)
+            return leanUnboxUInt((p_0 as Array<*>)[9])
         }
         1 ->         {
             return 0u
@@ -220,14 +204,14 @@ sealed class Frame {
 }
 
 @PublishedApi internal fun f_cellId___boxed(p_0: Any?): Any? {
-    val res_195_1 = f_cellId(p_0)
-    return res_195_1
+    val res_193_1 = f_cellId(p_0)
+    return res_193_1
 }
 
 @PublishedApi internal fun f_cellX(p_0: Any?): Long {
     when (((p_0 as Array<*>)[0] as Int))     {
         0 ->         {
-            return ((p_0 as Array<*>)[1] as Long)
+            return leanUnboxLong((p_0 as Array<*>)[1])
         }
         1 ->         {
             return (-1L)
@@ -237,18 +221,18 @@ sealed class Frame {
 }
 
 @PublishedApi internal fun f_cellX___boxed(p_0: Any?): Any? {
-    val res_201_1 = f_cellX(p_0)
-    return res_201_1
+    val res_199_1 = f_cellX(p_0)
+    return res_199_1
 }
 
 private fun f_List_getD___redArg(p_0: Any?, i: java.math.BigInteger, fallback: Any?): Any? {
-    val v_x_206_1 = f_List_get_x3fInternal___redArg(p_0, i)
-    when (((v_x_206_1 as Array<*>)[0] as Int))     {
+    val v_x_204_1 = f_List_get_x3fInternal___redArg(p_0, i)
+    when (((v_x_204_1 as Array<*>)[0] as Int))     {
         0 ->         {
             return fallback
         }
         1 ->         {
-            return (v_x_206_1 as Array<*>)[1]
+            return (v_x_204_1 as Array<*>)[1]
         }
         else ->         { error("unreachable") }
     }
@@ -257,19 +241,23 @@ private fun f_List_getD___redArg(p_0: Any?, i: java.math.BigInteger, fallback: A
 private tailrec fun f_List_get_x3fInternal___redArg(p_0: Any?, p_1: java.math.BigInteger): Any? {
     when (((p_0 as Array<*>)[0] as Int))     {
         1 ->         {
-            val head_210_2 = (p_0 as Array<*>)[1]
-            val tail_211_3 = (p_0 as Array<*>)[2]
+            val head_208_2 = (p_0 as Array<*>)[1]
+            val tail_209_3 = (p_0 as Array<*>)[2]
             if ((p_1 == java.math.BigInteger.ZERO))             {
-                val v_x_214_4 = arrayOf<Any?>(1, head_210_2)
-                return v_x_214_4
+                val v_x_212_4 = arrayOf<Any?>(1, head_208_2)
+                return v_x_212_4
             } else             {
-                return f_List_get_x3fInternal___redArg(tail_211_3, (p_1.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO)))
+                return f_List_get_x3fInternal___redArg(tail_209_3, (p_1.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO)))
             }
         }
         else ->         {
-            val v_x_218_5 = arrayOf<Any?>(0)
-            return v_x_218_5
+            val v_x_216_5 = arrayOf<Any?>(0)
+            return v_x_216_5
         }
     }
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt
+private inline fun leanUnboxLong(x: Any?): Long = if (x is ULong) x.toLong() else x as Long
+private inline fun leanUnboxULong(x: Any?): ULong = if (x is Long) x.toULong() else x as ULong

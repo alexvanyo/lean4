@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal tailrec fun f_loopSum(n: UInt, acc: UInt): UInt {
     if (!(n == 0u))     {
         var n_9_1: UInt = (n - 1u)
@@ -22,8 +22,8 @@
 }
 
 @PublishedApi internal fun f_loopSum___boxed(n: Any?, acc: Any?): Any? {
-    val n_boxed_19_1 = (n as UInt)
-    val acc_boxed_20_2 = (acc as UInt)
+    val n_boxed_19_1 = leanUnboxUInt(n)
+    val acc_boxed_20_2 = leanUnboxUInt(acc)
     var n_23_4: UInt = n_boxed_19_1
     var acc_24_5: UInt = acc_boxed_20_2
     val res_21_3: UInt
@@ -59,7 +59,7 @@
 }
 
 @PublishedApi internal fun f_computeSum___boxed(limit: Any?): Any? {
-    val limit_boxed_43_1 = (limit as UInt)
+    val limit_boxed_43_1 = leanUnboxUInt(limit)
     val res_44_2 = f_computeSum(limit_boxed_43_1)
     return res_44_2
 }
@@ -89,9 +89,9 @@
 }
 
 @PublishedApi internal fun f_findIndexLoop___boxed(limit: Any?, target: Any?, idx: Any?): Any? {
-    val limit_boxed_67_1 = (limit as UInt)
-    val target_boxed_68_2 = (target as UInt)
-    val idx_boxed_69_3 = (idx as UInt)
+    val limit_boxed_67_1 = leanUnboxUInt(limit)
+    val target_boxed_68_2 = leanUnboxUInt(target)
+    val idx_boxed_69_3 = leanUnboxUInt(idx)
     var idx_74_5: UInt = idx_boxed_69_3
     val res_70_4: Int
     loop_1@ while (true)     {
@@ -128,8 +128,8 @@
 }
 
 @PublishedApi internal fun f_searchWithEarlyReturn___boxed(limit: Any?, target: Any?): Any? {
-    val limit_boxed_96_1 = (limit as UInt)
-    val target_boxed_97_2 = (target as UInt)
+    val limit_boxed_96_1 = leanUnboxUInt(limit)
+    val target_boxed_97_2 = leanUnboxUInt(target)
     val res_98_3 = f_searchWithEarlyReturn(limit_boxed_96_1, target_boxed_97_2)
     return res_98_3
 }
@@ -163,9 +163,9 @@
 }
 
 @PublishedApi internal fun f_scanRowAll___boxed(pred: Any?, base: Any?, cols: Any?, j: Any?): Any? {
-    val base_boxed_132_1 = (base as UInt)
-    val cols_boxed_133_2 = (cols as UInt)
-    val j_boxed_134_3 = (j as UInt)
+    val base_boxed_132_1 = leanUnboxUInt(base)
+    val cols_boxed_133_2 = leanUnboxUInt(cols)
+    val j_boxed_134_3 = leanUnboxUInt(j)
     var j_140_5: UInt = j_boxed_134_3
     val res_135_4: Boolean
     loop_1@ while (true)     {
@@ -237,9 +237,9 @@
 }
 
 @PublishedApi internal fun f_scanGridAll___boxed(pred: Any?, rows: Any?, cols: Any?, i: Any?): Any? {
-    val rows_boxed_205_1 = (rows as UInt)
-    val cols_boxed_206_2 = (cols as UInt)
-    val i_boxed_207_3 = (i as UInt)
+    val rows_boxed_205_1 = leanUnboxUInt(rows)
+    val cols_boxed_206_2 = leanUnboxUInt(cols)
+    val i_boxed_207_3 = leanUnboxUInt(i)
     var i_213_5: UInt = i_boxed_207_3
     val res_208_4: Boolean
     loop_1@ while (true)     {
@@ -277,8 +277,8 @@
 }
 
 @PublishedApi internal fun f_allBelowLimit___lam__0___boxed(limit: Any?, x: Any?): Any? {
-    val limit_boxed_240_1 = (limit as UInt)
-    val x_boxed_241_2 = (x as UInt)
+    val limit_boxed_240_1 = leanUnboxUInt(limit)
+    val x_boxed_241_2 = leanUnboxUInt(x)
     val res_242_3 = f_allBelowLimit___lam__0(limit_boxed_240_1, x_boxed_241_2)
     return res_242_3
 }
@@ -294,7 +294,7 @@
                     break@loop_2
                 } else                 {
                     val x_277_5: Any? = (base_263_3 + j_265_4)
-                    val x_boxed_279_6 = (x_277_5 as UInt)
+                    val x_boxed_279_6 = leanUnboxUInt(x_277_5)
                     val res_280_7 = f_allBelowLimit___lam__0(limit, x_boxed_279_6)
                     if (!res_280_7)                     {
                         return false
@@ -313,9 +313,9 @@
 }
 
 @PublishedApi internal fun f_allBelowLimit___boxed(rows: Any?, cols: Any?, limit: Any?): Any? {
-    val rows_boxed_285_1 = (rows as UInt)
-    val cols_boxed_286_2 = (cols as UInt)
-    val limit_boxed_287_3 = (limit as UInt)
+    val rows_boxed_285_1 = leanUnboxUInt(rows)
+    val cols_boxed_286_2 = leanUnboxUInt(cols)
+    val limit_boxed_287_3 = leanUnboxUInt(limit)
     val res_288_4 = f_allBelowLimit(rows_boxed_285_1, cols_boxed_286_2, limit_boxed_287_3)
     return res_288_4
 }
@@ -329,8 +329,8 @@
 }
 
 @PublishedApi internal fun f_anyEquals___lam__0___boxed(target: Any?, x: Any?): Any? {
-    val target_boxed_297_1 = (target as UInt)
-    val x_boxed_298_2 = (x as UInt)
+    val target_boxed_297_1 = leanUnboxUInt(target)
+    val x_boxed_298_2 = leanUnboxUInt(x)
     val res_299_3 = f_anyEquals___lam__0(target_boxed_297_1, x_boxed_298_2)
     return res_299_3
 }
@@ -347,7 +347,7 @@
                     break@loop_2
                 } else                 {
                     val x_336_6: Any? = (base_322_4 + j_324_5)
-                    val x_boxed_338_7 = (x_336_6 as UInt)
+                    val x_boxed_338_7 = leanUnboxUInt(x_336_6)
                     val res_339_8 = f_anyEquals___lam__0(target, x_boxed_338_7)
                     if (!res_339_8)                     {
                         v_x_307_2 = false
@@ -373,10 +373,12 @@
 }
 
 @PublishedApi internal fun f_anyEquals___boxed(rows: Any?, cols: Any?, target: Any?): Any? {
-    val rows_boxed_344_1 = (rows as UInt)
-    val cols_boxed_345_2 = (cols as UInt)
-    val target_boxed_346_3 = (target as UInt)
+    val rows_boxed_344_1 = leanUnboxUInt(rows)
+    val cols_boxed_345_2 = leanUnboxUInt(cols)
+    val target_boxed_346_3 = leanUnboxUInt(target)
     val res_347_4 = f_anyEquals(rows_boxed_344_1, cols_boxed_345_2, target_boxed_346_3)
     return res_347_4
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

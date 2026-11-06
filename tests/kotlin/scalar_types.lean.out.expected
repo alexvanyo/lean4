@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal fun f_testUInts___redArg(c: UInt, d: ULong): ULong {
     val v_x_14_1 = (((d shr 2) + ((d shl 2) shr 1)) + ((d and 255uL) or (d xor 1024uL)))
     if (!(0u < c))     {
@@ -11,8 +11,8 @@
 }
 
 @PublishedApi internal fun f_testUInts___redArg___boxed(c: Any?, d: Any?): Any? {
-    val c_boxed_21_1 = (c as UInt)
-    val d_boxed_22_2 = (d as ULong)
+    val c_boxed_21_1 = leanUnboxUInt(c)
+    val d_boxed_22_2 = leanUnboxULong(d)
     val res_23_3 = f_testUInts___redArg(c_boxed_21_1, d_boxed_22_2)
     return res_23_3
 }
@@ -22,11 +22,11 @@
 }
 
 @PublishedApi internal fun f_testUInts___boxed(a: Any?, b: Any?, c: Any?, d: Any?, s: Any?): Any? {
-    val a_boxed_36_1 = (a as UByte)
-    val b_boxed_37_2 = (b as UShort)
-    val c_boxed_38_3 = (c as UInt)
-    val d_boxed_39_4 = (d as ULong)
-    val s_boxed_40_5 = (s as Int)
+    val a_boxed_36_1 = leanUnboxUByte(a)
+    val b_boxed_37_2 = leanUnboxUShort(b)
+    val c_boxed_38_3 = leanUnboxUInt(c)
+    val d_boxed_39_4 = leanUnboxULong(d)
+    val s_boxed_40_5 = leanUnboxInt(s)
     val res_41_6 = f_testUInts(a_boxed_36_1, b_boxed_37_2, c_boxed_38_3, d_boxed_39_4, s_boxed_40_5)
     return res_41_6
 }
@@ -41,8 +41,8 @@
 }
 
 @PublishedApi internal fun f_testInts___redArg___boxed(c: Any?, d: Any?): Any? {
-    val c_boxed_61_1 = (c as Int)
-    val d_boxed_62_2 = (d as Long)
+    val c_boxed_61_1 = leanUnboxInt(c)
+    val d_boxed_62_2 = leanUnboxLong(d)
     val res_63_3 = f_testInts___redArg(c_boxed_61_1, d_boxed_62_2)
     return res_63_3
 }
@@ -52,11 +52,11 @@
 }
 
 @PublishedApi internal fun f_testInts___boxed(a: Any?, b: Any?, c: Any?, d: Any?, s: Any?): Any? {
-    val a_boxed_76_1 = (a as Byte)
-    val b_boxed_77_2 = (b as Short)
-    val c_boxed_78_3 = (c as Int)
-    val d_boxed_79_4 = (d as Long)
-    val s_boxed_80_5 = (s as Int)
+    val a_boxed_76_1 = leanUnboxByte(a)
+    val b_boxed_77_2 = leanUnboxShort(b)
+    val c_boxed_78_3 = leanUnboxInt(c)
+    val d_boxed_79_4 = leanUnboxLong(d)
+    val s_boxed_80_5 = leanUnboxInt(s)
     val res_81_6 = f_testInts(a_boxed_76_1, b_boxed_77_2, c_boxed_78_3, d_boxed_79_4, s_boxed_80_5)
     return res_81_6
 }
@@ -227,23 +227,23 @@
 
 @PublishedApi internal fun f_testLeanInts___closed__2(): Any? {
     val v_x_213_1 = f_testLeanInts___closed__1()
-    return (-(v_x_213_1 as Int))
+    return (-leanUnboxInt(v_x_213_1))
 }
 
 @PublishedApi internal fun f_testLeanInts(a: Any?, b: Any?): Any? {
-    val sum_217_1 = ((a as Int) + (b as Int))
+    val sum_217_1 = (leanUnboxInt(a) + leanUnboxInt(b))
     val v_x_218_2 = f_testLeanInts___closed__0()
-    val diff_219_3 = (sum_217_1 - (v_x_218_2 as Int))
+    val diff_219_3 = (sum_217_1 - leanUnboxInt(v_x_218_2))
     val v_x_220_4 = f_testLeanInts___closed__2()
-    val prod_221_5 = (diff_219_3 * (v_x_220_4 as Int))
-    val r_223_6 = (prod_221_5 % (v_x_218_2 as Int))
-    val eq_224_7 = (if ((b as Int) == 0) 0 else if ((b as Int) > 0) Math.floorDiv((a as Int), (b as Int)) else -Math.floorDiv((a as Int), -(b as Int)))
-    val er_225_8 = (if ((b as Int) == 0) (a as Int) else Math.floorMod((a as Int), kotlin.math.abs((b as Int))))
-    val neg_226_9 = (-(prod_221_5 / (v_x_218_2 as Int)))
-    val absVal_228_10 = (kotlin.math.abs(((a as Int)).toLong())).toInt()
-    if (!((a as Int) == (b as Int)))     {
-        if (!((a as Int) < (b as Int)))         {
-            if (!((a as Int) <= (b as Int)))             {
+    val prod_221_5 = (diff_219_3 * leanUnboxInt(v_x_220_4))
+    val r_223_6 = (prod_221_5 % leanUnboxInt(v_x_218_2))
+    val eq_224_7 = (if (leanUnboxInt(b) == 0) 0 else if (leanUnboxInt(b) > 0) Math.floorDiv(leanUnboxInt(a), leanUnboxInt(b)) else -Math.floorDiv(leanUnboxInt(a), -leanUnboxInt(b)))
+    val er_225_8 = (if (leanUnboxInt(b) == 0) leanUnboxInt(a) else Math.floorMod(leanUnboxInt(a), kotlin.math.abs(leanUnboxInt(b))))
+    val neg_226_9 = (-(prod_221_5 / leanUnboxInt(v_x_218_2)))
+    val absVal_228_10 = (kotlin.math.abs((leanUnboxInt(a)).toLong())).toInt()
+    if (!(leanUnboxInt(a) == leanUnboxInt(b)))     {
+        if (!(leanUnboxInt(a) < leanUnboxInt(b)))         {
+            if (!(leanUnboxInt(a) <= leanUnboxInt(b)))             {
                 return ((neg_226_9 - r_223_6) + absVal_228_10)
             }
         }
@@ -261,16 +261,11 @@
     val g_254_3 = (a.gcd(b))
     val lg_255_4 = java.math.BigInteger.valueOf(maxOf(0, (a).bitLength() - 1).toLong())
     val pr_256_5 = (a.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO))
-    val v_y_263_6: Boolean
     if (!(a < b))     {
-        val v_x_266_7 = (a <= b)
-        v_y_263_6 = v_x_266_7
-    } else     {
-        v_y_263_6 = true
-    }
-    if (!v_y_263_6)     {
-        if (!(a == b))         {
-            return bit_251_1
+        if (!(a <= b))         {
+            if (!(a == b))             {
+                return bit_251_1
+            }
         }
     }
     return ((((bit_251_1.add(p_253_2)).add(g_254_3)).add(lg_255_4)).add(pr_256_5))
@@ -293,9 +288,9 @@
 }
 
 @PublishedApi internal fun f_testBitVec64(a: java.math.BigInteger, b: java.math.BigInteger): java.math.BigInteger {
-    val v_x_283_1 = f_BitVec_add(java.math.BigInteger.valueOf(64L), a, b)
-    val v_x_285_2 = f_BitVec_shiftLeft(java.math.BigInteger.valueOf(64L), a, java.math.BigInteger.valueOf(3L))
-    return (v_x_283_1.xor(v_x_285_2))
+    val v_x_281_1 = f_BitVec_add(java.math.BigInteger.valueOf(64L), a, b)
+    val v_x_283_2 = f_BitVec_shiftLeft(java.math.BigInteger.valueOf(64L), a, java.math.BigInteger.valueOf(3L))
+    return (v_x_281_1.xor(v_x_283_2))
 }
 
 @PublishedApi internal fun f_testBitVec64___boxed(a: Any?, b: Any?): Any? {
@@ -315,16 +310,16 @@
 }
 
 @PublishedApi internal fun f_testPanicOpt___closed__3(): String {
-    val v_x_293_1 = "value is none"
-    val v_x_296_2 = "Option.get!"
-    val v_x_297_3 = "Init.Data.Option.BasicAux"
-    return ("PANIC at " + v_x_296_2 + " " + v_x_297_3 + ":" + (java.math.BigInteger.valueOf(22L)).toString() + ":" + (java.math.BigInteger.valueOf(14L)).toString() + ": " + v_x_293_1)
+    val v_x_291_1 = "value is none"
+    val v_x_294_2 = "Option.get!"
+    val v_x_295_3 = "Init.Data.Option.BasicAux"
+    return ("PANIC at " + v_x_294_2 + " " + v_x_295_3 + ":" + (java.math.BigInteger.valueOf(22L)).toString() + ":" + (java.math.BigInteger.valueOf(14L)).toString() + ": " + v_x_291_1)
 }
 
 @PublishedApi internal fun f_testPanicOpt(x: java.math.BigInteger?): java.math.BigInteger {
     if (x == null)     {
-        val v_x_300_2 = f_testPanicOpt___closed__3()
-        return error(v_x_300_2)
+        val v_x_298_2 = f_testPanicOpt___closed__3()
+        return error(v_x_298_2)
     } else     {
         return (x as java.math.BigInteger)
     }
@@ -357,3 +352,12 @@ private fun f_BitVec_add(n: java.math.BigInteger, x: java.math.BigInteger, y: ja
     return f_BitVec_ofNat(n, (x.add(y)))
 }
 
+
+private inline fun leanUnboxByte(x: Any?): Byte = if (x is UByte) x.toByte() else x as Byte
+private inline fun leanUnboxUByte(x: Any?): UByte = if (x is Byte) x.toUByte() else x as UByte
+private inline fun leanUnboxShort(x: Any?): Short = if (x is UShort) x.toShort() else x as Short
+private inline fun leanUnboxUShort(x: Any?): UShort = if (x is Short) x.toUShort() else x as UShort
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt
+private inline fun leanUnboxLong(x: Any?): Long = if (x is ULong) x.toLong() else x as Long
+private inline fun leanUnboxULong(x: Any?): ULong = if (x is Long) x.toULong() else x as ULong

@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal tailrec fun f_Std_DTreeMap_Internal_Impl_Const_get_x3f___at___00testTreeMap_spec__2___redArg(t: Any?, k: String): Any? {
     when (((t as Array<*>)[0] as Int))     {
         0 ->         {
@@ -396,18 +396,18 @@
                                                         when (((r_524_16 as Array<*>)[0] as Int))                                                         {
                                                             0 ->                                                             {
                                                                 val size_551_76 = (r_524_16 as Array<*>)[1]
-                                                                v_y_535_68 = reuseFailAlloc_553_74
-                                                                v_y_536_69 = v_x_550_75
+                                                                v_y_535_68 = v_x_550_75
+                                                                v_y_536_69 = reuseFailAlloc_553_74
                                                                 v_y_537_70 = size_551_76
                                                             }
                                                             1 ->                                                             {
-                                                                v_y_535_68 = reuseFailAlloc_553_74
-                                                                v_y_536_69 = v_x_550_75
+                                                                v_y_535_68 = v_x_550_75
+                                                                v_y_536_69 = reuseFailAlloc_553_74
                                                                 v_y_537_70 = java.math.BigInteger.ZERO
                                                             }
                                                             else ->                                                             { error("unreachable") }
                                                         }
-                                                        return arrayOf<Any?>(0, v_x_533_67, k_521_63, v_522_64, v_y_535_68, arrayOf<Any?>(0, ((v_y_536_69 as java.math.BigInteger).add((v_y_537_70 as java.math.BigInteger))), k_495_57, v_496_58, r_524_16, r_498_18))
+                                                        return arrayOf<Any?>(0, v_x_533_67, k_521_63, v_522_64, v_y_536_69, arrayOf<Any?>(0, ((v_y_535_68 as java.math.BigInteger).add((v_y_537_70 as java.math.BigInteger))), k_495_57, v_496_58, r_524_16, r_498_18))
                                                     } else                                                     {
                                                         val v_x_562_77 = (java.math.BigInteger.ONE.add((size_508_61 as java.math.BigInteger)))
                                                         return arrayOf<Any?>(0, (v_x_562_77.add((size_494_56 as java.math.BigInteger))), k_495_57, v_496_58, arrayOf<Any?>(0, (v_x_562_77.add((size_520_62 as java.math.BigInteger))), k_506_59, v_507_60, tree_505_19, l_497_7), r_498_18)
@@ -587,18 +587,18 @@
                                             when (((r_824_25 as Array<*>)[0] as Int))                                             {
                                                 0 ->                                                 {
                                                     val size_851_114 = (r_824_25 as Array<*>)[1]
-                                                    v_y_834_105 = reuseFailAlloc_853_112
-                                                    v_y_835_106 = v_x_850_113
+                                                    v_y_834_105 = v_x_850_113
+                                                    v_y_835_106 = reuseFailAlloc_853_112
                                                     v_y_836_107 = size_851_114
                                                 }
                                                 1 ->                                                 {
-                                                    v_y_834_105 = reuseFailAlloc_853_112
-                                                    v_y_835_106 = v_x_850_113
+                                                    v_y_834_105 = v_x_850_113
+                                                    v_y_835_106 = reuseFailAlloc_853_112
                                                     v_y_836_107 = java.math.BigInteger.ZERO
                                                 }
                                                 else ->                                                 { error("unreachable") }
                                             }
-                                            return arrayOf<Any?>(0, v_x_832_104, k_821_102, v_822_103, v_y_834_105, arrayOf<Any?>(0, ((v_y_835_106 as java.math.BigInteger).add((v_y_836_107 as java.math.BigInteger))), k_307_29, v_308_30, r_824_25, impl_800_11))
+                                            return arrayOf<Any?>(0, v_x_832_104, k_821_102, v_822_103, v_y_835_106, arrayOf<Any?>(0, ((v_y_834_105 as java.math.BigInteger).add((v_y_836_107 as java.math.BigInteger))), k_307_29, v_308_30, r_824_25, impl_800_11))
                                         } else                                         {
                                             return arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_803_97 as java.math.BigInteger))).add((size_802_96 as java.math.BigInteger))), k_804_98, v_805_99, l_806_27, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_802_96 as java.math.BigInteger))).add((size_820_101 as java.math.BigInteger))), k_307_29, v_308_30, r_807_10, impl_800_11))
                                         }
@@ -771,18 +771,18 @@
     when (((v_x_1039_1 as Array<*>)[0] as Int))     {
         0 ->         {
             val size_1042_17 = (v_x_1039_1 as Array<*>)[1]
-            v_y_1030_2 = v_x_1041_16
-            v_y_1031_3 = v_x_1040_15
+            v_y_1030_2 = v_x_1040_15
+            v_y_1031_3 = v_x_1041_16
             v_y_1032_4 = size_1042_17
         }
         1 ->         {
-            v_y_1030_2 = v_x_1041_16
-            v_y_1031_3 = v_x_1040_15
+            v_y_1030_2 = v_x_1040_15
+            v_y_1031_3 = v_x_1041_16
             v_y_1032_4 = java.math.BigInteger.ZERO
         }
         else ->         { error("unreachable") }
     }
-    return Pair(v_y_1031_3, Pair(v_y_1030_2, (v_y_1032_4 as java.math.BigInteger)))
+    return Pair(v_y_1030_2, Pair(v_y_1031_3, (v_y_1032_4 as java.math.BigInteger)))
 }
 
 @PublishedApi internal fun f_Std_DTreeMap_Internal_Impl_contains___at___00testTreeSet_spec__0(p_0: Any?, k: String, t: Any?): Boolean {
@@ -1357,14 +1357,14 @@
 }
 
 @PublishedApi internal fun f_testScalarExtras___boxed(u8: Any?, u16: Any?, u32: Any?, u64: Any?, i8: Any?, i16: Any?, i32: Any?, i64: Any?): Any? {
-    val u8_boxed_1774_1 = (u8 as UByte)
-    val u16_boxed_1775_2 = (u16 as UShort)
-    val u32_boxed_1776_3 = (u32 as UInt)
-    val u64_boxed_1777_4 = (u64 as ULong)
-    val i8_boxed_1778_5 = (i8 as Byte)
-    val i16_boxed_1779_6 = (i16 as Short)
-    val i32_boxed_1780_7 = (i32 as Int)
-    val i64_boxed_1781_8 = (i64 as Long)
+    val u8_boxed_1774_1 = leanUnboxUByte(u8)
+    val u16_boxed_1775_2 = leanUnboxUShort(u16)
+    val u32_boxed_1776_3 = leanUnboxUInt(u32)
+    val u64_boxed_1777_4 = leanUnboxULong(u64)
+    val i8_boxed_1778_5 = leanUnboxByte(i8)
+    val i16_boxed_1779_6 = leanUnboxShort(i16)
+    val i32_boxed_1780_7 = leanUnboxInt(i32)
+    val i64_boxed_1781_8 = leanUnboxLong(i64)
     val res_1782_9 = f_testScalarExtras(u8_boxed_1774_1, u16_boxed_1775_2, u32_boxed_1776_3, u64_boxed_1777_4, i8_boxed_1778_5, i16_boxed_1779_6, i32_boxed_1780_7, i64_boxed_1781_8)
     return res_1782_9
 }
@@ -1385,7 +1385,7 @@
 @PublishedApi internal fun f_testByteSliceBeq(a: ByteArray, b: ByteArray): Boolean {
     val sa_1809_1 = f_ByteSlice_ofByteArray(a)
     val sb_1810_2 = f_ByteSlice_ofByteArray(b)
-    return (run { val x = sa_1809_1 as Array<*>; val y = sb_1810_2 as Array<*>; val bx = x[1] as ByteArray; val sx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, bx.size); val lx = (x[3] as java.math.BigInteger).toInt().coerceIn(0, bx.size - sx); val by = y[1] as ByteArray; val sy = (y[2] as java.math.BigInteger).toInt().coerceIn(0, by.size); val ly = (y[3] as java.math.BigInteger).toInt().coerceIn(0, by.size - sy); java.util.Arrays.equals(bx, sx, sx + lx, by, sy, sy + ly) })
+    return (run { val x = sa_1809_1 as Array<*>; val y = sb_1810_2 as Array<*>; val bx = x[1] as ByteArray; val sx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, bx.size); val lx = (x[3] as java.math.BigInteger).toInt().coerceIn(0, bx.size - sx); val by = y[1] as ByteArray; val sy = (y[2] as java.math.BigInteger).toInt().coerceIn(0, by.size); val ly = (y[3] as java.math.BigInteger).toInt().coerceIn(0, by.size - sy); bx.copyOfRange(sx, sx + lx).contentEquals(by.copyOfRange(sy, sy + ly)) })
 }
 
 @PublishedApi internal fun f_testByteSliceBeq___boxed(a: Any?, b: Any?): Any? {
@@ -1398,7 +1398,9 @@
     val sa_1820_2 = arrayOf<Any?>(0, a, java.math.BigInteger.ZERO, v_x_1819_1)
     val v_x_1821_3 = java.math.BigInteger.valueOf((b).encodeToByteArray().size.toLong())
     val sb_1822_4 = arrayOf<Any?>(0, b, java.math.BigInteger.ZERO, v_x_1821_3)
-    return Pair(((run { val sl = sa_1820_2 as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() }) == (run { val sl = sb_1822_4 as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() })), (run { val x = sa_1820_2 as Array<*>; val y = sb_1822_4 as Array<*>; val sx = (x[1] as String).encodeToByteArray(); val bx = (x[2] as java.math.BigInteger).toInt().coerceIn(0, sx.size); val ex = (x[3] as java.math.BigInteger).toInt().coerceIn(bx, sx.size); val sy = (y[1] as String).encodeToByteArray(); val by = (y[2] as java.math.BigInteger).toInt().coerceIn(0, sy.size); val ey = (y[3] as java.math.BigInteger).toInt().coerceIn(by, sy.size); java.util.Arrays.compareUnsigned(sx, bx, ex, sy, by, ey) < 0 }))
+    val v_x_1825_5 = ((run { val sl = sa_1820_2 as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() }) == (run { val sl = sb_1822_4 as Array<*>; val s = (sl[1] as String).encodeToByteArray(); val b = (sl[2] as java.math.BigInteger).toInt().coerceIn(0, s.size); val e = (sl[3] as java.math.BigInteger).toInt().coerceIn(b, s.size); s.copyOfRange(b, e).contentHashCode().toULong() }))
+    val v_x_1826_6 = f_String_Slice_blt(sa_1820_2, sb_1822_4)
+    return Pair(v_x_1825_5, v_x_1826_6)
 }
 
 @PublishedApi internal fun f_testDbgTrace___lam__0(x: java.math.BigInteger, p_1: Any?): java.math.BigInteger {
@@ -1419,6 +1421,25 @@
     return ((run { System.err.println(v_x_1840_2); (v_f_1839_1 as (Any?) -> Any?)(null) }) as java.math.BigInteger)
 }
 
+private fun f_String_Slice_blt(s: Any?, t: Any?): Boolean {
+    val str_1844_3 = (s as Array<*>)[1]
+    val startInclusive_1845_4 = (s as Array<*>)[2]
+    val str_1847_5 = (t as Array<*>)[1]
+    val startInclusive_1848_6 = (t as Array<*>)[2]
+    val v_x_1850_7 = (((s as Array<*>)[3] as java.math.BigInteger).subtract((startInclusive_1845_4 as java.math.BigInteger)).max(java.math.BigInteger.ZERO))
+    val v_x_1851_8 = (((t as Array<*>)[3] as java.math.BigInteger).subtract((startInclusive_1848_6 as java.math.BigInteger)).max(java.math.BigInteger.ZERO))
+    if (!(v_x_1850_7 < v_x_1851_8))     {
+        return (run { val x = ((str_1844_3 as String)).encodeToByteArray(); val y = ((str_1847_5 as String)).encodeToByteArray(); val bx = ((startInclusive_1845_4 as java.math.BigInteger)).toInt(); val by = ((startInclusive_1848_6 as java.math.BigInteger)).toInt(); val n = (v_x_1851_8).toInt(); var i = 0; var r = 0; while (i < n && r == 0) { r = (x[bx + i].toInt() and 0xFF) - (y[by + i].toInt() and 0xFF); i++ }; r < 0 })
+    } else     {
+        val v_x_1854_9 = (run { val x = ((str_1847_5 as String)).encodeToByteArray(); val y = ((str_1844_3 as String)).encodeToByteArray(); val bx = ((startInclusive_1848_6 as java.math.BigInteger)).toInt(); val by = ((startInclusive_1845_4 as java.math.BigInteger)).toInt(); val n = (v_x_1850_7).toInt(); var i = 0; var r = 0; while (i < n && r == 0) { r = (x[bx + i].toInt() and 0xFF) - (y[by + i].toInt() and 0xFF); i++ }; r < 0 })
+        if (!v_x_1854_9)         {
+            return true
+        } else         {
+            return false
+        }
+    }
+}
+
 /**
  * Creates a new ByteSlice of a ByteArray
  */
@@ -1429,94 +1450,94 @@ private fun f_ByteSlice_ofByteArray(ba: ByteArray): Any? {
 private fun f_Std_DTreeMap_Internal_Impl_minView___redArg(k: Any?, v: Any?, l: Any?, r: Any?): Any? {
     when (((l as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_x_1854_8 = f_Std_DTreeMap_Internal_Impl_minView___redArg((l as Array<*>)[2], (l as Array<*>)[3], (l as Array<*>)[4], (l as Array<*>)[5])
-            val k_1855_10 = (v_x_1854_8 as Array<*>)[1]
-            val v_1856_11 = (v_x_1854_8 as Array<*>)[2]
-            val tree_1857_6 = (v_x_1854_8 as Array<*>)[3]
-            val v_y_1859_12: Any?
-            val v_y_1860_13: Any?
-            val v_y_1861_14: Any?
-            val v_y_1862_15: Any?
-            val v_y_1863_16: Any?
-            val v_y_1864_17: Any?
-            val v_y_1865_18: Any?
-            val v_y_1866_19: Any?
-            val v_y_1867_20: Any?
-            val v_y_1868_21: Any?
-            val v_y_1874_1: Any?
-            val v_y_1875_22: Any?
-            val v_y_1876_23: Any?
-            val v_y_1877_24: Any?
-            val v_y_1878_25: Any?
-            val v_y_1879_26: Any?
-            val v_y_1880_27: Any?
-            val v_y_1881_28: Any?
-            val v_y_1882_29: Any?
-            val v_y_1883_30: Any?
-            val v_y_1884_31: Any?
-            val v_y_1885_32: Any?
-            when (((tree_1857_6 as Array<*>)[0] as Int))             {
+            val v_x_1868_8 = f_Std_DTreeMap_Internal_Impl_minView___redArg((l as Array<*>)[2], (l as Array<*>)[3], (l as Array<*>)[4], (l as Array<*>)[5])
+            val k_1869_10 = (v_x_1868_8 as Array<*>)[1]
+            val v_1870_11 = (v_x_1868_8 as Array<*>)[2]
+            val tree_1871_6 = (v_x_1868_8 as Array<*>)[3]
+            val v_y_1873_12: Any?
+            val v_y_1874_13: Any?
+            val v_y_1875_14: Any?
+            val v_y_1876_15: Any?
+            val v_y_1877_16: Any?
+            val v_y_1878_17: Any?
+            val v_y_1879_18: Any?
+            val v_y_1880_19: Any?
+            val v_y_1881_20: Any?
+            val v_y_1882_21: Any?
+            val v_y_1888_22: Any?
+            val v_y_1889_23: Any?
+            val v_y_1890_24: Any?
+            val v_y_1891_25: Any?
+            val v_y_1892_26: Any?
+            val v_y_1893_1: Any?
+            val v_y_1894_27: Any?
+            val v_y_1895_28: Any?
+            val v_y_1896_29: Any?
+            val v_y_1897_30: Any?
+            val v_y_1898_31: Any?
+            val v_y_1899_32: Any?
+            when (((tree_1871_6 as Array<*>)[0] as Int))             {
                 0 ->                 {
                     when (((r as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val size_1891_33 = (tree_1857_6 as Array<*>)[1]
-                            val size_1892_34 = (r as Array<*>)[1]
-                            val k_1893_35 = (r as Array<*>)[2]
-                            val v_1894_36 = (r as Array<*>)[3]
-                            val l_1895_4 = (r as Array<*>)[4]
-                            val r_1896_3 = (r as Array<*>)[5]
-                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_1891_33 as java.math.BigInteger))) < (size_1892_34 as java.math.BigInteger)))                             {
-                                return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_1891_33 as java.math.BigInteger))).add((size_1892_34 as java.math.BigInteger))), k, v, tree_1857_6, r))
+                            val size_1905_33 = (tree_1871_6 as Array<*>)[1]
+                            val size_1906_34 = (r as Array<*>)[1]
+                            val k_1907_35 = (r as Array<*>)[2]
+                            val v_1908_36 = (r as Array<*>)[3]
+                            val l_1909_4 = (r as Array<*>)[4]
+                            val r_1910_3 = (r as Array<*>)[5]
+                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_1905_33 as java.math.BigInteger))) < (size_1906_34 as java.math.BigInteger)))                             {
+                                return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_1905_33 as java.math.BigInteger))).add((size_1906_34 as java.math.BigInteger))), k, v, tree_1871_6, r))
                             } else                             {
-                                val size_1905_37 = (if (l_1895_4 is Pair<*, *>) l_1895_4.first else (l_1895_4 as Array<*>)[1])
-                                val k_1906_38 = (if (l_1895_4 is Pair<*, *>) l_1895_4.second else (l_1895_4 as Array<*>)[2])
-                                val v_1907_39 = (l_1895_4 as Array<*>)[3]
-                                val l_1908_2 = (l_1895_4 as Array<*>)[4]
-                                val r_1909_40 = (l_1895_4 as Array<*>)[5]
-                                val size_1910_41 = (if (r_1896_3 is Pair<*, *>) r_1896_3.first else (r_1896_3 as Array<*>)[1])
-                                if (!((size_1905_37 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_1910_41 as java.math.BigInteger)))))                                 {
-                                    val v_x_1915_42 = (java.math.BigInteger.ONE.add((size_1891_33 as java.math.BigInteger)))
-                                    val v_x_1916_43 = (v_x_1915_42.add((size_1892_34 as java.math.BigInteger)))
-                                    when (((l_1908_2 as Array<*>)[0] as Int))                                     {
+                                val size_1919_37 = (if (l_1909_4 is Pair<*, *>) l_1909_4.first else (l_1909_4 as Array<*>)[1])
+                                val k_1920_38 = (if (l_1909_4 is Pair<*, *>) l_1909_4.second else (l_1909_4 as Array<*>)[2])
+                                val v_1921_39 = (l_1909_4 as Array<*>)[3]
+                                val l_1922_2 = (l_1909_4 as Array<*>)[4]
+                                val r_1923_40 = (l_1909_4 as Array<*>)[5]
+                                val size_1924_41 = (if (r_1910_3 is Pair<*, *>) r_1910_3.first else (r_1910_3 as Array<*>)[1])
+                                if (!((size_1919_37 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_1924_41 as java.math.BigInteger)))))                                 {
+                                    val v_x_1929_42 = (java.math.BigInteger.ONE.add((size_1905_33 as java.math.BigInteger)))
+                                    val v_x_1930_43 = (v_x_1929_42.add((size_1906_34 as java.math.BigInteger)))
+                                    when (((l_1922_2 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_1917_44 = (l_1908_2 as Array<*>)[1]
-                                            v_y_1874_1 = r_1909_40
-                                            v_y_1875_22 = size_1910_41
-                                            v_y_1876_23 = l_1908_2
-                                            v_y_1877_24 = v_1894_36
-                                            v_y_1878_25 = v_x_1916_43
-                                            v_y_1879_26 = v_x_1915_42
-                                            v_y_1880_27 = v_1907_39
-                                            v_y_1881_28 = java.math.BigInteger.ONE
-                                            v_y_1882_29 = k_1893_35
-                                            v_y_1883_30 = k_1906_38
-                                            v_y_1884_31 = r_1896_3
-                                            v_y_1885_32 = size_1917_44
+                                            val size_1931_44 = (l_1922_2 as Array<*>)[1]
+                                            v_y_1888_22 = size_1924_41
+                                            v_y_1889_23 = l_1922_2
+                                            v_y_1890_24 = r_1910_3
+                                            v_y_1891_25 = v_1908_36
+                                            v_y_1892_26 = v_x_1930_43
+                                            v_y_1893_1 = r_1923_40
+                                            v_y_1894_27 = java.math.BigInteger.ONE
+                                            v_y_1895_28 = v_x_1929_42
+                                            v_y_1896_29 = k_1907_35
+                                            v_y_1897_30 = v_1921_39
+                                            v_y_1898_31 = k_1920_38
+                                            v_y_1899_32 = size_1931_44
                                         }
                                         1 ->                                         {
-                                            v_y_1874_1 = r_1909_40
-                                            v_y_1875_22 = size_1910_41
-                                            v_y_1876_23 = l_1908_2
-                                            v_y_1877_24 = v_1894_36
-                                            v_y_1878_25 = v_x_1916_43
-                                            v_y_1879_26 = v_x_1915_42
-                                            v_y_1880_27 = v_1907_39
-                                            v_y_1881_28 = java.math.BigInteger.ONE
-                                            v_y_1882_29 = k_1893_35
-                                            v_y_1883_30 = k_1906_38
-                                            v_y_1884_31 = r_1896_3
-                                            v_y_1885_32 = java.math.BigInteger.ZERO
+                                            v_y_1888_22 = size_1924_41
+                                            v_y_1889_23 = l_1922_2
+                                            v_y_1890_24 = r_1910_3
+                                            v_y_1891_25 = v_1908_36
+                                            v_y_1892_26 = v_x_1930_43
+                                            v_y_1893_1 = r_1923_40
+                                            v_y_1894_27 = java.math.BigInteger.ONE
+                                            v_y_1895_28 = v_x_1929_42
+                                            v_y_1896_29 = k_1907_35
+                                            v_y_1897_30 = v_1921_39
+                                            v_y_1898_31 = k_1920_38
+                                            v_y_1899_32 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
                                 } else                                 {
-                                    val v_x_1920_45 = (java.math.BigInteger.ONE.add((size_1891_33 as java.math.BigInteger)))
-                                    return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, (v_x_1920_45.add((size_1892_34 as java.math.BigInteger))), k_1893_35, v_1894_36, arrayOf<Any?>(0, (v_x_1920_45.add((size_1905_37 as java.math.BigInteger))), k, v, tree_1857_6, l_1895_4), r_1896_3))
+                                    val v_x_1934_45 = (java.math.BigInteger.ONE.add((size_1905_33 as java.math.BigInteger)))
+                                    return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, (v_x_1934_45.add((size_1906_34 as java.math.BigInteger))), k_1907_35, v_1908_36, arrayOf<Any?>(0, (v_x_1934_45.add((size_1919_37 as java.math.BigInteger))), k, v, tree_1871_6, l_1909_4), r_1910_3))
                                 }
                             }
                         }
                         1 ->                         {
-                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((tree_1857_6 as Array<*>)[1] as java.math.BigInteger))), k, v, tree_1857_6, r))
+                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((tree_1871_6 as Array<*>)[1] as java.math.BigInteger))), k, v, tree_1871_6, r))
                         }
                         else ->                         { error("unreachable") }
                     }
@@ -1524,28 +1545,28 @@ private fun f_Std_DTreeMap_Internal_Impl_minView___redArg(k: Any?, v: Any?, l: A
                 1 ->                 {
                     when (((r as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val l_1931_7 = (r as Array<*>)[4]
-                            when (((l_1931_7 as Array<*>)[0] as Int))                             {
+                            val l_1945_7 = (r as Array<*>)[4]
+                            when (((l_1945_7 as Array<*>)[0] as Int))                             {
                                 0 ->                                 {
-                                    val r_1932_46 = (r as Array<*>)[5]
-                                    when (((r_1932_46 as Array<*>)[0] as Int))                                     {
+                                    val r_1946_46 = (r as Array<*>)[5]
+                                    when (((r_1946_46 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((r as Array<*>)[1] as java.math.BigInteger))), (r as Array<*>)[2], (r as Array<*>)[3], arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((l_1931_7 as Array<*>)[1] as java.math.BigInteger))), k, v, tree_1857_6, l_1931_7), r_1932_46))
+                                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((r as Array<*>)[1] as java.math.BigInteger))), (r as Array<*>)[2], (r as Array<*>)[3], arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((l_1945_7 as Array<*>)[1] as java.math.BigInteger))), k, v, tree_1871_6, l_1945_7), r_1946_46))
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l_1931_7 as Array<*>)[2], (l_1931_7 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r_1932_46, r_1932_46), arrayOf<Any?>(0, java.math.BigInteger.ONE, (r as Array<*>)[2], (r as Array<*>)[3], r_1932_46, r_1932_46)))
+                                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l_1945_7 as Array<*>)[2], (l_1945_7 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r_1946_46, r_1946_46), arrayOf<Any?>(0, java.math.BigInteger.ONE, (r as Array<*>)[2], (r as Array<*>)[3], r_1946_46, r_1946_46)))
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
                                 }
                                 1 ->                                 {
-                                    val r_1953_47 = (r as Array<*>)[5]
-                                    when (((r_1953_47 as Array<*>)[0] as Int))                                     {
+                                    val r_1967_47 = (r as Array<*>)[5]
+                                    when (((r_1967_47 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r as Array<*>)[2], (r as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l_1931_7, l_1931_7), r_1953_47))
+                                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r as Array<*>)[2], (r as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l_1945_7, l_1945_7), r_1967_47))
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, java.math.BigInteger.TWO, k, v, r_1953_47, arrayOf<Any?>(0, (r as Array<*>)[1], (r as Array<*>)[2], (r as Array<*>)[3], r_1953_47, r_1953_47)))
+                                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, java.math.BigInteger.TWO, k, v, r_1967_47, arrayOf<Any?>(0, (r as Array<*>)[1], (r as Array<*>)[2], (r as Array<*>)[3], r_1967_47, r_1967_47)))
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
@@ -1554,45 +1575,45 @@ private fun f_Std_DTreeMap_Internal_Impl_minView___redArg(k: Any?, v: Any?, l: A
                             }
                         }
                         1 ->                         {
-                            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r, r))
+                            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r, r))
                         }
                         else ->                         { error("unreachable") }
                     }
                 }
                 else ->                 { error("unreachable") }
             }
-            val v_x_1886_48 = ((v_y_1879_26 as java.math.BigInteger).add((v_y_1885_32 as java.math.BigInteger)))
-            val v_x_1887_49 = arrayOf<Any?>(0, v_x_1886_48, k, v, tree_1857_6, v_y_1876_23)
-            val v_x_1888_50 = ((v_y_1881_28 as java.math.BigInteger).add((v_y_1875_22 as java.math.BigInteger)))
-            when (((v_y_1874_1 as Array<*>)[0] as Int))             {
+            val v_x_1900_48 = ((v_y_1895_28 as java.math.BigInteger).add((v_y_1899_32 as java.math.BigInteger)))
+            val v_x_1901_49 = arrayOf<Any?>(0, v_x_1900_48, k, v, tree_1871_6, v_y_1889_23)
+            val v_x_1902_50 = ((v_y_1894_27 as java.math.BigInteger).add((v_y_1888_22 as java.math.BigInteger)))
+            when (((v_y_1893_1 as Array<*>)[0] as Int))             {
                 0 ->                 {
-                    val size_1889_51 = (v_y_1874_1 as Array<*>)[1]
-                    v_y_1859_12 = v_y_1874_1
-                    v_y_1860_13 = v_y_1877_24
-                    v_y_1861_14 = v_y_1878_25
-                    v_y_1862_15 = v_x_1888_50
-                    v_y_1863_16 = v_y_1880_27
-                    v_y_1864_17 = v_y_1882_29
-                    v_y_1865_18 = v_y_1883_30
-                    v_y_1866_19 = v_y_1884_31
-                    v_y_1867_20 = v_x_1887_49
-                    v_y_1868_21 = size_1889_51
+                    val size_1903_51 = (v_y_1893_1 as Array<*>)[1]
+                    v_y_1873_12 = v_y_1890_24
+                    v_y_1874_13 = v_x_1902_50
+                    v_y_1875_14 = v_y_1891_25
+                    v_y_1876_15 = v_y_1892_26
+                    v_y_1877_16 = v_y_1893_1
+                    v_y_1878_17 = v_y_1897_30
+                    v_y_1879_18 = v_y_1896_29
+                    v_y_1880_19 = v_x_1901_49
+                    v_y_1881_20 = v_y_1898_31
+                    v_y_1882_21 = size_1903_51
                 }
                 1 ->                 {
-                    v_y_1859_12 = v_y_1874_1
-                    v_y_1860_13 = v_y_1877_24
-                    v_y_1861_14 = v_y_1878_25
-                    v_y_1862_15 = v_x_1888_50
-                    v_y_1863_16 = v_y_1880_27
-                    v_y_1864_17 = v_y_1882_29
-                    v_y_1865_18 = v_y_1883_30
-                    v_y_1866_19 = v_y_1884_31
-                    v_y_1867_20 = v_x_1887_49
-                    v_y_1868_21 = java.math.BigInteger.ZERO
+                    v_y_1873_12 = v_y_1890_24
+                    v_y_1874_13 = v_x_1902_50
+                    v_y_1875_14 = v_y_1891_25
+                    v_y_1876_15 = v_y_1892_26
+                    v_y_1877_16 = v_y_1893_1
+                    v_y_1878_17 = v_y_1897_30
+                    v_y_1879_18 = v_y_1896_29
+                    v_y_1880_19 = v_x_1901_49
+                    v_y_1881_20 = v_y_1898_31
+                    v_y_1882_21 = java.math.BigInteger.ZERO
                 }
                 else ->                 { error("unreachable") }
             }
-            return arrayOf<Any?>(0, k_1855_10, v_1856_11, arrayOf<Any?>(0, v_y_1861_14, v_y_1865_18, v_y_1863_16, v_y_1867_20, arrayOf<Any?>(0, ((v_y_1862_15 as java.math.BigInteger).add((v_y_1868_21 as java.math.BigInteger))), v_y_1864_17, v_y_1860_13, v_y_1859_12, v_y_1866_19)))
+            return arrayOf<Any?>(0, k_1869_10, v_1870_11, arrayOf<Any?>(0, v_y_1876_15, v_y_1881_20, v_y_1878_17, v_y_1880_19, arrayOf<Any?>(0, ((v_y_1874_13 as java.math.BigInteger).add((v_y_1882_21 as java.math.BigInteger))), v_y_1879_18, v_y_1875_14, v_y_1877_16, v_y_1873_12)))
         }
         1 ->         {
             return arrayOf<Any?>(0, k, v, r)
@@ -1604,90 +1625,90 @@ private fun f_Std_DTreeMap_Internal_Impl_minView___redArg(k: Any?, v: Any?, l: A
 private fun f_Std_DTreeMap_Internal_Impl_maxView___redArg(k: Any?, v: Any?, l: Any?, r: Any?): Any? {
     when (((r as Array<*>)[0] as Int))     {
         0 ->         {
-            val v_x_1980_9 = f_Std_DTreeMap_Internal_Impl_maxView___redArg((r as Array<*>)[2], (r as Array<*>)[3], (r as Array<*>)[4], (r as Array<*>)[5])
-            val k_1981_11 = (v_x_1980_9 as Array<*>)[1]
-            val v_1982_12 = (v_x_1980_9 as Array<*>)[2]
-            val tree_1983_6 = (v_x_1980_9 as Array<*>)[3]
-            val v_y_1985_13: Any?
-            val v_y_1986_14: Any?
-            val v_y_1987_15: Any?
-            val v_y_1988_16: Any?
-            val v_y_1989_17: Any?
-            val v_y_1990_18: Any?
-            val v_y_1991_19: Any?
-            val v_y_1997_20: Any?
-            val v_y_1998_21: Any?
-            val v_y_1999_1: Any?
-            val v_y_2000_22: Any?
-            val v_y_2001_23: Any?
-            val v_y_2002_24: Any?
-            val v_y_2003_25: Any?
-            val v_y_2004_26: Any?
-            val v_y_2005_27: Any?
-            val v_y_2006_28: Any?
-            val v_y_2007_29: Any?
-            val v_y_2008_30: Any?
-            when (((tree_1983_6 as Array<*>)[0] as Int))             {
+            val v_x_1994_9 = f_Std_DTreeMap_Internal_Impl_maxView___redArg((r as Array<*>)[2], (r as Array<*>)[3], (r as Array<*>)[4], (r as Array<*>)[5])
+            val k_1995_11 = (v_x_1994_9 as Array<*>)[1]
+            val v_1996_12 = (v_x_1994_9 as Array<*>)[2]
+            val tree_1997_6 = (v_x_1994_9 as Array<*>)[3]
+            val v_y_1999_13: Any?
+            val v_y_2000_14: Any?
+            val v_y_2001_15: Any?
+            val v_y_2002_16: Any?
+            val v_y_2003_17: Any?
+            val v_y_2004_18: Any?
+            val v_y_2005_19: Any?
+            val v_y_2011_20: Any?
+            val v_y_2012_21: Any?
+            val v_y_2013_1: Any?
+            val v_y_2014_22: Any?
+            val v_y_2015_23: Any?
+            val v_y_2016_24: Any?
+            val v_y_2017_25: Any?
+            val v_y_2018_26: Any?
+            val v_y_2019_27: Any?
+            val v_y_2020_28: Any?
+            val v_y_2021_29: Any?
+            val v_y_2022_30: Any?
+            when (((tree_1997_6 as Array<*>)[0] as Int))             {
                 0 ->                 {
                     when (((l as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val size_2014_31 = (tree_1983_6 as Array<*>)[1]
-                            val size_2015_32 = (l as Array<*>)[1]
-                            val k_2016_33 = (l as Array<*>)[2]
-                            val v_2017_34 = (l as Array<*>)[3]
-                            val l_2018_4 = (l as Array<*>)[4]
-                            val r_2019_3 = (l as Array<*>)[5]
-                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_2014_31 as java.math.BigInteger))) < (size_2015_32 as java.math.BigInteger)))                             {
-                                return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2015_32 as java.math.BigInteger))).add((size_2014_31 as java.math.BigInteger))), k, v, l, tree_1983_6))
+                            val size_2028_31 = (tree_1997_6 as Array<*>)[1]
+                            val size_2029_32 = (l as Array<*>)[1]
+                            val k_2030_33 = (l as Array<*>)[2]
+                            val v_2031_34 = (l as Array<*>)[3]
+                            val l_2032_4 = (l as Array<*>)[4]
+                            val r_2033_3 = (l as Array<*>)[5]
+                            if (!((java.math.BigInteger.valueOf(3L).multiply((size_2028_31 as java.math.BigInteger))) < (size_2029_32 as java.math.BigInteger)))                             {
+                                return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2029_32 as java.math.BigInteger))).add((size_2028_31 as java.math.BigInteger))), k, v, l, tree_1997_6))
                             } else                             {
-                                val size_2028_35 = (if (l_2018_4 is Pair<*, *>) l_2018_4.first else (l_2018_4 as Array<*>)[1])
-                                val size_2029_36 = (if (r_2019_3 is Pair<*, *>) r_2019_3.first else (r_2019_3 as Array<*>)[1])
-                                val k_2030_37 = (if (r_2019_3 is Pair<*, *>) r_2019_3.second else (r_2019_3 as Array<*>)[2])
-                                val v_2031_38 = (r_2019_3 as Array<*>)[3]
-                                val l_2032_2 = (r_2019_3 as Array<*>)[4]
-                                val r_2033_39 = (r_2019_3 as Array<*>)[5]
-                                if (!((size_2029_36 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_2028_35 as java.math.BigInteger)))))                                 {
-                                    val v_x_2039_40 = ((java.math.BigInteger.ONE.add((size_2015_32 as java.math.BigInteger))).add((size_2014_31 as java.math.BigInteger)))
-                                    val v_x_2040_41 = (java.math.BigInteger.ONE.add((size_2028_35 as java.math.BigInteger)))
-                                    when (((l_2032_2 as Array<*>)[0] as Int))                                     {
+                                val size_2042_35 = (if (l_2032_4 is Pair<*, *>) l_2032_4.first else (l_2032_4 as Array<*>)[1])
+                                val size_2043_36 = (if (r_2033_3 is Pair<*, *>) r_2033_3.first else (r_2033_3 as Array<*>)[1])
+                                val k_2044_37 = (if (r_2033_3 is Pair<*, *>) r_2033_3.second else (r_2033_3 as Array<*>)[2])
+                                val v_2045_38 = (r_2033_3 as Array<*>)[3]
+                                val l_2046_2 = (r_2033_3 as Array<*>)[4]
+                                val r_2047_39 = (r_2033_3 as Array<*>)[5]
+                                if (!((size_2043_36 as java.math.BigInteger) < (java.math.BigInteger.TWO.multiply((size_2042_35 as java.math.BigInteger)))))                                 {
+                                    val v_x_2053_40 = ((java.math.BigInteger.ONE.add((size_2029_32 as java.math.BigInteger))).add((size_2028_31 as java.math.BigInteger)))
+                                    val v_x_2054_41 = (java.math.BigInteger.ONE.add((size_2042_35 as java.math.BigInteger)))
+                                    when (((l_2046_2 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            val size_2041_42 = (l_2032_2 as Array<*>)[1]
-                                            v_y_1997_20 = size_2014_31
-                                            v_y_1998_21 = l_2018_4
-                                            v_y_1999_1 = r_2033_39
-                                            v_y_2000_22 = v_x_2039_40
-                                            v_y_2001_23 = k_2016_33
-                                            v_y_2002_24 = l_2032_2
-                                            v_y_2003_25 = java.math.BigInteger.ONE
-                                            v_y_2004_26 = k_2030_37
-                                            v_y_2005_27 = v_x_2040_41
-                                            v_y_2006_28 = v_2017_34
-                                            v_y_2007_29 = v_2031_38
-                                            v_y_2008_30 = size_2041_42
+                                            val size_2055_42 = (l_2046_2 as Array<*>)[1]
+                                            v_y_2011_20 = l_2046_2
+                                            v_y_2012_21 = v_x_2053_40
+                                            v_y_2013_1 = r_2047_39
+                                            v_y_2014_22 = v_2031_34
+                                            v_y_2015_23 = k_2030_33
+                                            v_y_2016_24 = size_2028_31
+                                            v_y_2017_25 = java.math.BigInteger.ONE
+                                            v_y_2018_26 = k_2044_37
+                                            v_y_2019_27 = l_2032_4
+                                            v_y_2020_28 = v_x_2054_41
+                                            v_y_2021_29 = v_2045_38
+                                            v_y_2022_30 = size_2055_42
                                         }
                                         1 ->                                         {
-                                            v_y_1997_20 = size_2014_31
-                                            v_y_1998_21 = l_2018_4
-                                            v_y_1999_1 = r_2033_39
-                                            v_y_2000_22 = v_x_2039_40
-                                            v_y_2001_23 = k_2016_33
-                                            v_y_2002_24 = l_2032_2
-                                            v_y_2003_25 = java.math.BigInteger.ONE
-                                            v_y_2004_26 = k_2030_37
-                                            v_y_2005_27 = v_x_2040_41
-                                            v_y_2006_28 = v_2017_34
-                                            v_y_2007_29 = v_2031_38
-                                            v_y_2008_30 = java.math.BigInteger.ZERO
+                                            v_y_2011_20 = l_2046_2
+                                            v_y_2012_21 = v_x_2053_40
+                                            v_y_2013_1 = r_2047_39
+                                            v_y_2014_22 = v_2031_34
+                                            v_y_2015_23 = k_2030_33
+                                            v_y_2016_24 = size_2028_31
+                                            v_y_2017_25 = java.math.BigInteger.ONE
+                                            v_y_2018_26 = k_2044_37
+                                            v_y_2019_27 = l_2032_4
+                                            v_y_2020_28 = v_x_2054_41
+                                            v_y_2021_29 = v_2045_38
+                                            v_y_2022_30 = java.math.BigInteger.ZERO
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
                                 } else                                 {
-                                    return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2015_32 as java.math.BigInteger))).add((size_2014_31 as java.math.BigInteger))), k_2016_33, v_2017_34, l_2018_4, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2014_31 as java.math.BigInteger))).add((size_2029_36 as java.math.BigInteger))), k, v, r_2019_3, tree_1983_6)))
+                                    return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2029_32 as java.math.BigInteger))).add((size_2028_31 as java.math.BigInteger))), k_2030_33, v_2031_34, l_2032_4, arrayOf<Any?>(0, ((java.math.BigInteger.ONE.add((size_2028_31 as java.math.BigInteger))).add((size_2043_36 as java.math.BigInteger))), k, v, r_2033_3, tree_1997_6)))
                                 }
                             }
                         }
                         1 ->                         {
-                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((tree_1983_6 as Array<*>)[1] as java.math.BigInteger))), k, v, l, tree_1983_6))
+                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((tree_1997_6 as Array<*>)[1] as java.math.BigInteger))), k, v, l, tree_1997_6))
                         }
                         else ->                         { error("unreachable") }
                     }
@@ -1695,28 +1716,28 @@ private fun f_Std_DTreeMap_Internal_Impl_maxView___redArg(k: Any?, v: Any?, l: A
                 1 ->                 {
                     when (((l as Array<*>)[0] as Int))                     {
                         0 ->                         {
-                            val l_2056_43 = (l as Array<*>)[4]
-                            when (((l_2056_43 as Array<*>)[0] as Int))                             {
+                            val l_2070_43 = (l as Array<*>)[4]
+                            when (((l_2070_43 as Array<*>)[0] as Int))                             {
                                 0 ->                                 {
-                                    val r_2057_7 = (l as Array<*>)[5]
-                                    when (((r_2057_7 as Array<*>)[0] as Int))                                     {
+                                    val r_2071_7 = (l as Array<*>)[5]
+                                    when (((r_2071_7 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((l as Array<*>)[1] as java.math.BigInteger))), (l as Array<*>)[2], (l as Array<*>)[3], l_2056_43, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((r_2057_7 as Array<*>)[1] as java.math.BigInteger))), k, v, r_2057_7, tree_1983_6)))
+                                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((l as Array<*>)[1] as java.math.BigInteger))), (l as Array<*>)[2], (l as Array<*>)[3], l_2070_43, arrayOf<Any?>(0, (java.math.BigInteger.ONE.add(((r_2071_7 as Array<*>)[1] as java.math.BigInteger))), k, v, r_2071_7, tree_1997_6)))
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l as Array<*>)[2], (l as Array<*>)[3], l_2056_43, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r_2057_7, r_2057_7)))
+                                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (l as Array<*>)[2], (l as Array<*>)[3], l_2070_43, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, r_2071_7, r_2071_7)))
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
                                 }
                                 1 ->                                 {
-                                    val r_2075_8 = (l as Array<*>)[5]
-                                    when (((r_2075_8 as Array<*>)[0] as Int))                                     {
+                                    val r_2089_8 = (l as Array<*>)[5]
+                                    when (((r_2089_8 as Array<*>)[0] as Int))                                     {
                                         0 ->                                         {
-                                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r_2075_8 as Array<*>)[2], (r_2075_8 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, (l as Array<*>)[2], (l as Array<*>)[3], l_2056_43, l_2056_43), arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l_2056_43, l_2056_43)))
+                                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, java.math.BigInteger.valueOf(3L), (r_2089_8 as Array<*>)[2], (r_2089_8 as Array<*>)[3], arrayOf<Any?>(0, java.math.BigInteger.ONE, (l as Array<*>)[2], (l as Array<*>)[3], l_2070_43, l_2070_43), arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l_2070_43, l_2070_43)))
                                         }
                                         1 ->                                         {
-                                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, java.math.BigInteger.TWO, k, v, l, r_2075_8))
+                                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, java.math.BigInteger.TWO, k, v, l, r_2089_8))
                                         }
                                         else ->                                         { error("unreachable") }
                                     }
@@ -1725,39 +1746,39 @@ private fun f_Std_DTreeMap_Internal_Impl_maxView___redArg(k: Any?, v: Any?, l: A
                             }
                         }
                         1 ->                         {
-                            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l, l))
+                            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, java.math.BigInteger.ONE, k, v, l, l))
                         }
                         else ->                         { error("unreachable") }
                     }
                 }
                 else ->                 { error("unreachable") }
             }
-            val v_x_2009_44 = ((v_y_2005_27 as java.math.BigInteger).add((v_y_2008_30 as java.math.BigInteger)))
-            val v_x_2010_45 = arrayOf<Any?>(0, v_x_2009_44, v_y_2001_23, v_y_2006_28, v_y_1998_21, v_y_2002_24)
-            val v_x_2011_46 = ((v_y_2003_25 as java.math.BigInteger).add((v_y_1997_20 as java.math.BigInteger)))
-            when (((v_y_1999_1 as Array<*>)[0] as Int))             {
+            val v_x_2023_44 = ((v_y_2020_28 as java.math.BigInteger).add((v_y_2022_30 as java.math.BigInteger)))
+            val v_x_2024_45 = arrayOf<Any?>(0, v_x_2023_44, v_y_2015_23, v_y_2014_22, v_y_2019_27, v_y_2011_20)
+            val v_x_2025_46 = ((v_y_2017_25 as java.math.BigInteger).add((v_y_2016_24 as java.math.BigInteger)))
+            when (((v_y_2013_1 as Array<*>)[0] as Int))             {
                 0 ->                 {
-                    val size_2012_47 = (v_y_1999_1 as Array<*>)[1]
-                    v_y_1985_13 = v_x_2010_45
-                    v_y_1986_14 = v_y_2000_22
-                    v_y_1987_15 = v_y_1999_1
-                    v_y_1988_16 = v_x_2011_46
-                    v_y_1989_17 = v_y_2004_26
-                    v_y_1990_18 = v_y_2007_29
-                    v_y_1991_19 = size_2012_47
+                    val size_2026_47 = (v_y_2013_1 as Array<*>)[1]
+                    v_y_1999_13 = v_y_2012_21
+                    v_y_2000_14 = v_y_2013_1
+                    v_y_2001_15 = v_x_2024_45
+                    v_y_2002_16 = v_y_2018_26
+                    v_y_2003_17 = v_y_2021_29
+                    v_y_2004_18 = v_x_2025_46
+                    v_y_2005_19 = size_2026_47
                 }
                 1 ->                 {
-                    v_y_1985_13 = v_x_2010_45
-                    v_y_1986_14 = v_y_2000_22
-                    v_y_1987_15 = v_y_1999_1
-                    v_y_1988_16 = v_x_2011_46
-                    v_y_1989_17 = v_y_2004_26
-                    v_y_1990_18 = v_y_2007_29
-                    v_y_1991_19 = java.math.BigInteger.ZERO
+                    v_y_1999_13 = v_y_2012_21
+                    v_y_2000_14 = v_y_2013_1
+                    v_y_2001_15 = v_x_2024_45
+                    v_y_2002_16 = v_y_2018_26
+                    v_y_2003_17 = v_y_2021_29
+                    v_y_2004_18 = v_x_2025_46
+                    v_y_2005_19 = java.math.BigInteger.ZERO
                 }
                 else ->                 { error("unreachable") }
             }
-            return arrayOf<Any?>(0, k_1981_11, v_1982_12, arrayOf<Any?>(0, v_y_1986_14, v_y_1989_17, v_y_1990_18, v_y_1985_13, arrayOf<Any?>(0, ((v_y_1988_16 as java.math.BigInteger).add((v_y_1991_19 as java.math.BigInteger))), k, v, v_y_1987_15, tree_1983_6)))
+            return arrayOf<Any?>(0, k_1995_11, v_1996_12, arrayOf<Any?>(0, v_y_1999_13, v_y_2002_16, v_y_2003_17, v_y_2001_15, arrayOf<Any?>(0, ((v_y_2004_18 as java.math.BigInteger).add((v_y_2005_19 as java.math.BigInteger))), k, v, v_y_2000_14, tree_1997_6)))
         }
         1 ->         {
             return arrayOf<Any?>(0, k, v, l)
@@ -1766,3 +1787,12 @@ private fun f_Std_DTreeMap_Internal_Impl_maxView___redArg(k: Any?, v: Any?, l: A
     }
 }
 
+
+private inline fun leanUnboxByte(x: Any?): Byte = if (x is UByte) x.toByte() else x as Byte
+private inline fun leanUnboxUByte(x: Any?): UByte = if (x is Byte) x.toUByte() else x as UByte
+private inline fun leanUnboxShort(x: Any?): Short = if (x is UShort) x.toShort() else x as Short
+private inline fun leanUnboxUShort(x: Any?): UShort = if (x is Short) x.toUShort() else x as UShort
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt
+private inline fun leanUnboxLong(x: Any?): Long = if (x is ULong) x.toLong() else x as Long
+private inline fun leanUnboxULong(x: Any?): ULong = if (x is Long) x.toULong() else x as ULong

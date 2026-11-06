@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 class Point(val x: Int, val y: Int) {
 public fun translate(dx: Int, dy: Int): Point {
     val x_4_1 = x
@@ -95,8 +95,8 @@ class MutablePerson(var name: String, var age: java.math.BigInteger) {
 }
 
 @PublishedApi internal fun f_addMeters___boxed(a: Any?, b: Any?): Any? {
-    val a_boxed_72_1 = (a as Int)
-    val b_boxed_73_2 = (b as Int)
+    val a_boxed_72_1 = leanUnboxInt(a)
+    val b_boxed_73_2 = leanUnboxInt(b)
     val res_74_3 = f_addMeters(a_boxed_72_1, b_boxed_73_2)
     return res_74_3
 }
@@ -106,8 +106,8 @@ class MutablePerson(var name: String, var age: java.math.BigInteger) {
 }
 
 @PublishedApi internal fun f_scaleMeters___boxed(m: Any?, factor: Any?): Any? {
-    val m_boxed_81_1 = (m as Int)
-    val factor_boxed_82_2 = (factor as Int)
+    val m_boxed_81_1 = leanUnboxInt(m)
+    val factor_boxed_82_2 = leanUnboxInt(factor)
     val res_83_3 = f_scaleMeters(m_boxed_81_1, factor_boxed_82_2)
     return res_83_3
 }
@@ -121,3 +121,5 @@ class MutablePerson(var name: String, var age: java.math.BigInteger) {
     }
 }
 
+
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int

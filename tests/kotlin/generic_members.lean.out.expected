@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 class GenericCounter(var count: UInt, var total: ULong) {
     /**
      * The type parameter before the receiver.
@@ -72,7 +72,7 @@ class GenericCounter(var count: UInt, var total: ULong) {
 }
 
 @PublishedApi internal fun f_applyAfter___redArg___boxed(n: Any?, f: Any?): Any? {
-    val n_boxed_105_1 = (n as UInt)
+    val n_boxed_105_1 = leanUnboxUInt(n)
     return f_applyAfter___redArg(n_boxed_105_1, (f as (UInt) -> Any?))
 }
 
@@ -84,7 +84,7 @@ class GenericCounter(var count: UInt, var total: ULong) {
 }
 
 @PublishedApi internal fun f_applyAfter___boxed(n: Any?, p_1: Any?, f: Any?): Any? {
-    val n_boxed_114_1 = (n as UInt)
+    val n_boxed_114_1 = leanUnboxUInt(n)
     return f_applyAfter(n_boxed_114_1, (f as (UInt) -> Any?))
 }
 
@@ -93,7 +93,7 @@ class GenericCounter(var count: UInt, var total: ULong) {
 }
 
 @PublishedApi internal fun f_applyAfterTwice___lam__0___boxed(x: Any?): Any? {
-    val x_boxed_121_1 = (x as UInt)
+    val x_boxed_121_1 = leanUnboxUInt(x)
     val res_122_2 = f_applyAfterTwice___lam__0(x_boxed_121_1)
     return res_122_2
 }
@@ -111,13 +111,13 @@ class GenericCounter(var count: UInt, var total: ULong) {
     val v_f_128_2 = f_applyAfterTwice___closed__1()
     val v_x_129_3 = f_applyAfter___redArg(n, (v_f_127_1 as (UInt) -> Any?))
     val v_x_132_4 = f_applyAfter___redArg((n + 1u), (v_f_128_2 as (UInt) -> Any?))
-    val v_x_133_5 = (v_x_129_3 as ULong)
-    val v_x_134_6 = (v_x_132_4 as ULong)
+    val v_x_133_5 = leanUnboxULong(v_x_129_3)
+    val v_x_134_6 = leanUnboxULong(v_x_132_4)
     return (v_x_133_5 + v_x_134_6)
 }
 
 @PublishedApi internal fun f_applyAfterTwice___boxed(n: Any?): Any? {
-    val n_boxed_137_1 = (n as UInt)
+    val n_boxed_137_1 = leanUnboxUInt(n)
     val res_138_2 = f_applyAfterTwice(n_boxed_137_1)
     return res_138_2
 }
@@ -156,3 +156,6 @@ private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
     }
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt
+private inline fun leanUnboxULong(x: Any?): ULong = if (x is Long) x.toULong() else x as ULong

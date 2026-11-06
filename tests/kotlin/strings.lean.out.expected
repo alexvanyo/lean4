@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @PublishedApi internal fun f_testStringEscape___closed__0(): String {
     return "line1\nline2\t\"quoted\" \$dollar \\backslash"
 }
@@ -76,22 +76,20 @@
             val head_48_2 = (p_0 as Array<*>)[1]
             val tail_49_3 = (p_0 as Array<*>)[2]
             val v_y_54_4: UInt
-            val v_y_61_5: Boolean
-            val v_x_67_6 = (head_48_2 as UInt)
-            if (!(97u <= v_x_67_6))             {
-                v_y_61_5 = false
+            val v_x_61_5 = leanUnboxUInt(head_48_2)
+            if (!(97u <= v_x_61_5))             {
+                val v_x_63_6 = leanUnboxUInt(head_48_2)
+                v_y_54_4 = v_x_63_6
             } else             {
-                val v_x_70_7 = (head_48_2 as UInt)
-                val v_x_71_8 = (v_x_70_7 <= 122u)
-                v_y_61_5 = v_x_71_8
-            }
-            if (!v_y_61_5)             {
-                val v_x_62_9 = (head_48_2 as UInt)
-                v_y_54_4 = v_x_62_9
-            } else             {
-                val v_x_64_10 = (head_48_2 as UInt)
-                val v_x_65_11 = (v_x_64_10 + 4294967264u)
-                v_y_54_4 = v_x_65_11
+                val v_x_65_7 = leanUnboxUInt(head_48_2)
+                if (!(v_x_65_7 <= 122u))                 {
+                    val v_x_67_8 = leanUnboxUInt(head_48_2)
+                    v_y_54_4 = v_x_67_8
+                } else                 {
+                    val v_x_69_9 = leanUnboxUInt(head_48_2)
+                    val v_x_70_10 = (v_x_69_9 + 4294967264u)
+                    v_y_54_4 = v_x_70_10
+                }
             }
             return f_List_mapTR_loop___at___00testStringChars_spec__0(tail_49_3, arrayOf<Any?>(1, v_y_54_4, p_1))
         }
@@ -100,8 +98,9 @@
 }
 
 @PublishedApi internal fun f_testStringChars(s: String): String {
-    val v_x_76_1 = f_List_mapTR_loop___at___00testStringChars_spec__0((s).codePoints().toArray().foldRight(arrayOf<Any?>(0) as Any?) { cp, acc -> arrayOf<Any?>(1, cp.toUInt(), acc) }, arrayOf<Any?>(0))
-    return buildString { var cur: Any? = v_x_76_1; while (((cur as Array<*>)[0] as Int) == 1) { appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }
+    val v_x_73_1 = f_String_toListImpl(s)
+    val v_x_75_2 = f_List_mapTR_loop___at___00testStringChars_spec__0(v_x_73_1, arrayOf<Any?>(0))
+    return buildString { var cur: Any? = v_x_75_2; while (((cur as Array<*>)[0] as Int) == 1) { appendCodePoint(((cur as Array<*>)[1] as UInt).toInt()); cur = (cur as Array<*>)[2] } }
 }
 
 @PublishedApi internal fun f_testStringExtract(s: String): String {
@@ -117,14 +116,95 @@
 }
 
 @PublishedApi internal fun f_testCharOps(n: java.math.BigInteger): java.math.BigInteger {
-    val c_86_1 = (run { val b = n; val cp = if (b.bitLength() <= 21) b.toInt().toUInt() else 0x110000u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
-    val v_x_89_2 = (java.math.BigInteger.valueOf(((c_86_1).toInt()).toLong()).add(java.math.BigInteger.valueOf((run { val cp = c_86_1; if (cp <= 0x7Fu) 1L else if (cp <= 0x7FFu) 2L else if (cp <= 0xFFFFu) 3L else 4L }))))
-    val v_x_90_3 = ""
-    return (v_x_89_2.add(java.math.BigInteger.valueOf(((v_x_90_3 + Character.toString((c_86_1).toInt()))).encodeToByteArray().size.toLong())))
+    val c_85_1 = (run { val b = n; val cp = if (b.bitLength() <= 21) b.toInt().toUInt() else 0x110000u; if (cp < 0xd800u || (cp > 0xdfffu && cp < 0x110000u)) cp else 0u })
+    val v_y_88_2: Any?
+    if (!(c_85_1 <= 127u))     {
+        if (!(c_85_1 <= 2047u))         {
+            if (!(c_85_1 <= 65535u))             {
+                v_y_88_2 = java.math.BigInteger.valueOf(4L)
+            } else             {
+                v_y_88_2 = java.math.BigInteger.valueOf(3L)
+            }
+        } else         {
+            v_y_88_2 = java.math.BigInteger.TWO
+        }
+    } else     {
+        v_y_88_2 = java.math.BigInteger.ONE
+    }
+    val v_x_89_3 = (java.math.BigInteger.valueOf(((c_85_1).toInt()).toLong()).add((v_y_88_2 as java.math.BigInteger)))
+    val v_x_90_4 = ""
+    return (v_x_89_3.add(java.math.BigInteger.valueOf(((run { val cp = (c_85_1).toInt(); if (cp < 0x10000) (v_x_90_4 + Char(cp)) else (v_x_90_4 + charArrayOf(Char(0xD800 or ((cp - 0x10000) ushr 10)), Char(0xDC00 or ((cp - 0x10000) and 0x3FF))).concatToString()) })).encodeToByteArray().size.toLong())))
 }
 
 @PublishedApi internal fun f_testCharOps___boxed(n: Any?): Any? {
     return f_testCharOps((n as java.math.BigInteger))
+}
+
+private fun f_String_toListImpl(s: String): Any? {
+    val v_x_108_1 = java.math.BigInteger.valueOf((s).encodeToByteArray().size.toLong())
+    val v_x_109_2 = arrayOf<Any?>(0, s, java.math.BigInteger.ZERO, v_x_108_1)
+    val v_x_110_3 = f_String_Slice_revPositions(v_x_109_2)
+    return f___private_Init_WFExtrinsicFix_0__WellFounded_opaqueFix_u2082___at___00String_toListImpl_spec__0___redArg(v_x_109_2, s, v_x_110_3, arrayOf<Any?>(0))
+}
+
+private tailrec fun f___private_Init_WFExtrinsicFix_0__WellFounded_opaqueFix_u2082___at___00String_toListImpl_spec__0___redArg(p_0: Any?, s: String, a: java.math.BigInteger, b: Any?): Any? {
+    if (!(a == java.math.BigInteger.ZERO))     {
+        val prevPos_121_1 = f_String_Slice_posLE(p_0, (a.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO)))
+        val v_x_122_2 = (run { val bs = (s).encodeToByteArray(); val idx = (prevPos_121_1).toInt(); if (idx < 0 || idx >= bs.size) 65u else { val b0 = bs[idx].toInt() and 0xFF; val len = if (b0 < 0x80) 1 else if (b0 < 0xC0) 0 else if (b0 < 0xE0) 2 else if (b0 < 0xF0) 3 else 4; if (len == 0 || idx + len > bs.size) 65u else bs.decodeToString(idx, idx + len).codePointAt(0).toUInt() } })
+        return f___private_Init_WFExtrinsicFix_0__WellFounded_opaqueFix_u2082___at___00String_toListImpl_spec__0___redArg(p_0, s, prevPos_121_1, arrayOf<Any?>(1, v_x_122_2, b))
+    } else     {
+        return b
+    }
+}
+
+private tailrec fun f_String_Slice_posLE(s: Any?, offset: java.math.BigInteger): java.math.BigInteger {
+    val v_x_128_1 = f_String_Pos_Raw_isValidForSlice(s, offset)
+    if (!v_x_128_1)     {
+        return f_String_Slice_posLE(s, (offset.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO)))
+    } else     {
+        return offset
+    }
+}
+
+/**
+ * Efficiently checks whether a position is at a UTF-8 character boundary of the slice `s`.
+ */
+private fun f_String_Pos_Raw_isValidForSlice(s: Any?, p: java.math.BigInteger): Boolean {
+    val str_134_2 = (s as Array<*>)[1]
+    val startInclusive_135_3 = (s as Array<*>)[2]
+    val v_x_137_4 = (((s as Array<*>)[3] as java.math.BigInteger).subtract((startInclusive_135_3 as java.math.BigInteger)).max(java.math.BigInteger.ZERO))
+    if (!((p.add(java.math.BigInteger.ONE)) <= v_x_137_4))     {
+        return (p == v_x_137_4)
+    } else     {
+        val v_x_143_5 = ((str_134_2 as String)).encodeToByteArray()[(((startInclusive_135_3 as java.math.BigInteger).add(p))).toInt()].toUByte()
+        if (!((v_x_143_5 and (128u).toUByte()) == (0u).toUByte()))         {
+            if (!((v_x_143_5 and (224u).toUByte()) == (192u).toUByte()))             {
+                if (!((v_x_143_5 and (240u).toUByte()) == (224u).toUByte()))                 {
+                    return ((v_x_143_5 and (248u).toUByte()) == (240u).toUByte())
+                } else                 {
+                    return true
+                }
+            } else             {
+                return true
+            }
+        } else         {
+            return true
+        }
+    }
+}
+
+/**
+ * Creates an iterator over all valid positions within {name}`s`, starting from the last valid
+ * position and iterating towards the first one.
+ *
+ * Examples
+ *  * {lean}`("abc".toSlice.revPositions.map (fun ⟨p, h⟩ => p.get h) |>.toList) = ['c', 'b', 'a']`
+ *  * {lean}`("abc".toSlice.revPositions.map (·.val.offset.byteIdx) |>.toList) = [2, 1, 0]`
+ *  * {lean}`("ab∀c".toSlice.revPositions.map (fun ⟨p, h⟩ => p.get h) |>.toList) = ['c', '∀', 'b', 'a']`
+ *  * {lean}`("ab∀c".toSlice.revPositions.map (·.val.offset.byteIdx) |>.toList) = [5, 2, 1, 0]`
+ */
+private fun f_String_Slice_revPositions(s: Any?): java.math.BigInteger {
+    return (((s as Array<*>)[3] as java.math.BigInteger).subtract(((s as Array<*>)[2] as java.math.BigInteger)).max(java.math.BigInteger.ZERO))
 }
 
 private fun f_List_reverse___redArg(p_0: Any?): Any? {
@@ -143,3 +223,5 @@ private tailrec fun f_List_reverseAux___redArg(p_0: Any?, p_1: Any?): Any? {
     }
 }
 
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

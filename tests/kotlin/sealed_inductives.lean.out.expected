@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 enum class TrafficLight {
     Red,
     Green,
@@ -32,24 +32,13 @@ sealed class JsonValue {
 
 data class Vec2(val x: Int, val y: Int)
 
-@PublishedApi internal fun f_TrafficLight_ctorIdx(x: UByte): java.math.BigInteger {
-    when ((x).toInt())     {
-        0 ->         {
-            return java.math.BigInteger.ZERO
-        }
-        1 ->         {
-            return java.math.BigInteger.ONE
-        }
-        2 ->         {
-            return java.math.BigInteger.TWO
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_TrafficLight_ctorIdx___impl(p_0: TrafficLight): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((p_0 as TrafficLight).ordinal).toLong())
 }
 
-@PublishedApi internal fun f_TrafficLight_ctorIdx___boxed(x: Any?): Any? {
-    val x_boxed_6_1 = (x as UByte)
-    return f_TrafficLight_ctorIdx(x_boxed_6_1)
+@PublishedApi internal fun f_TrafficLight_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    val x_4_boxed_5_1 = (p_0 as TrafficLight)
+    return f_TrafficLight_ctorIdx___impl(x_4_boxed_5_1)
 }
 
 @PublishedApi internal fun f_TrafficLight_ctorElim___redArg(k: Any?): Any? {
@@ -65,8 +54,8 @@ data class Vec2(val x: Int, val y: Int)
 }
 
 @PublishedApi internal fun f_TrafficLight_ctorElim___boxed(motive: Any?, ctorIdx: Any?, t: Any?, h: Any?, k: Any?): Any? {
-    val t_boxed_21_1 = (t as UByte)
-    return f_TrafficLight_ctorElim(motive, (ctorIdx as java.math.BigInteger), t_boxed_21_1, h, k)
+    val t_boxed_20_1 = leanUnboxUByte(t)
+    return f_TrafficLight_ctorElim(motive, (ctorIdx as java.math.BigInteger), t_boxed_20_1, h, k)
 }
 
 @PublishedApi internal fun f_TrafficLight_red_elim___redArg(red: Any?): Any? {
@@ -82,8 +71,8 @@ data class Vec2(val x: Int, val y: Int)
 }
 
 @PublishedApi internal fun f_TrafficLight_red_elim___boxed(motive: Any?, t: Any?, h: Any?, red: Any?): Any? {
-    val t_boxed_34_1 = (t as UByte)
-    return f_TrafficLight_red_elim(motive, t_boxed_34_1, h, red)
+    val t_boxed_33_1 = leanUnboxUByte(t)
+    return f_TrafficLight_red_elim(motive, t_boxed_33_1, h, red)
 }
 
 @PublishedApi internal fun f_TrafficLight_green_elim___redArg(green: Any?): Any? {
@@ -99,8 +88,8 @@ data class Vec2(val x: Int, val y: Int)
 }
 
 @PublishedApi internal fun f_TrafficLight_green_elim___boxed(motive: Any?, t: Any?, h: Any?, green: Any?): Any? {
-    val t_boxed_47_1 = (t as UByte)
-    return f_TrafficLight_green_elim(motive, t_boxed_47_1, h, green)
+    val t_boxed_46_1 = leanUnboxUByte(t)
+    return f_TrafficLight_green_elim(motive, t_boxed_46_1, h, green)
 }
 
 @PublishedApi internal fun f_TrafficLight_yellow_elim___redArg(yellow: Any?): Any? {
@@ -116,8 +105,8 @@ data class Vec2(val x: Int, val y: Int)
 }
 
 @PublishedApi internal fun f_TrafficLight_yellow_elim___boxed(motive: Any?, t: Any?, h: Any?, yellow: Any?): Any? {
-    val t_boxed_60_1 = (t as UByte)
-    return f_TrafficLight_yellow_elim(motive, t_boxed_60_1, h, yellow)
+    val t_boxed_59_1 = leanUnboxUByte(t)
+    return f_TrafficLight_yellow_elim(motive, t_boxed_59_1, h, yellow)
 }
 
 @PublishedApi internal fun f_lightToCode(c: TrafficLight): UInt {
@@ -146,39 +135,28 @@ data class Vec2(val x: Int, val y: Int)
     }
 }
 
-@PublishedApi internal fun f_ArithExpr_ctorIdx(x: Any?): java.math.BigInteger {
-    when (x)     {
-        is ArithExpr.Lit ->         {
-            return java.math.BigInteger.ZERO
-        }
-        is ArithExpr.Add ->         {
-            return java.math.BigInteger.ONE
-        }
-        is ArithExpr.Neg ->         {
-            return java.math.BigInteger.TWO
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_ArithExpr_ctorIdx___impl(p_0: ArithExpr): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (p_0) { is ArithExpr.Lit -> 0; is ArithExpr.Add -> 1; is ArithExpr.Neg -> 2; else -> error("unreachable") })).toLong())
 }
 
-@PublishedApi internal fun f_ArithExpr_ctorIdx___boxed(x: Any?): Any? {
-    return f_ArithExpr_ctorIdx(x)
+@PublishedApi internal fun f_ArithExpr_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    return f_ArithExpr_ctorIdx___impl((p_0 as ArithExpr))
 }
 
 @PublishedApi internal fun f_ArithExpr_ctorElim___redArg(t: Any?, k: Any?): Any? {
     when (t)     {
         is ArithExpr.Lit ->         {
-            val v_82_2 = t.v
-            return (k as (Any?) -> Any?)(v_82_2)
+            val v_79_2 = t.v
+            return (k as (Any?) -> Any?)(v_79_2)
         }
         is ArithExpr.Add ->         {
-            val l_85_3 = t.l
-            val r_86_4 = t.r
-            return (k as (Any?, Any?) -> Any?)(l_85_3, r_86_4)
+            val l_82_3 = t.l
+            val r_83_4 = t.r
+            return (k as (Any?, Any?) -> Any?)(l_82_3, r_83_4)
         }
         is ArithExpr.Neg ->         {
-            val e_88_5 = t.e
-            return (k as (Any?) -> Any?)(e_88_5)
+            val e_85_5 = t.e
+            return (k as (Any?) -> Any?)(e_85_5)
         }
         else ->         { error("unreachable") }
     }
@@ -222,16 +200,16 @@ data class Vec2(val x: Int, val y: Int)
             return t.v
         }
         is ArithExpr.Add ->         {
-            val l_128_1 = t.l
-            val r_129_2 = t.r
-            val v_x_130_3 = f_evalArith(l_128_1)
-            val v_x_131_4 = f_evalArith(r_129_2)
-            return (v_x_130_3 + v_x_131_4)
+            val l_125_1 = t.l
+            val r_126_2 = t.r
+            val v_x_127_3 = f_evalArith(l_125_1)
+            val v_x_128_4 = f_evalArith(r_126_2)
+            return (v_x_127_3 + v_x_128_4)
         }
         is ArithExpr.Neg ->         {
-            val e_133_5 = t.e
-            val v_x_134_6 = f_evalArith(e_133_5)
-            return (-v_x_134_6)
+            val e_130_5 = t.e
+            val v_x_131_6 = f_evalArith(e_130_5)
+            return (-v_x_131_6)
         }
     }
 }
@@ -240,23 +218,12 @@ data class Vec2(val x: Int, val y: Int)
     return ArithExpr.Add(ArithExpr.Lit(x), ArithExpr.Neg(ArithExpr.Lit(y)))
 }
 
-@PublishedApi internal fun f_Shape_ctorIdx(x: Any?): java.math.BigInteger {
-    when (x)     {
-        Shape.Empty ->         {
-            return java.math.BigInteger.ZERO
-        }
-        is Shape.Circle ->         {
-            return java.math.BigInteger.ONE
-        }
-        is Shape.Rect ->         {
-            return java.math.BigInteger.TWO
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_Shape_ctorIdx___impl(p_0: Shape): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (p_0) { Shape.Empty -> 0; is Shape.Circle -> 1; is Shape.Rect -> 2; else -> error("unreachable") })).toLong())
 }
 
-@PublishedApi internal fun f_Shape_ctorIdx___boxed(x: Any?): Any? {
-    return f_Shape_ctorIdx(x)
+@PublishedApi internal fun f_Shape_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    return f_Shape_ctorIdx___impl((p_0 as Shape))
 }
 
 @PublishedApi internal fun f_Shape_ctorElim___redArg(t: Any?, k: Any?): Any? {
@@ -265,13 +232,13 @@ data class Vec2(val x: Int, val y: Int)
             return k
         }
         is Shape.Circle ->         {
-            val radius_152_2 = t.radius
-            return (k as (Any?) -> Any?)(radius_152_2)
+            val radius_147_2 = t.radius
+            return (k as (Any?) -> Any?)(radius_147_2)
         }
         is Shape.Rect ->         {
-            val width_155_3 = t.width
-            val height_156_4 = t.height
-            return (k as (Any?, Any?) -> Any?)(width_155_3, height_156_4)
+            val width_150_3 = t.width
+            val height_151_4 = t.height
+            return (k as (Any?, Any?) -> Any?)(width_150_3, height_151_4)
         }
         else ->         { error("unreachable") }
     }
@@ -351,14 +318,14 @@ data class Vec2(val x: Int, val y: Int)
             return f_area___closed__0()
         }
         is Shape.Circle ->         {
-            val radius_233_1 = s.radius
-            val v_x_234_2 = f_area___closed__1()
-            return ((v_x_234_2 * radius_233_1) * radius_233_1)
+            val radius_228_1 = s.radius
+            val v_x_229_2 = f_area___closed__1()
+            return ((v_x_229_2 * radius_228_1) * radius_228_1)
         }
         is Shape.Rect ->         {
-            val width_237_3 = s.width
-            val height_238_4 = s.height
-            return (width_237_3 * height_238_4)
+            val width_232_3 = s.width
+            val height_233_4 = s.height
+            return (width_232_3 * height_233_4)
         }
     }
 }
@@ -375,26 +342,12 @@ data class Vec2(val x: Int, val y: Int)
     return Shape.Rect(w, h)
 }
 
-@PublishedApi internal fun f_JsonValue_ctorIdx(x: Any?): java.math.BigInteger {
-    when (x)     {
-        JsonValue.NullVal ->         {
-            return java.math.BigInteger.ZERO
-        }
-        is JsonValue.BoolVal ->         {
-            return java.math.BigInteger.ONE
-        }
-        is JsonValue.NumVal ->         {
-            return java.math.BigInteger.TWO
-        }
-        is JsonValue.StrVal ->         {
-            return java.math.BigInteger.valueOf(3L)
-        }
-        else ->         { error("unreachable") }
-    }
+@PublishedApi internal fun f_JsonValue_ctorIdx___impl(p_0: JsonValue): java.math.BigInteger {
+    return java.math.BigInteger.valueOf(((when (p_0) { JsonValue.NullVal -> 0; is JsonValue.BoolVal -> 1; is JsonValue.NumVal -> 2; is JsonValue.StrVal -> 3; else -> error("unreachable") })).toLong())
 }
 
-@PublishedApi internal fun f_JsonValue_ctorIdx___boxed(x: Any?): Any? {
-    return f_JsonValue_ctorIdx(x)
+@PublishedApi internal fun f_JsonValue_ctorIdx___impl___boxed(p_0: Any?): Any? {
+    return f_JsonValue_ctorIdx___impl((p_0 as JsonValue))
 }
 
 @PublishedApi internal fun f_JsonValue_ctorElim___redArg(t: Any?, k: Any?): Any? {
@@ -403,16 +356,16 @@ data class Vec2(val x: Int, val y: Int)
             return k
         }
         is JsonValue.BoolVal ->         {
-            val b_255_2 = t.b
-            return (k as (Any?) -> Any?)(b_255_2)
+            val b_247_2 = t.b
+            return (k as (Any?) -> Any?)(b_247_2)
         }
         is JsonValue.NumVal ->         {
-            val n_258_3 = t.n
-            return (k as (Any?) -> Any?)(n_258_3)
+            val n_250_3 = t.n
+            return (k as (Any?) -> Any?)(n_250_3)
         }
         is JsonValue.StrVal ->         {
-            val s_261_4 = t.s
-            return (k as (Any?) -> Any?)(s_261_4)
+            val s_253_4 = t.s
+            return (k as (Any?) -> Any?)(s_253_4)
         }
         else ->         { error("unreachable") }
     }
@@ -480,21 +433,21 @@ data class Vec2(val x: Int, val y: Int)
             return "null"
         }
         is JsonValue.BoolVal ->         {
-            val b_313_1 = j.b
-            if (!b_313_1)             {
+            val b_305_1 = j.b
+            if (!b_305_1)             {
                 return "false"
             } else             {
                 return "true"
             }
         }
         is JsonValue.NumVal ->         {
-            val n_316_2 = j.n
-            return (n_316_2).toString()
+            val n_308_2 = j.n
+            return (n_308_2).toString()
         }
         is JsonValue.StrVal ->         {
-            val s_319_3 = j.s
-            val v_x_320_4 = "\""
-            return ((v_x_320_4 + s_319_3) + v_x_320_4)
+            val s_311_3 = j.s
+            val v_x_312_4 = "\""
+            return ((v_x_312_4 + s_311_3) + v_x_312_4)
         }
     }
 }
@@ -516,10 +469,12 @@ data class Vec2(val x: Int, val y: Int)
 }
 
 @PublishedApi internal fun f_addVec2(a: Vec2, b: Vec2): Vec2 {
-    val x_332_1 = a.x
-    val y_333_2 = a.y
-    val x_334_3 = b.x
-    val y_335_4 = b.y
-    return Vec2((x_332_1 + x_334_3), (y_333_2 + y_335_4))
+    val x_324_1 = a.x
+    val y_325_2 = a.y
+    val x_326_3 = b.x
+    val y_327_4 = b.y
+    return Vec2((x_324_1 + x_326_3), (y_325_2 + y_327_4))
 }
 
+
+private inline fun leanUnboxUByte(x: Any?): UByte = if (x is Byte) x.toUByte() else x as UByte

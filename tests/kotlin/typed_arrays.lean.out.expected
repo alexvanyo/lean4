@@ -1,6 +1,6 @@
 // Generated automatically by Lean 4 to Kotlin compiler backend.
 // DO NOT EDIT DIRECTLY.
-@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON")
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
 @file:OptIn(ExperimentalUnsignedTypes::class)
 @PublishedApi internal fun f_makeU64Array___boxed__const__1(): Any? {
     return 0uL
@@ -118,11 +118,7 @@
     if (!(java.math.BigInteger.ZERO < v_x_98_1))     {
         return v_x_99_2
     } else     {
-        if (!(v_x_98_1 <= v_x_98_1))         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, (v_x_98_1).toInt(), v_x_99_2)
-        } else         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, (v_x_98_1).toInt(), v_x_99_2)
-        }
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00filterNatArray_spec__0(minVal, xs, 0, (v_x_98_1).toInt(), v_x_99_2)
     }
 }
 
@@ -135,23 +131,19 @@
 }
 
 @PublishedApi internal fun f_sumNatArray(xs: Array<Any?>): java.math.BigInteger {
-    val v_x_120_1 = java.math.BigInteger.valueOf(xs.size.toLong())
-    if (!(java.math.BigInteger.ZERO < v_x_120_1))     {
+    val v_x_116_1 = java.math.BigInteger.valueOf(xs.size.toLong())
+    if (!(java.math.BigInteger.ZERO < v_x_116_1))     {
         return java.math.BigInteger.ZERO
     } else     {
-        if (!(v_x_120_1 <= v_x_120_1))         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, (v_x_120_1).toInt(), java.math.BigInteger.ZERO)
-        } else         {
-            return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, (v_x_120_1).toInt(), java.math.BigInteger.ZERO)
-        }
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00sumNatArray_spec__0(xs, 0, (v_x_116_1).toInt(), java.math.BigInteger.ZERO)
     }
 }
 
 @PublishedApi internal fun f_makeByteArray(a: UByte, b: UByte, c: UByte): ByteArray {
-    val v_x_132_1 = ByteArray(0)
-    val v_x_133_2 = (v_x_132_1 + (a).toByte())
-    val v_x_134_3 = (v_x_133_2 + (b).toByte())
-    return (v_x_134_3 + (c).toByte())
+    val v_x_124_1 = ByteArray(0)
+    val v_x_125_2 = (v_x_124_1 + (a).toByte())
+    val v_x_126_3 = (v_x_125_2 + (b).toByte())
+    return (v_x_126_3 + (c).toByte())
 }
 
 @PublishedApi internal fun f_byteArraySize(bs: ByteArray): java.math.BigInteger {
@@ -163,9 +155,9 @@
 }
 
 @PublishedApi internal fun f_byteArraySet_x21(bs: ByteArray, i: java.math.BigInteger, v: UByte): ByteArray {
-    val v_x_144_1 = (bs).copyOf()
-    if ((i).toInt() >= 0 && (i).toInt() < v_x_144_1.size) v_x_144_1[(i).toInt()] = (v).toByte()
-    return v_x_144_1
+    val v_x_136_1 = (bs).copyOf()
+    if ((i).toInt() >= 0 && (i).toInt() < v_x_136_1.size) v_x_136_1[(i).toInt()] = (v).toByte()
+    return v_x_136_1
 }
 
 @PublishedApi internal fun f_byteArrayAppend(a: ByteArray, b: ByteArray): ByteArray {
@@ -193,35 +185,31 @@
 }
 
 @PublishedApi internal fun f_stringUTF8RoundTrip___closed__3(): String {
-    val v_x_163_1 = "invalid UTF-8 string"
-    val v_x_166_2 = "String.fromUTF8!"
-    val v_x_167_3 = "Init.Data.String.Basic"
-    return ("PANIC at " + v_x_166_2 + " " + v_x_167_3 + ":" + (java.math.BigInteger.valueOf(193L)).toString() + ":" + (java.math.BigInteger.valueOf(46L)).toString() + ": " + v_x_163_1)
+    val v_x_155_1 = "invalid UTF-8 string"
+    val v_x_158_2 = "String.fromUTF8!"
+    val v_x_159_3 = "Init.Data.String.Basic"
+    return ("PANIC at " + v_x_158_2 + " " + v_x_159_3 + ":" + (java.math.BigInteger.valueOf(193L)).toString() + ":" + (java.math.BigInteger.valueOf(46L)).toString() + ": " + v_x_155_1)
 }
 
 @PublishedApi internal fun f_stringUTF8RoundTrip(s: String): String {
-    val v_x_170_1 = (s).encodeToByteArray()
-    if (!(try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(v_x_170_1)); true } catch (_: Throwable) { false }))     {
-        val v_x_172_2 = f_stringUTF8RoundTrip___closed__3()
-        return error(v_x_172_2)
+    val v_x_162_1 = (s).encodeToByteArray()
+    if (!(try { (v_x_162_1).decodeToString(throwOnInvalidSequence = true); true } catch (_: CharacterCodingException) { false }))     {
+        val v_x_164_2 = f_stringUTF8RoundTrip___closed__3()
+        return error(v_x_164_2)
     } else     {
-        return (v_x_170_1).decodeToString()
+        return (v_x_162_1).decodeToString()
     }
 }
 
-@PublishedApi internal fun f_stringUTF8RoundTrip___boxed(s: Any?): Any? {
-    return f_stringUTF8RoundTrip((s as String))
-}
-
 @PublishedApi internal fun f_byteArrayValidateUTF8(bs: ByteArray): Boolean {
-    return (try { java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bs)); true } catch (_: Throwable) { false })
+    return (try { (bs).decodeToString(throwOnInvalidSequence = true); true } catch (_: CharacterCodingException) { false })
 }
 
 @PublishedApi internal fun f_makeFloatArray(a: Double, b: Double, c: Double): DoubleArray {
-    val v_x_182_1 = DoubleArray(0)
-    val v_x_183_2 = (v_x_182_1 + a)
-    val v_x_184_3 = (v_x_183_2 + b)
-    return (v_x_184_3 + c)
+    val v_x_172_1 = DoubleArray(0)
+    val v_x_173_2 = (v_x_172_1 + a)
+    val v_x_174_3 = (v_x_173_2 + b)
+    return (v_x_174_3 + c)
 }
 
 @PublishedApi internal fun f_floatArraySize(ds: DoubleArray): java.math.BigInteger {
@@ -233,9 +221,9 @@
 }
 
 @PublishedApi internal fun f_floatArraySet_x21(ds: DoubleArray, i: java.math.BigInteger, v: Double): DoubleArray {
-    val v_x_194_1 = (ds).copyOf()
-    if ((i).toInt() >= 0 && (i).toInt() < v_x_194_1.size) v_x_194_1[(i).toInt()] = v
-    return v_x_194_1
+    val v_x_184_1 = (ds).copyOf()
+    if ((i).toInt() >= 0 && (i).toInt() < v_x_184_1.size) v_x_184_1[(i).toInt()] = v
+    return v_x_184_1
 }
 
 @PublishedApi internal tailrec fun f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(p_0: DoubleArray, i: Int, stop: Int, b: Double): Double {
@@ -251,16 +239,12 @@
 }
 
 @PublishedApi internal fun f_sumFloatArray(ds: DoubleArray): Double {
-    val v_x_212_1 = f_sumFloatArray___closed__0()
-    val v_x_213_2 = java.math.BigInteger.valueOf((ds).size.toLong())
-    if (!(java.math.BigInteger.ZERO < v_x_213_2))     {
-        return v_x_212_1
+    val v_x_202_1 = f_sumFloatArray___closed__0()
+    val v_x_203_2 = java.math.BigInteger.valueOf((ds).size.toLong())
+    if (!(java.math.BigInteger.ZERO < v_x_203_2))     {
+        return v_x_202_1
     } else     {
-        if (!(v_x_213_2 <= v_x_213_2))         {
-            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, (v_x_213_2).toInt(), v_x_212_1)
-        } else         {
-            return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, (v_x_213_2).toInt(), v_x_212_1)
-        }
+        return f___private_Init_Data_FloatArray_Basic_0__FloatArray_foldlMUnsafe_fold___at___00sumFloatArray_spec__0(ds, 0, (v_x_203_2).toInt(), v_x_202_1)
     }
 }
 
