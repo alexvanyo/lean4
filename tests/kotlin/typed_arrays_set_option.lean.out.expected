@@ -1,0 +1,67 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+@file:OptIn(ExperimentalUnsignedTypes::class)
+class CellBatch(val warnings: Array<Any?>, val cells: ULongArray)
+
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00TypedArraysSetOption_sumCells_spec__0(p_0: ULongArray, i: Int, stop: Int, b: ULong): ULong {
+    if (!(i == stop))     {
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00TypedArraysSetOption_sumCells_spec__0(p_0, (i + 1), stop, (b + p_0[i]))
+    } else     {
+        return b
+    }
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_sumCells(cells: ULongArray): ULong {
+    val v_x_15_1 = java.math.BigInteger.valueOf(cells.size.toLong())
+    if (!(java.math.BigInteger.ZERO < v_x_15_1))     {
+        return 0uL
+    } else     {
+        return f___private_Init_Data_Array_Basic_0__Array_foldlMUnsafe_fold___at___00TypedArraysSetOption_sumCells_spec__0(cells, 0, (v_x_15_1).toInt(), 0uL)
+    }
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_mkBatch___closed__0(): Array<Any?> {
+    return arrayOfNulls<Any?>(0)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_mkBatch(n: ULong): CellBatch {
+    val v_x_23_1 = f_TypedArraysSetOption_mkBatch___closed__0()
+    val v_x_25_2 = (n + 1uL)
+    val v_x_27_3 = ULongArray(0)
+    val v_x_29_4 = (v_x_27_3 + n)
+    val v_x_31_5 = (v_x_29_4 + v_x_25_2)
+    return CellBatch(v_x_23_1, v_x_31_5)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_emptyBatch___closed__0(): ULongArray {
+    return ULongArray(0)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_emptyBatch___closed__1(): CellBatch {
+    val v_x_35_1 = f_TypedArraysSetOption_emptyBatch___closed__0()
+    val v_x_36_2 = f_TypedArraysSetOption_mkBatch___closed__0()
+    return CellBatch(v_x_36_2, v_x_35_1)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_emptyBatch(): CellBatch {
+    return f_TypedArraysSetOption_emptyBatch___closed__1()
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_emptyBatchOf(n: UInt): Pair<CellBatch, UInt> {
+    val v_x_40_1 = f_TypedArraysSetOption_emptyBatch___closed__1()
+    return Pair(v_x_40_1, n)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_emptyBatchOf___boxed(n: Any?): Any? {
+    val n_boxed_44_1 = leanUnboxUInt(n)
+    return f_TypedArraysSetOption_emptyBatchOf(n_boxed_44_1)
+}
+
+@PublishedApi internal fun f_TypedArraysSetOption_total(b: CellBatch): ULong {
+    val cells_47_1 = b.cells
+    return f_TypedArraysSetOption_sumCells(cells_47_1)
+}
+
+
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

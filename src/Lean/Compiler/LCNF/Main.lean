@@ -194,6 +194,7 @@ partial def run (declNames : Array Name) (baseOpts : Options) : CompilerM Unit :
       resumeCompilation c baseOpts
 
   let decls := markRecDecls decls
+  recordKotlinTypedArrays
   let manager ← getPassManager
   let isCheckEnabled := compiler.check.get (← getOptions)
   let decls ← runPassManagerPart .pure .pure "compilation (LCNF base)" manager.basePasses decls isCheckEnabled

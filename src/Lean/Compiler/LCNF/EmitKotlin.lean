@@ -137,6 +137,12 @@ structure Context where
   rematerialize : Std.HashSet FVarId := {}
   /-- `unbox` results in `_boxed` wrappers that are passed for a parameter of Kotlin enum type. -/
   unboxEnums : Std.HashMap FVarId String := {}
+  /--
+  Mono types of the `Prod.mk` applications of the current declaration, by the user names of their
+  arguments; their type arguments still distinguish e.g. `Int32` from `UInt32`, unlike the erased
+  `UInt32.toInt32`. `none` if ambiguous.
+  -/
+  monoPairTypes : Std.HashMap (String × String) (Option Expr) := {}
 
 structure State where
   buf : String := ""
@@ -519,6 +525,13 @@ def unboxHelperDefs (text : String) : String := Id.run do
       out := out ++ s!"private inline fun {h}(x: Any?): {t} = if (x is {other}) x.to{t}() else x as {t}\n"
   return out
 
+/-- `T` for a Kotlin type `Array<T>` with `T` other than `Any?`, e.g. from `@[kotlin_types]`. -/
+def typedArrayElemType? (ty : String) : Option String :=
+  if ty.startsWith "Array<" && ty.endsWith ">" then
+    let elem := ((ty.drop 6).dropEnd 1).trimAscii.toString
+    if elem == "Any?" || elem == "*" || elem.startsWith "out " || elem.startsWith "in " then none else some elem
+  else none
+
 @[noinline] partial def castIfNeeded (s : String) (targetTy : String) (knownTy? : Option String := none) : EmitM String := do
   if targetTy == "Any?" || targetTy == "_" || s == "null" then
     return s
@@ -612,6 +625,11 @@ def unboxHelperDefs (text : String) : String := Id.run do
         return s!"(if ({recv} is Array<*>) (if (({recv} as Array<*>)[0] as Int == 1) ({recv} as Array<*>)[1] as {elemTy} else null) else ({recv} as {targetTy}))"
   if let some h := unboxHelper? targetTy then
     return s!"{h}({s})"
+  if let some elemTy := typedArrayElemType? targetTy then
+    -- Lean arrays are `Array<Any?>`, which JVM arrays (being reified) cannot be cast from.
+    let elem ← castIfNeeded "a[i]" elemTy
+    let recv := if s.all (fun c => c.isAlphanum || c == '_') then s else s!"({s})"
+    return s!"({recv} as Array<*>).let \{ a -> Array<{elemTy}>(a.size) \{ i -> {elem} } }"
   return s!"({s} as {targetTy})"
 
 def isKotlinKeyword (s : String) : Bool :=
@@ -903,6 +921,22 @@ def emitPrimitiveOp? (fn : Name) (args : Array (Arg .impure)) : EmitM (Option St
   if args.size == 1 then
     let a0 ← toKotlinArg args[0]!
     let a0Ty? := (← get).varTypes[a0]?
+    -- An argument of the other signedness (e.g. after an erased `Int32.toUInt32`) is first
+    -- reinterpreted as the source type, so that widening conversions extend it correctly.
+    let (a0, a0Ty?) := match fn, a0Ty? with
+      | .str (.str .anonymous src) m, some aTy =>
+        let srcTy? := match src with
+          | "UInt8" => some ("UByte", "Byte") | "Int8" => some ("Byte", "UByte")
+          | "UInt16" => some ("UShort", "Short") | "Int16" => some ("Short", "UShort")
+          | "UInt32" => some ("UInt", "Int") | "Int32" => some ("Int", "UInt")
+          | "UInt64" => some ("ULong", "Long") | "Int64" => some ("Long", "ULong")
+          | _ => none
+        match srcTy? with
+        | some (srcTy, otherTy) =>
+          if m.startsWith "to" && aTy == otherTy then (s!"({a0}).to{srcTy}()", some srcTy) else (a0, a0Ty?)
+        | none => (a0, a0Ty?)
+      | _, _ => (a0, a0Ty?)
+    if let some t := a0Ty? then recordVarType a0 t
     match fn with
     -- Conversions to Int8 (Byte)
     | ``Int8.ofNat =>
@@ -1830,6 +1864,11 @@ def isCompilerAuxDecl (env : Environment) (n : Name) : Bool :=
     s.endsWith "_elim" || s.startsWith "_cstage" || s.startsWith "_jp"
   | _ => false
 
+/-- Runs `x` with `compiler.kotlin.typedArrays` as it was when `declName` was compiled. -/
+def withTypedArraysOf [Monad m] [MonadEnv m] [MonadOptions m] [MonadWithOptions m] (declName : Name) (x : m α) : m α := do
+  let flag := usesKotlinTypedArrays (← getEnv) (← getOptions) declName
+  withOptions (compiler.kotlin.typedArrays.set · flag) x
+
 partial def formatGenericKotlinType (env : Environment) (typeParams : Std.HashMap Name String) (type : Expr) : MetaM String := do
   let type ← Meta.whnf type
   match (type : Expr) with
@@ -1962,7 +2001,7 @@ auxiliary declarations and declarations without a Lean type.
 def getFnDeclaredParamKotlinTypes (env : Environment) (fn : Name) : CoreM (Array String) := do
   if isCompilerAuxDecl env fn then return #[]
   let baseFn := match fn with | .str p "_redArg" => p | _ => fn
-  Meta.MetaM.run' do
+  withTypedArraysOf fn <| Meta.MetaM.run' do
     let some info := (env.find? fn).orElse (fun _ => env.find? baseFn) | return #[]
     let typeParams ← getDeclTypeParams env baseFn
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
@@ -1986,7 +2025,7 @@ def ctorClassLayout (ctorName : Name) : EmitM ClassLayout := do
   let env ← getEnv
   let some (.ctorInfo ctorVal) := env.find? ctorName | return {}
   let layout ← getCtorLayout ctorName
-  let (typeParamNames, fieldNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+  let (typeParamNames, fieldNames, fieldKotlinTypes) ← withTypedArraysOf ctorVal.induct (Meta.MetaM.run' do
     let typeParams ← getDeclTypeParams env ctorVal.induct
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
     Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
@@ -2046,7 +2085,7 @@ def classLayout (s : Name) : EmitM ClassLayout := do
   let fields := getStructureFields env s
   let ctorVal := getStructureCtor env s
   let layout ← getCtorLayout ctorVal.name
-  let (typeParamNames, fieldKotlinTypes) ← (Meta.MetaM.run' do
+  let (typeParamNames, fieldKotlinTypes) ← withTypedArraysOf s (Meta.MetaM.run' do
     let typeParams ← getDeclTypeParams env s
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
     Meta.forallTelescopeReducing ctorVal.type fun xs _ => do
@@ -2166,6 +2205,13 @@ def dropShape? (fn : Name) : EmitM (Option Ownership.RetShape) := do
   if let some d := declMap[fn]? then
     if d.type.isScalar then return none
   let some s := (← read).summaries[fn]? | return none
+  -- A `@[kotlin_types]` result type is part of the Kotlin API.
+  let env ← getEnv
+  let tyOverrides := (Compiler.getKotlinTypes? env fn).getD #[]
+  if !tyOverrides.isEmpty then
+    let numParams := (← getFnDeclaredParamKotlinTypes env fn).size
+    let numEmitted := if (Compiler.getKotlinMemberInfo? env fn).isSome then numParams - 1 else numParams
+    if tyOverrides[numEmitted]?.any (· != "_") then return none
   let canDrop (j : Nat) : Bool := s.exclusive[j]?.getD false
   match s.ret with
   | .param j => return if canDrop j then some (.param j) else none
@@ -2194,7 +2240,7 @@ Kotlin type of component `c` of the `Prod` result type of `declName`, naming the
 -/
 def genericResultComponentKotlinType? (env : Environment) (declName : Name) (c : Nat) : CoreM (Option String) :=
   let baseName := match declName with | .str p "_redArg" => p | _ => declName
-  Meta.MetaM.run' do
+  withTypedArraysOf declName <| Meta.MetaM.run' do
     let some info := (env.find? declName).orElse (fun _ => env.find? baseName) | return none
     let typeParams ← getDeclTypeParams env baseName
     let typeParamMap := typeParams.foldl (init := ({} : Std.HashMap Name String)) fun m (n, t) => m.insert n t
@@ -2257,7 +2303,7 @@ def fnRetKotlinType (fn : Name) (defaultTy : Expr) : EmitM String := do
     if isUnitShape shape then return "Unit"
     let c := (keptComps shape)[0]!
     if let some ci := env.find? fn then
-      if let some t ← prodComponentKotlinType? (resultType ci.type) c then
+      if let some t ← withTypedArraysOf fn (prodComponentKotlinType? (resultType ci.type) c) then
         return t
   let baseFn := match fn with | .str p "_boxed" => p | _ => fn
   if let some ci := (env.find? fn).orElse (fun _ => env.find? baseFn) then
@@ -3038,6 +3084,34 @@ def emitReturnUnit : EmitM Unit := do
   | .breakOnly loopLbl => emitLn s!"break@{loopLbl}"
   | .returnLbl lbl _ => emitLn s!"return@{lbl} Unit"
   | .threaded _ failureLbl _ => emitLn s!"break@{failureLbl}"
+
+/-- The user name of a Kotlin local `<user name>_<index>_<index>`, or `s` itself (e.g. a parameter). -/
+def kotlinLocalUserName (s : String) : String := Id.run do
+  let mut cs := s.toList.reverse
+  for _ in [0:2] do
+    let digits := cs.takeWhile Char.isDigit
+    if digits.isEmpty then return s
+    match cs.drop digits.length with
+    | '_' :: rest => cs := rest
+    | _ => return s
+  return String.ofList cs.reverse
+
+/--
+`Pair<T0, T1>` for a mono type `Prod α β` with a fixed-width integer component, whose Kotlin
+signedness the erased `UInt32.toInt32` etc. may not reflect; other components are `Any?`.
+-/
+def monoPairScalarKotlinType? (t : Expr) : Option String :=
+  if !t.isAppOfArity ``Prod 2 then none else
+  let comp (e : Expr) : Option String := match e with
+    | .const n _ =>
+      if n ∈ [``Int8, ``Int16, ``Int32, ``Int64, ``ISize, ``UInt8, ``UInt16, ``UInt32, ``UInt64, ``USize] then
+        some (toKotlinType e)
+      else none
+    | _ => none
+  let args := t.getAppArgs
+  match comp args[0]!, comp args[1]! with
+  | none, none => none
+  | c0, c1 => some s!"Pair<{c0.getD "Any?"}, {c1.getD "Any?"}>"
 
 def formatKotlinPair (comps : Array String) (targetTy? : Option String := none) : EmitM (String × String) := do
   let c0 ← resolveKnownBool (comps[0]?.getD "null")
@@ -4491,6 +4565,11 @@ partial def emitLetAndContinue (decl : LetDecl .impure) (k : Code .impure) : Emi
           modify fun st => { st with tuples := st.tuples.insert n strs }
         else
           let targetPairTy := toKotlinType decl.type
+          let monoPairTypes := (← read).monoPairTypes
+          let targetPairTy := if targetPairTy != "Any?" then targetPairTy else
+            match monoPairTypes[(kotlinLocalUserName strs[0]!, kotlinLocalUserName strs[1]!)]? with
+            | some (some t) => monoPairScalarKotlinType? t |>.getD targetPairTy
+            | _ => targetPairTy
           let (pairExpr, pairTy) ← formatKotlinPair strs (if targetPairTy != "Any?" then some targetPairTy else none)
           if !(← get).aliases.values.contains x && countUsesCode x k == 1 && (← usedBeforeSideEffect x k) then
             setParamVarName x pairExpr
@@ -5564,6 +5643,43 @@ partial def hoistCtorFieldInits (code : Code .impure) : EmitM (Code .impure) := 
   | .setTag x cidx k u => return .setTag x cidx (← hoistCtorFieldInits k) u
   | .return .. | .unreach .. | .jmp .. => return code
 
+/-- See `Context.monoPairTypes`. Arguments that are compiler temporaries are not recorded. -/
+def collectMonoPairTypes (decl : Decl .pure) : Std.HashMap (String × String) (Option Expr) := Id.run do
+  let .code c := decl.value | return {}
+  let userName (n : Name) : Option String :=
+    let s := n.eraseMacroScopes.toString
+    if s.isEmpty || s.startsWith "_" || !s.all (fun c => c.isAlphanum || c == '_') then none else some s
+  let mut names : Std.HashMap FVarId String := {}
+  for p in decl.params do
+    if let some n := userName p.binderName then names := names.insert p.fvarId n
+  let mut m : Std.HashMap (String × String) (Option Expr) := {}
+  let mut todo := #[c]
+  while !todo.isEmpty do
+    let c := todo.back!
+    todo := todo.pop
+    match c with
+    | .let d k =>
+      if let some n := userName d.binderName then names := names.insert d.fvarId n
+      if let .const ``Prod.mk _ #[_, _, .fvar a, .fvar b] := d.value then
+        if let (some na, some nb) := (names[a]?, names[b]?) then
+          m := m.insert (na, nb) (match m[(na, nb)]? with
+            | some (some t) => if t == d.type then some t else none
+            | some none => none
+            | none => some d.type)
+      todo := todo.push k
+    | .fun d k | .jp d k =>
+      for p in d.params do
+        if let some n := userName p.binderName then names := names.insert p.fvarId n
+      todo := (todo.push k).push d.value
+    | .cases cs =>
+      for alt in cs.alts do
+        if let .alt _ ps _ := alt then
+          for p in ps do
+            if let some n := userName p.binderName then names := names.insert p.fvarId n
+        todo := todo.push alt.getCode
+    | _ => pure ()
+  return m
+
 partial def collectMonoVarTypes (code : Code .pure) (m : Std.HashMap String Expr := {}) : Std.HashMap String Expr :=
   match code with
   | .let decl k =>
@@ -5637,7 +5753,7 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
         | none =>
           let c := (keptComps shape)[0]!
           let t? ← match env.find? decl.name with
-            | some ci => prodComponentKotlinType? (resultType ci.type) c
+            | some ci => withTypedArraysOf decl.name (prodComponentKotlinType? (resultType ci.type) c)
             | none => pure none
           -- A component that mentions a type parameter has loose bound variables after `resultType`: name the
           -- type parameter if this declaration declares it, and otherwise (compiler auxiliary declarations such as
@@ -5656,7 +5772,7 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
     | some md => pure (some md)
     | none => getMonoDecl? baseDeclName
   let declaredParamTys ← getFnDeclaredParamKotlinTypes env decl.name
-  let fnTypeInfo? ← (Meta.MetaM.run' do
+  let fnTypeInfo? ← withTypedArraysOf decl.name (Meta.MetaM.run' do
     if isAux then return none
     let some info := (env.find? decl.name).orElse (fun _ => env.find? baseDeclName) | return none
     let typeParams ← getDeclTypeParams env baseDeclName
@@ -5696,6 +5812,8 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
   let retType := if retUnit then "Unit" else retCast?.getD defaultRetTy
   let mut paramDecls : Array String := #[]
   let mut seenParamNames : Std.HashSet String := {}
+  let mut arrayParamCopies : Array String := #[]
+  let exclusiveParams := ((← read).summaries[decl.name]?.map (·.exclusive)).getD #[]
   for i in [:params.size] do
     if typeParamMask[i]?.getD false then
       setParamVarName params[i]!.fvarId ""
@@ -5731,6 +5849,11 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
       let rawPType := (override? emittedIdx).getD defaultParamTy
       let (paramAnno, pType) := splitKotlinParamAnnotations rawPType
       recordVarType pName pType
+      -- The body may update an exclusive array in place, but the JVM array of an `Array<T>` only
+      -- stores `T`s.
+      if (typedArrayElemType? pType).isSome && exclusiveParams[fullIdx]?.getD false then
+        arrayParamCopies := arrayParamCopies.push pName
+        recordVarType pName "Array<Any?>"
       if pType == "Any?" then
         if let some mp := monoDecl?.bind (·.params[fullIdx]?) then
           if isAdtMonoType mp.type then
@@ -5791,6 +5914,8 @@ def emitFnDeclCore (origParamNames : Array Name) (decl : Decl .impure) : EmitM U
       | none => {}
     withReader (fun ctx => { ctx with currFn := decl.name, currParams := params, currClass? := member?.map (·.className), retCast? := if retUnit then none else some retType, retUnit, retShape? := shape?, monoVarTypes }) do
       for p in params do discard <| classStructOf? p.fvarId
+      for pName in arrayParamCopies do
+        emitLn s!"val {pName}: Array<Any?> = Array<Any?>({pName}.size) \{ {pName}[it] }"
       -- The Lean body of a `@[kotlin_expr]` declaration is replaced by its template.
       let tmpl? ← if (Compiler.getKotlinExpr? env decl.name).isSome then
           emitExternCall? decl.name (params.map (.fvar ·.fvarId)) decl.type
@@ -5857,10 +5982,13 @@ def emitFnDecl (decl : Decl .impure) : EmitM Unit := do
   let unboxEnums ← match decl.name, decl.value with
     | .str _ "_boxed", .code c => collectUnboxEnums c
     | _, _ => pure {}
+  let monoPairTypes := match ← getMonoDecl? decl.name with
+    | some md => collectMonoPairTypes md
+    | none => {}
   withReader (fun ctx => { ctx with
       nonExclusiveArraySets := translate ctx.nonExclusiveArraySets
       rematerialize := translate ctx.rematerialize
-      unboxEnums })
+      unboxEnums, monoPairTypes })
     (emitFnDeclCore origParamNames decl)
 
 /-- Replaces each `// @LeanMembers(Cls)` line with the members of `Cls`, at the marker's indent. -/

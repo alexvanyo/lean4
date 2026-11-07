@@ -74,6 +74,10 @@ where
       else
         -- We only apply CSE to pure code
         let key := decl.value.toExpr
+        -- With `compiler.kotlin.typedArrays`, e.g. `#[] : Array UInt64` and `#[] : Array String` are
+        -- different Kotlin arrays although their values agree after type erasure.
+        let key := if (← getOptions).getBool `compiler.kotlin.typedArrays then
+          mkApp2 (mkConst `_cseTyped) decl.type key else key
         match (← get).map.find? key with
         | some fvarId =>
           replaceLet decl fvarId

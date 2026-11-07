@@ -1,0 +1,57 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+@PublishedApi internal fun f_ErasedSignedness_pushCell(cells: Array<Any?>, col: UInt, row: UInt): Array<Any?> {
+    return (cells.copyOf(cells.size + 1).also { it[cells.size] = Pair((col).toInt(), (row).toInt()) })
+}
+
+@PublishedApi internal fun f_ErasedSignedness_pushCell___boxed(cells: Any?, col: Any?, row: Any?): Any? {
+    val col_boxed_11_1 = leanUnboxUInt(col)
+    val row_boxed_12_2 = leanUnboxUInt(row)
+    return f_ErasedSignedness_pushCell((cells as Array<Any?>), col_boxed_11_1, row_boxed_12_2)
+}
+
+@PublishedApi internal fun f_ErasedSignedness_mkCell(col: UInt, row: UInt): Pair<Int, Int> {
+    return Pair((col).toInt(), (row).toInt())
+}
+
+@PublishedApi internal fun f_ErasedSignedness_mkCell___boxed(col: Any?, row: Any?): Any? {
+    val col_boxed_21_1 = leanUnboxUInt(col)
+    val row_boxed_22_2 = leanUnboxUInt(row)
+    return f_ErasedSignedness_mkCell(col_boxed_21_1, row_boxed_22_2)
+}
+
+@PublishedApi internal fun f_ErasedSignedness_widenSnd(c: Pair<Int, Int>): ULong {
+    val v_x_26_2 = c.second
+    return ((v_x_26_2).toUInt()).toULong()
+}
+
+@PublishedApi internal fun f_ErasedSignedness_widenSnd___boxed(c: Any?): Any? {
+    val res_29_1 = f_ErasedSignedness_widenSnd((run { val _p = c as Pair<*, *>; Pair(leanUnboxInt(_p.first), leanUnboxInt(_p.second)) }))
+    return res_29_1
+}
+
+@PublishedApi internal fun f_ErasedSignedness_widen(c: Int): ULong {
+    return (((c).toUInt()).toULong() + 1uL)
+}
+
+@PublishedApi internal fun f_ErasedSignedness_widen___boxed(c: Any?): Any? {
+    val c_boxed_36_1 = leanUnboxInt(c)
+    val res_37_2 = f_ErasedSignedness_widen(c_boxed_36_1)
+    return res_37_2
+}
+
+@PublishedApi internal fun f_ErasedSignedness_narrowToNat(c: UByte): Long {
+    return ((c).toByte()).toLong()
+}
+
+@PublishedApi internal fun f_ErasedSignedness_narrowToNat___boxed(c: Any?): Any? {
+    val c_boxed_42_1 = leanUnboxUByte(c)
+    val res_43_2 = f_ErasedSignedness_narrowToNat(c_boxed_42_1)
+    return res_43_2
+}
+
+
+private inline fun leanUnboxUByte(x: Any?): UByte = if (x is Byte) x.toUByte() else x as UByte
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

@@ -1,0 +1,102 @@
+// Generated automatically by Lean 4 to Kotlin compiler backend.
+// DO NOT EDIT DIRECTLY.
+@file:Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "NAME_SHADOWING", "RemoveRedundantBackticks", "ConstantConditionIf", "RedundantExplicitType", "RedundantCallOfConversionMethod", "USELESS_CAST", "NOTHING_TO_INLINE", "UNREACHABLE_CODE", "UNUSED_PARAMETER", "UNUSED_EXPRESSION", "SENSELESS_COMPARISON", "NO_TAIL_CALLS_FOUND", "NON_TAIL_RECURSIVE_CALL", "USELESS_IS_CHECK", "CAST_NEVER_SUCCEEDS", "UNNECESSARY_NOT_NULL_ASSERTION")
+class Named(val count: UInt, val items: Array<String>)
+
+@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0___closed__0(): String {
+    return ","
+}
+
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0(sz: Int, i: Int, bs: Any?): Unit {
+    if (!(i < sz))     {
+        return
+    } else     {
+        val v_6_1 = (bs as Array<Any?>)[i]
+        val fst_7_2 = (if (v_6_1 is Pair<*, *>) v_6_1.first else (v_6_1 as Array<*>)[1])
+        val snd_8_3 = (if (v_6_1 is Pair<*, *>) v_6_1.second else (v_6_1 as Array<*>)[2])
+        (bs as Array<Any?>)[i] = java.math.BigInteger.ZERO
+        val v_x_11_4 = leanUnboxUInt(fst_7_2)
+        val v_x_13_5 = ((v_x_11_4).toInt()).toString()
+        val v_x_14_6 = ","
+        val v_x_16_7 = leanUnboxUInt(snd_8_3)
+        val v_x_21_8 = (i + 1)
+        (bs as Array<Any?>)[i] = ((v_x_13_5 + v_x_14_6) + ((v_x_16_7).toInt()).toString())
+        f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0(sz, v_x_21_8, bs)
+        return
+    }
+}
+
+@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0___boxed(sz: Any?, i: Any?, bs: Any?): Unit {
+    val sz_boxed_27_1 = leanUnboxInt(sz)
+    val i_boxed_28_2 = leanUnboxInt(i)
+    f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0(sz_boxed_27_1, i_boxed_28_2, bs)
+    return
+}
+
+@PublishedApi internal fun f_TypedArrayOverrides_labels(xs: Array<Pair<UInt, UInt>>): Array<String> {
+    val xs: Array<Any?> = Array<Any?>(xs.size) { xs[it] }
+    val sz_31_1 = xs.size
+    f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_labels_spec__0(sz_31_1, 0, xs)
+    return (xs as Array<*>).let { a -> Array<String>(a.size) { i -> (a[i] as String) } }
+}
+
+@PublishedApi internal tailrec fun f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_names_spec__0(sz: Int, i: Int, bs: Any?): Unit {
+    if (!(i < sz))     {
+        return
+    } else     {
+        val v_38_1 = (bs as Array<Any?>)[i]
+        (bs as Array<Any?>)[i] = java.math.BigInteger.ZERO
+        val v_x_43_2 = (i + 1)
+        (bs as Array<Any?>)[i] = (v_38_1).toString()
+        f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_names_spec__0(sz, v_x_43_2, bs)
+        return
+    }
+}
+
+@PublishedApi internal fun f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_names_spec__0___boxed(sz: Any?, i: Any?, bs: Any?): Unit {
+    val sz_boxed_49_1 = leanUnboxInt(sz)
+    val i_boxed_50_2 = leanUnboxInt(i)
+    f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_names_spec__0(sz_boxed_49_1, i_boxed_50_2, bs)
+    return
+}
+
+@PublishedApi internal fun f_TypedArrayOverrides_names(n: java.math.BigInteger): Array<String> {
+    val v_x_53_1 = f_List_range(n)
+    val v_x_54_2 = (run { val tmp = ArrayList<Any?>(); var cur: Any? = v_x_53_1; while (((cur as Array<*>)[0] as Int) == 1) { tmp.add((cur as Array<*>)[1]); cur = (cur as Array<*>)[2] }; tmp.toTypedArray() })
+    val sz_55_3 = v_x_54_2.size
+    f___private_Init_Data_Array_Basic_0__Array_mapMUnsafe_map___at___00TypedArrayOverrides_names_spec__0(sz_55_3, 0, v_x_54_2)
+    return (v_x_54_2 as Array<*>).let { a -> Array<String>(a.size) { i -> (a[i] as String) } }
+}
+
+@PublishedApi internal fun f_TypedArrayOverrides_mkNamed(n: java.math.BigInteger): Named {
+    val v_x_59_1 = (n).toInt().toUInt()
+    val v_x_60_2 = f_TypedArrayOverrides_names(n)
+    return Named(v_x_59_1, v_x_60_2)
+}
+
+/**
+ * Returns a list of the numbers from `0` to `n` exclusive, in increasing order.
+ *
+ * `O(n)`.
+ *
+ * Examples:
+ * * `range 5 = [0, 1, 2, 3, 4]`
+ * * `range 0 = []`
+ * * `range 2 = [0, 1]`
+ */
+private fun f_List_range(n: java.math.BigInteger): Any? {
+    return f_List_range_loop(n, arrayOf<Any?>(0))
+}
+
+private tailrec fun f_List_range_loop(p_0: java.math.BigInteger, p_1: Any?): Any? {
+    if ((p_0 == java.math.BigInteger.ZERO))     {
+        return p_1
+    } else     {
+        val n_70_1 = (p_0.subtract(java.math.BigInteger.ONE).max(java.math.BigInteger.ZERO))
+        return f_List_range_loop(n_70_1, arrayOf<Any?>(1, n_70_1, p_1))
+    }
+}
+
+
+private inline fun leanUnboxInt(x: Any?): Int = if (x is UInt) x.toInt() else x as Int
+private inline fun leanUnboxUInt(x: Any?): UInt = if (x is Int) x.toUInt() else x as UInt

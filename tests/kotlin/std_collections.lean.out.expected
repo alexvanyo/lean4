@@ -1353,7 +1353,7 @@
 }
 
 @PublishedApi internal fun f_testScalarExtras(u8: UByte, u16: UShort, u32: UInt, u64: ULong, i8: Byte, i16: Short, i32: Int, i64: Long): ULong {
-    return ((((((((((maxOf(0, 7 - (u8).countLeadingZeroBits())).toUByte()).toULong() + ((maxOf(0, 15 - (u16).countLeadingZeroBits())).toUShort()).toULong()) + ((maxOf(0, 31 - (u32).countLeadingZeroBits())).toUInt()).toULong()) + (maxOf(0, 63 - (u64).countLeadingZeroBits())).toULong()) + ((run { val v = i8; if (v < 0) (-v.toInt()).toByte() else v })).toULong()) + ((run { val v = i16; if (v < 0) (-v.toInt()).toShort() else v })).toULong()) + ((run { val v = i32; if (v < 0) -v else v })).toULong()) + ((run { val v = i64; if (v < 0L) -v else v })).toULong()) + 42uL)
+    return ((((((((((maxOf(0, 7 - (u8).countLeadingZeroBits())).toUByte()).toULong() + ((maxOf(0, 15 - (u16).countLeadingZeroBits())).toUShort()).toULong()) + ((maxOf(0, 31 - (u32).countLeadingZeroBits())).toUInt()).toULong()) + (maxOf(0, 63 - (u64).countLeadingZeroBits())).toULong()) + (((run { val v = i8; if (v < 0) (-v.toInt()).toByte() else v })).toUByte()).toULong()) + (((run { val v = i16; if (v < 0) (-v.toInt()).toShort() else v })).toUShort()).toULong()) + (((run { val v = i32; if (v < 0) -v else v })).toUInt()).toULong()) + ((run { val v = i64; if (v < 0L) -v else v })).toULong()) + 42uL)
 }
 
 @PublishedApi internal fun f_testScalarExtras___boxed(u8: Any?, u16: Any?, u32: Any?, u64: Any?, i8: Any?, i16: Any?, i32: Any?, i64: Any?): Any? {

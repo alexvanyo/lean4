@@ -27,6 +27,28 @@ public register_builtin_option compiler.kotlin.nullableOption : Bool := {
     enabled by default by `lean -K`"
 }
 
+/-- Records whether the current module compiled declarations with `compiler.kotlin.typedArrays`. -/
+builtin_initialize kotlinTypedArraysExt : SimplePersistentEnvExtension Unit Bool ←
+  registerSimplePersistentEnvExtension {
+    addImportedFn := fun _ => false
+    addEntryFn := fun _ _ => true
+    asyncMode := .sync
+  }
+
+/-- Notes that the declarations being compiled use `compiler.kotlin.typedArrays`, if they do. -/
+public def recordKotlinTypedArrays : CoreM Unit := do
+  if compiler.kotlin.typedArrays.get (← getOptions) && !kotlinTypedArraysExt.getState (← getEnv) then
+    modifyEnv (kotlinTypedArraysExt.addEntry · ())
+
+/--
+Whether `declName` was compiled with `compiler.kotlin.typedArrays`, which may have been set in its
+module rather than in the current options.
+-/
+public def usesKotlinTypedArrays (env : Environment) (opts : Options) (declName : Name) : Bool :=
+  match env.getModuleIdxFor? declName with
+  | some idx => !(kotlinTypedArraysExt.getModuleEntries env idx).isEmpty
+  | none => kotlinTypedArraysExt.getState env || compiler.kotlin.typedArrays.get opts
+
 /-- Kotlin array type for `Array elemType` (with `compiler.kotlin.typedArrays`). -/
 public def kotlinArrayType (elemType : Lean.Expr) : String :=
   match elemType with
